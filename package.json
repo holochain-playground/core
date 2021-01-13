@@ -13,7 +13,8 @@
     "lint": "eslint --ext .ts,.html . --ignore-path .gitignore && prettier \"**/*.ts\" --check --ignore-path .gitignore",
     "format": "eslint --ext .ts,.html . --fix --ignore-path .gitignore && prettier \"**/*.ts\" --write --ignore-path .gitignore",
     "test": "tsc && wtr --coverage",
-    "test:watch": "tsc && concurrently -k -r \"tsc --watch --preserveWatchOutput\" \"wtr --watch\""
+    "test:watch": "tsc && concurrently -k -r \"tsc --watch --preserveWatchOutput\" \"wtr --watch\"",
+    "publish-to-branch": "npm run build && gh-pages -d dist -b build"
   },
   "dependencies": {
     "@holochain-open-dev/common": "git+https://github.com/holochain-open-dev/common.git#ui-build",
@@ -34,6 +35,7 @@
     "concurrently": "^5.3.0",
     "eslint": "^6.1.0",
     "eslint-config-prettier": "^6.11.0",
+    "gh-pages": "^3.1.0",
     "husky": "^1.0.0",
     "lint-staged": "^10.0.0",
     "prettier": "^2.0.4",
