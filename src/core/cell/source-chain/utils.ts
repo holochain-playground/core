@@ -18,17 +18,18 @@ export function getTipOfChain(cellState: CellState): Hash {
 }
 
 export function getAuthor(cellState: CellState): AgentPubKey {
-  return getHeaderAt(cellState, 0).author;
+  return getHeaderAt(cellState, 0).header.content.author;
 }
 
 export function getDnaHash(state: CellState): Hash {
   const firstHeaderHash = state.sourceChain[state.sourceChain.length - 1];
 
-  const dna: Dna = state.CAS[serializeHash(firstHeaderHash)];
-  return dna.hash;
+  const dna: SignedHeaderHashed<Dna> =
+    state.CAS[serializeHash(firstHeaderHash)];
+  return dna.header.content.hash;
 }
 
-export function getHeaderAt(cellState: CellState, index: number): Header {
+export function getHeaderAt(cellState: CellState, index: number): SignedHeaderHashed {
   const headerHash = cellState.sourceChain[index];
   return cellState.CAS[serializeHash(headerHash)];
 }

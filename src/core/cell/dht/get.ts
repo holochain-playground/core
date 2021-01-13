@@ -49,15 +49,15 @@ export function getHeadersForEntry(
   state: CellState,
   entryHash: Hash
 ): SignedHeaderHashed[] {
-  return (state.metadata.system_meta[serializeHash(entryHash)]
+  return state.metadata.system_meta[serializeHash(entryHash)]
     .map(h => {
       const hash = getSysMetaValHeaderHash(h);
       if (hash) {
-        state.CAS[serializeHash(hash)];
+        return state.CAS[serializeHash(hash)];
       }
       return undefined;
     })
-    .filter(header => !!header) as unknown) as SignedHeaderHashed[];
+    .filter(header => !!header);
 }
 
 export function getLinksForEntry(
