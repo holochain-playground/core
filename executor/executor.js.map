@@ -1,0 +1,1 @@
+{"version":3,"file":"executor.js","sourceRoot":"","sources":["../../src/executor/executor.ts"],"names":[],"mappings":"","sourcesContent":["export interface Task<T> {\n  name: string;\n  description: string;\n  task: () => Promise<T>;\n}\n\nexport interface Executor {\n  execute<T>(task: Task<T>): Promise<T>;\n}\n"]}
