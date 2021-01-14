@@ -10,6 +10,7 @@ import { CellState } from './cell/state';
 export interface ConductorState {
   cellsState: Array<{ id: CellId; state: CellState }>;
   networkState: NetworkState;
+  registeredTemplates: Dictionary<SimulatedDnaTemplate>;
   registeredDnas: Dictionary<SimulatedDna>;
 }
 
@@ -27,6 +28,7 @@ export class Conductor {
       cell: new Cell(this, state, this.network.createP2pCell(id)),
     }));
     this.registeredDnas = state.registeredDnas;
+    this.registeredTemplates = state.registeredTemplates;
   }
 
   static async create(): Promise<Conductor> {
@@ -36,6 +38,7 @@ export class Conductor {
         p2pCellsState: [],
       },
       registeredDnas: {},
+      registeredTemplates: {},
     };
 
     return new Conductor(state);
@@ -49,6 +52,7 @@ export class Conductor {
         state: c.cell.getState(),
       })),
       registeredDnas: this.registeredDnas,
+      registeredTemplates: this.registeredTemplates,
     };
   }
 
