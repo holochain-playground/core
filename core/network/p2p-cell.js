@@ -16,7 +16,7 @@ export class P2pCell {
     async leave(dnaHash, agent_pub_key) { }
     async publish(dht_hash, ops) {
         const neighbors = this._getClosestNeighbors(dht_hash, this.redundancyFactor);
-        const promises = neighbors.map(neighbor => this._sendMessage(neighbor, cell => cell.handle_publish(this.cellId[0], dht_hash, ops)));
+        const promises = neighbors.map(neighbor => this._sendMessage(neighbor, cell => cell.handle_publish(this.cellId[1], dht_hash, ops)));
         await Promise.all(promises);
     }
     async get(dna_hash, from_agent, dht_hash, _options // TODO: complete?
@@ -40,7 +40,7 @@ export class P2pCell {
             debugger;
             throw new Error('Agent was not found');
         }
-        return this.network.sendMessage(this.cellId[1], this.cellId[0], agentId, message);
+        return this.network.sendMessage(this.cellId[0], this.cellId[1], agentId, message);
     }
 }
 //# sourceMappingURL=p2p-cell.js.map

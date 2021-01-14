@@ -31,7 +31,7 @@ export class Network {
         }
     }
     createP2pCell(cellId) {
-        const peersOfTheSameDna = this.peerCells[serializeHash(cellId[1])];
+        const peersOfTheSameDna = this.peerCells[serializeHash(cellId[0])];
         const peersAlreadyKnown = peersOfTheSameDna
             ? Object.keys(peersOfTheSameDna).map(deserializeHash)
             : [];

@@ -9,11 +9,11 @@ export declare type CellSignal = 'after-workflow-executed' | 'before-workflow-ex
 export declare type CellSignalListener = (payload: any) => void;
 export declare class Cell {
     #private;
+    conductor: Conductor;
     state: CellState;
     p2p: P2pCell;
-    simulatedDna?: SimulatedDna | undefined;
     executor: Executor;
-    constructor(state: CellState, p2p: P2pCell, simulatedDna?: SimulatedDna | undefined);
+    constructor(conductor: Conductor, state: CellState, p2p: P2pCell);
     get cellId(): CellId;
     get agentPubKey(): AgentPubKey;
     get dnaHash(): Hash;
@@ -21,7 +21,8 @@ export declare class Cell {
         'after-workflow-executed': Subject<Task<any>>;
         'before-workflow-executed': Subject<Task<any>>;
     };
-    static create(conductor: Conductor, simulatedDna: SimulatedDna, agentId: AgentPubKey, membrane_proof: any): Promise<Cell>;
+    getSimulatedDna(): SimulatedDna;
+    static create(conductor: Conductor, cellId: CellId, membrane_proof: any): Promise<Cell>;
     getState(): CellState;
     triggerWorkflow(workflow: Task<any>): void;
     _runPendingWorkflows(): Promise<void>;

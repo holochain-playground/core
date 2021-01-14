@@ -1,17 +1,18 @@
 var _pendingWorkflows, _signals;
 import { __classPrivateFieldGet, __classPrivateFieldSet } from "tslib";
 import { Subject } from 'rxjs';
-import { getAgentPubKey } from '@holochain-open-dev/core-types';
+import { getAgentPubKey, } from '@holochain-open-dev/core-types';
 import { genesis } from './cell/workflows/genesis';
 import { ImmediateExecutor } from '../executor/immediate-executor';
 import { callZomeFn } from './cell/workflows/call_zome_fn';
 import { getCellId, getDnaHash } from './cell/source-chain/utils';
 import { incoming_dht_ops } from './cell/workflows/incoming_dht_ops';
+import { serializeHash } from '@holochain-open-dev/common';
 export class Cell {
-    constructor(state, p2p, simulatedDna) {
+    constructor(conductor, state, p2p) {
+        this.conductor = conductor;
         this.state = state;
         this.p2p = p2p;
-        this.simulatedDna = simulatedDna;
         this.executor = new ImmediateExecutor();
         _pendingWorkflows.set(this, []);
         _signals.set(this, {
@@ -31,7 +32,10 @@ export class Cell {
     get signals() {
         return __classPrivateFieldGet(this, _signals);
     }
-    static async create(conductor, simulatedDna, agentId, membrane_proof) {
+    getSimulatedDna() {
+        return this.conductor.registeredDnas[serializeHash(this.dnaHash)];
+    }
+    static async create(conductor, cellId, membrane_proof) {
         const newCellState = {
             CAS: {},
             integrationLimbo: {},
@@ -45,12 +49,12 @@ export class Cell {
             authoredDHTOps: {},
             sourceChain: [],
         };
-        const p2p = conductor.network.createP2pCell([agentId, simulatedDna.hash]);
-        const cell = new Cell(newCellState, p2p, simulatedDna);
+        const p2p = conductor.network.createP2pCell(cellId);
+        const cell = new Cell(conductor, newCellState, p2p);
         await cell.executor.execute({
             name: 'Genesis Workflow',
             description: 'Initialize the cell with all the needed databases',
-            task: () => genesis(agentId, simulatedDna.hash, membrane_proof)(cell),
+            task: () => genesis(cellId[1], cellId[0], membrane_proof)(cell),
         });
         return cell;
     }
@@ -64,7 +68,7 @@ export class Cell {
     async _runPendingWorkflows() {
         const workflowsToRun = __classPrivateFieldGet(this, _pendingWorkflows);
         __classPrivateFieldSet(this, _pendingWorkflows, []);
-        const promises = workflowsToRun.map((w) => {
+        const promises = workflowsToRun.map(w => {
             __classPrivateFieldGet(this, _signals)['before-workflow-executed'].next(w);
             this.executor
                 .execute(w)

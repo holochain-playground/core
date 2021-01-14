@@ -30,7 +30,7 @@ export function getElement(state, headerHash) {
 export function getCellId(state) {
     const author = getAuthor(state);
     const dna = getDnaHash(state);
-    return [author, dna];
+    return [dna, author];
 }
 export function getNonPublishedDhtOps(state) {
     const nonPublishedDhtOps = {};

@@ -1,3 +1,3 @@
 import { Conductor } from '../core/conductor';
-import { SimulatedDna } from '../dnas/simulated-dna';
-export declare function createConductors(conductorsToCreate: number, currentConductors: Conductor[], dna: SimulatedDna): Promise<Conductor[]>;
+import { SimulatedDnaTemplate } from '../dnas/simulated-dna';
+export declare function createConductors(conductorsToCreate: number, currentConductors: Conductor[], dnaTemplate: SimulatedDnaTemplate): Promise<Conductor[]>;

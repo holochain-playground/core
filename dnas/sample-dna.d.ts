@@ -1,3 +1,3 @@
-import { SimulatedDna, SimulatedZome } from './simulated-dna';
+import { SimulatedDnaTemplate, SimulatedZome } from './simulated-dna';
 export declare const sampleZome: SimulatedZome;
-export declare function sampleDna(): SimulatedDna;
+export declare function sampleDnaTemplate(): SimulatedDnaTemplate;

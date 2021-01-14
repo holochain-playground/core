@@ -1,11 +1,22 @@
-import { Hash } from '@holochain-open-dev/core-types';
+import { EntryVisibility } from '@holochain-open-dev/core-types';
 import { HdkAction } from '../core/cell/source-chain/actions';
-export declare type SimulatedZome = {
+export declare type SimulatedZomeFunctions = {
     [fnName: string]: (payload: any) => Array<HdkAction>;
 };
-export declare type SimulatedDna = {
-    hash: Hash;
-    zomes: {
-        [zome: string]: SimulatedZome;
-    };
+export interface SimulatedZome {
+    name: string;
+    entry_defs: Array<EntryDef>;
+    zome_functions: SimulatedZomeFunctions;
+}
+export declare type SimulatedDnaTemplate = {
+    zomes: Array<SimulatedZome>;
 };
+export interface SimulatedDna {
+    zomes: Array<SimulatedZome>;
+    properties: any;
+    uuid: string;
+}
+export interface EntryDef {
+    id: string;
+    visibility: EntryVisibility;
+}

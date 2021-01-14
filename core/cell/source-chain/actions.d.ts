@@ -1,4 +1,4 @@
-import { Entry, EntryType, Element } from '@holochain-open-dev/core-types';
-import { CellState } from '../state';
-export declare type HdkAction = (state: CellState) => Promise<Element>;
-export declare const create: (entry: Entry, entry_type: EntryType) => HdkAction;
+import { Element } from '@holochain-open-dev/core-types';
+import { Cell } from '../../cell';
+export declare type HdkAction = (zome_index: number, cell: Cell) => Promise<Element>;
+export declare const create_entry: (content: any, entry_def_id: string) => HdkAction;
