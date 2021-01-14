@@ -29,7 +29,10 @@ export function getDnaHash(state: CellState): Hash {
   return dna.header.content.hash;
 }
 
-export function getHeaderAt(cellState: CellState, index: number): SignedHeaderHashed {
+export function getHeaderAt(
+  cellState: CellState,
+  index: number
+): SignedHeaderHashed {
   const headerHash = cellState.sourceChain[index];
   return cellState.CAS[serializeHash(headerHash)];
 }
@@ -55,7 +58,7 @@ export function getElement(state: CellState, headerHash: Hash): Element {
 export function getCellId(state: CellState): CellId {
   const author = getAuthor(state);
   const dna = getDnaHash(state);
-  return [author, dna];
+  return [dna, author];
 }
 
 export function getNonPublishedDhtOps(state: CellState): Dictionary<DHTOp> {

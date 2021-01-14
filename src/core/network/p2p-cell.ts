@@ -46,7 +46,7 @@ export class P2pCell {
 
     const promises = neighbors.map(neighbor =>
       this._sendMessage(neighbor, cell =>
-        cell.handle_publish(this.cellId[0], dht_hash, ops)
+        cell.handle_publish(this.cellId[1], dht_hash, ops)
       )
     );
 
@@ -91,8 +91,8 @@ export class P2pCell {
     }
 
     return this.network.sendMessage(
-      this.cellId[1],
       this.cellId[0],
+      this.cellId[1],
       agentId,
       message
     );

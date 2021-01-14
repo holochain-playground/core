@@ -103,13 +103,17 @@ export class Conductor {
     payload: any;
     cap: string;
   }): Promise<any> {
+    const dnaHashStr = serializeHash(args.cellId[0]);
+    const agentPubKeyStr = serializeHash(args.cellId[1]);
     const cell = this.cells.find(
-      cell => cell.id[0] === args.cellId[0] && cell.id[1] === args.cellId[1]
+      cell =>
+        serializeHash(cell.id[0]) === dnaHashStr &&
+        serializeHash(cell.id[1]) === agentPubKeyStr
     );
 
     if (!cell)
       throw new Error(
-        `No cells existst with cellId ${args.cellId[0]}:${args.cellId[1]}`
+        `No cells existst with cellId ${dnaHashStr}:${agentPubKeyStr}`
       );
 
     return cell.cell.callZomeFn({
