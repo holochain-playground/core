@@ -1,10 +1,19 @@
 import { serializeHash } from '@holochain-open-dev/common';
 // @ts-ignore
 import blake from 'blakejs';
+function str2ab(str) {
+    var buf = new ArrayBuffer(str.length);
+    var bufView = new Uint8Array(buf);
+    for (var i = 0, strLen = str.length; i < strLen; i++) {
+        bufView[i] = str.charCodeAt(i);
+    }
+    return buf;
+}
 // From https://github.com/holochain/holochain/blob/dc0cb61d0603fa410ac5f024ed6ccfdfc29715b3/crates/holo_hash/src/encode.rs
 export function hash(content) {
     const contentString = typeof content === 'string' ? content : JSON.stringify(content);
-    return blake.blake2b(contentString, null, 32);
+    const hashable = new Uint8Array(str2ab(contentString));
+    return blake.blake2b(hashable, null, 32);
 }
 export const hashLocation = {};
 export function location(hash) {
