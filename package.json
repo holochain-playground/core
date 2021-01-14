@@ -14,7 +14,7 @@
     "format": "eslint --ext .ts,.html . --fix --ignore-path .gitignore && prettier \"**/*.ts\" --write --ignore-path .gitignore",
     "test": "tsc && wtr --coverage",
     "test:watch": "tsc && concurrently -k -r \"tsc --watch --preserveWatchOutput\" \"wtr --watch\"",
-    "publish-to-branch": "npm run build && gh-pages -d dist -b build"
+    "publish-to-branch": "npm run build && gh-pages -d ./ -b build"
   },
   "dependencies": {
     "@holochain-open-dev/common": "git+https://github.com/holochain-open-dev/common.git#ui-build",

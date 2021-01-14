@@ -1,16 +1,12 @@
-import {
-  EntryVisibility,
-} from '@holochain-open-dev/core-types';
+import { Dictionary, EntryVisibility } from '@holochain-open-dev/core-types';
 import { HdkAction } from '../core/cell/source-chain/actions';
 
-export type SimulatedZomeFunctions = {
-  [fnName: string]: (payload: any) => Array<HdkAction>;
-};
+export type SimulatedZomeFunction = (payload: any) => Array<HdkAction>;
 
 export interface SimulatedZome {
   name: string;
   entry_defs: Array<EntryDef>;
-  zome_functions: SimulatedZomeFunctions;
+  zome_functions: Dictionary<SimulatedZomeFunction>;
 }
 
 export type SimulatedDnaTemplate = {

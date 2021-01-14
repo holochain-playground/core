@@ -1,7 +1,5 @@
 import { Entry, EntryType, Element } from '@holochain-open-dev/core-types';
-import { buildCreate, buildShh, buildUpdate } from './builder-headers';
-import { CellState } from '../state';
-import { hash } from '../../../processors/hash';
+import { buildCreate, buildShh } from './builder-headers';
 import { Cell } from '../../cell';
 
 export type HdkAction = (zome_index: number, cell: Cell) => Promise<Element>;
