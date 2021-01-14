@@ -2,11 +2,8 @@ import { serializeHash } from '@holochain-open-dev/common';
 import { Dictionary, Hash } from '@holochain-open-dev/core-types';
 // @ts-ignore
 import blake from 'blakejs';
-import * as buffer from 'buffer';
 
 // From https://github.com/holochain/holochain/blob/dc0cb61d0603fa410ac5f024ed6ccfdfc29715b3/crates/holo_hash/src/encode.rs
-// @ts-ignore
-window.Buffer = buffer.Buffer;
 export function hash(content: any): Hash {
   const contentString =
     typeof content === 'string' ? content : JSON.stringify(content);

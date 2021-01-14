@@ -1,10 +1,7 @@
 import { serializeHash } from '@holochain-open-dev/common';
 // @ts-ignore
 import blake from 'blakejs';
-import * as buffer from 'buffer';
 // From https://github.com/holochain/holochain/blob/dc0cb61d0603fa410ac5f024ed6ccfdfc29715b3/crates/holo_hash/src/encode.rs
-// @ts-ignore
-window.Buffer = buffer.Buffer;
 export function hash(content) {
     const contentString = typeof content === 'string' ? content : JSON.stringify(content);
     return blake.blake2b(contentString, null, 32);
