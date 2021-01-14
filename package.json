@@ -1,5 +1,5 @@
 {
-  "name": "holochain-playground-core",
+  "name": "@holochain-playground/core",
   "version": "0.0.0",
   "description": "Webcomponent holochain-playground-core following open-wc recommendations",
   "author": "holochain-playground-core",

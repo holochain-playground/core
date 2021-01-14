@@ -1,11 +1,11 @@
 import { Conductor } from '../core/conductor';
-import { SimulatedDna } from '../dnas/simulated-dna';
+import { SimulatedDna, SimulatedDnaTemplate } from '../dnas/simulated-dna';
 import { hookUpConductors } from './message';
 
 export async function createConductors(
   conductorsToCreate: number,
   currentConductors: Conductor[],
-  dna: SimulatedDna
+  dnaTemplate: SimulatedDnaTemplate
 ): Promise<Conductor[]> {
   const newConductorsPromises: Promise<Conductor>[] = [];
   for (let i = 0; i < conductorsToCreate; i++) {
@@ -17,7 +17,12 @@ export async function createConductors(
 
   const allConductors = [...currentConductors, ...newConductors];
 
-  await Promise.all(allConductors.map(c => c.installDna(dna, null)));
+  await Promise.all(
+    allConductors.map(async c => {
+      const dnaHash = await c.registerDna(dnaTemplate);
+      await c.installApp(dnaHash, null, null, '');
+    })
+  );
 
   hookUpConductors(allConductors);
 

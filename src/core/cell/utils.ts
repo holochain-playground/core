@@ -24,7 +24,7 @@ export function getAppEntryType(
 export function getEntryTypeString(entryType: EntryType): string {
   const appEntryType = getAppEntryType(entryType);
   // TODO: FIX
-  if (appEntryType) return appEntryType.id;
+  if (appEntryType) return appEntryType.id.toString();
 
   return entryType as string;
 }

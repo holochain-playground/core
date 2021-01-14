@@ -1,6 +1,12 @@
-
 import { Observable, Subject } from 'rxjs';
-import { CellId, AgentPubKey, getAgentPubKey, Hash, Dictionary, DHTOp } from '@holochain-open-dev/core-types';
+import {
+  CellId,
+  AgentPubKey,
+  getAgentPubKey,
+  Hash,
+  Dictionary,
+  DHTOp,
+} from '@holochain-open-dev/core-types';
 import { Conductor } from './conductor';
 import { genesis } from './cell/workflows/genesis';
 import { Executor, Task } from '../executor/executor';
@@ -11,6 +17,7 @@ import { getCellId, getDnaHash } from './cell/source-chain/utils';
 import { P2pCell } from './network/p2p-cell';
 import { incoming_dht_ops } from './cell/workflows/incoming_dht_ops';
 import { CellState } from './cell/state';
+import { serializeHash } from '@holochain-open-dev/common';
 
 export type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export type CellSignalListener = (payload: any) => void;
@@ -26,9 +33,9 @@ export class Cell {
   };
 
   constructor(
+    public conductor: Conductor,
     public state: CellState,
-    public p2p: P2pCell,
-    public simulatedDna?: SimulatedDna | undefined
+    public p2p: P2pCell
   ) {}
 
   get cellId(): CellId {
@@ -47,10 +54,13 @@ export class Cell {
     return this.#signals;
   }
 
+  getSimulatedDna() {
+    return this.conductor.registeredDnas[serializeHash(this.dnaHash)];
+  }
+
   static async create(
     conductor: Conductor,
-    simulatedDna: SimulatedDna,
-    agentId: AgentPubKey,
+    cellId: CellId,
     membrane_proof: any
   ): Promise<Cell> {
     const newCellState: CellState = {
@@ -67,14 +77,14 @@ export class Cell {
       sourceChain: [],
     };
 
-    const p2p = conductor.network.createP2pCell([agentId, simulatedDna.hash]);
+    const p2p = conductor.network.createP2pCell(cellId);
 
-    const cell = new Cell(newCellState, p2p, simulatedDna);
+    const cell = new Cell(conductor, newCellState, p2p);
 
     await cell.executor.execute({
       name: 'Genesis Workflow',
       description: 'Initialize the cell with all the needed databases',
-      task: () => genesis(agentId, simulatedDna.hash, membrane_proof)(cell),
+      task: () => genesis(cellId[1], cellId[0], membrane_proof)(cell),
     });
 
     return cell;
@@ -94,7 +104,7 @@ export class Cell {
     const workflowsToRun = this.#pendingWorkflows;
     this.#pendingWorkflows = [];
 
-    const promises = workflowsToRun.map((w) => {
+    const promises = workflowsToRun.map(w => {
       this.#signals['before-workflow-executed'].next(w);
       this.executor
         .execute(w)

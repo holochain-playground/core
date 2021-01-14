@@ -9,31 +9,35 @@ import { produce_dht_ops_task } from './produce_dht_ops';
  * This can only be called in the simulated mode: we can assume that cell.simulatedDna exists
  */
 export const callZomeFn = (
-  zome: string,
+  zomeName: string,
   fnName: string,
   payload: any,
   cap: string
 ) => async (cell: Cell): Promise<any> => {
   const currentHeader = getTipOfChain(cell.state);
 
-  if (!cell.simulatedDna)
+  const dna = cell.getSimulatedDna();
+  if (!dna)
     throw new Error(
       `Trying to do a simulated call to a cell that is not simulated`
     );
 
-  if (!cell.simulatedDna.zomes[zome])
-    throw new Error(`There is no zome with the name ${zome} in this DNA`);
+  const zomeIndex = dna.zomes.findIndex(zome => zome.name === zomeName);
+  if (zomeIndex < 0)
+    throw new Error(`There is no zome with the name ${zomeName} in this DNA`);
 
-  if (!cell.simulatedDna.zomes[zome][fnName])
+  if (!dna.zomes[zomeIndex].zome_functions[fnName])
     throw new Error(
-      `There is function with the name ${fnName} in this zome with the name ${zome}`
+      `There is function with the name ${fnName} in this zome with the name ${zomeName}`
     );
 
-  const actions: HdkAction[] = cell.simulatedDna.zomes[zome][fnName](payload);
+  const actions: HdkAction[] = dna.zomes[zomeIndex].zome_functions[fnName](
+    payload
+  );
 
   let result;
   for (const action of actions) {
-    const element = await action(cell.state);
+    const element = await action(zomeIndex, cell);
 
     putElement(element)(cell.state);
 
