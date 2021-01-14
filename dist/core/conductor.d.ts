@@ -9,6 +9,7 @@ export interface ConductorState {
         state: CellState;
     }>;
     networkState: NetworkState;
+    registeredTemplates: Dictionary<SimulatedDnaTemplate>;
     registeredDnas: Dictionary<SimulatedDna>;
 }
 export declare class Conductor {

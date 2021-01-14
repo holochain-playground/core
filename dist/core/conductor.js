@@ -10,6 +10,7 @@ export class Conductor {
             cell: new Cell(this, state, this.network.createP2pCell(id)),
         }));
         this.registeredDnas = state.registeredDnas;
+        this.registeredTemplates = state.registeredTemplates;
     }
     static async create() {
         const state = {
@@ -18,6 +19,7 @@ export class Conductor {
                 p2pCellsState: [],
             },
             registeredDnas: {},
+            registeredTemplates: {},
         };
         return new Conductor(state);
     }
@@ -29,6 +31,7 @@ export class Conductor {
                 state: c.cell.getState(),
             })),
             registeredDnas: this.registeredDnas,
+            registeredTemplates: this.registeredTemplates,
         };
     }
     getCells(dnaHash) {
