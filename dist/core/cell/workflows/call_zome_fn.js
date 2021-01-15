@@ -1,4 +1,4 @@
-import { putElement } from '../source-chain/put';
+import { buildZomeFunctionContext } from '../../hdk/context';
 import { getTipOfChain } from '../source-chain/utils';
 import { produce_dht_ops_task } from './produce_dht_ops';
 /**
@@ -15,13 +15,8 @@ export const callZomeFn = (zomeName, fnName, payload, cap) => async (cell) => {
         throw new Error(`There is no zome with the name ${zomeName} in this DNA`);
     if (!dna.zomes[zomeIndex].zome_functions[fnName])
         throw new Error(`There is function with the name ${fnName} in this zome with the name ${zomeName}`);
-    const actions = dna.zomes[zomeIndex].zome_functions[fnName](payload);
-    let result;
-    for (const action of actions) {
-        const element = await action(zomeIndex, cell);
-        putElement(element)(cell.state);
-        result = element;
-    }
+    const context = buildZomeFunctionContext(zomeIndex, cell);
+    const result = dna.zomes[zomeIndex].zome_functions[fnName](context)(payload);
     if (getTipOfChain(cell.state) != currentHeader) {
         // Do validation
         // Trigger production of DHT Ops

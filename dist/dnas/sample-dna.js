@@ -1,4 +1,3 @@
-import { create_entry } from '../core/cell/source-chain/actions';
 export const sampleZome = {
     name: 'sample',
     entry_defs: [
@@ -8,11 +7,9 @@ export const sampleZome = {
         },
     ],
     zome_functions: {
-        create_entry: ({ content }) => [create_entry(content, 'sample_entry')],
-        update_entry: ({ content, type, original_header_hash }) => [],
-        delete_entry: ({ deletes_address }) => [],
-        create_link: ({ base, target, tag }) => [],
-        delete_link: ({ link_add_address }) => [],
+        create_entry: ({ create_entry }) => ({ content }) => {
+            return create_entry(content, 'sample_entry');
+        },
     },
 };
 export function sampleDnaTemplate() {

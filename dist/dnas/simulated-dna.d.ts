@@ -1,6 +1,8 @@
-import { Dictionary, EntryVisibility } from '@holochain-open-dev/core-types';
-import { HdkAction } from '../core/cell/source-chain/actions';
-export declare type SimulatedZomeFunction = (payload: any) => Array<HdkAction>;
+import { Dictionary, EntryVisibility, Hash } from '@holochain-open-dev/core-types';
+export interface SimulatedZomeFunctionContext {
+    create_entry: (content: any, entry_def_id: string) => Promise<Hash>;
+}
+export declare type SimulatedZomeFunction = (context: SimulatedZomeFunctionContext) => (payload: any) => Promise<any>;
 export interface SimulatedZome {
     name: string;
     entry_defs: Array<EntryDef>;

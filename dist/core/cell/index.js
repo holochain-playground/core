@@ -1,6 +1,5 @@
 export * from './dht/get';
 export * from './dht/put';
-export * from './source-chain/actions';
 export * from './source-chain/get';
 export * from './source-chain/put';
 export * from './source-chain/utils';
