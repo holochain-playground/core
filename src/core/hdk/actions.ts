@@ -1,23 +1,35 @@
-import { Entry, EntryType, Element } from '@holochain-open-dev/core-types';
-import { buildCreate, buildShh } from './builder-headers';
-import { Cell } from '../../cell';
+import {
+  Entry,
+  EntryType,
+  Element,
+  Hash,
+} from '@holochain-open-dev/core-types';
+import { Cell } from '../cell';
+import { buildCreate, buildShh } from '../cell/source-chain/builder-headers';
+import { putElement } from '../cell/source-chain/put';
 
-export type HdkAction = (zome_index: number, cell: Cell) => Promise<Element>;
+export type HostFunction<A, R> = (
+  zome_index: number,
+  cell: Cell
+) => (args: A) => Promise<R>;
 
 // Creates a new Create header and its entry in the source chain
-export const create_entry = (
-  content: any,
-  entry_def_id: string
-): HdkAction => async (zome_index: number, cell: Cell): Promise<Element> => {
-  const entry: Entry = { entry_type: 'App', content };
+export const create_entry: HostFunction<
+  { content: any; entry_def_id: string },
+  Hash
+> = (zome_index: number, cell: Cell) => async (args: {
+  content: any;
+  entry_def_id: string;
+}): Promise<Hash> => {
+  const entry: Entry = { entry_type: 'App', content: args.content };
   const dna = cell.getSimulatedDna();
 
   const entryDefIndex = dna.zomes[zome_index].entry_defs.findIndex(
-    entry_def => entry_def.id === entry_def_id
+    entry_def => entry_def.id === args.entry_def_id
   );
   if (entryDefIndex < 0) {
     throw new Error(
-      `Given entry def id ${entry_def_id} does not exist in this zome`
+      `Given entry def id ${args.entry_def_id} does not exist in this zome`
     );
   }
 
@@ -35,8 +47,9 @@ export const create_entry = (
     signed_header: buildShh(create),
     entry,
   };
+  putElement(element)(cell.state);
 
-  return element;
+  return element.signed_header.header.hash;
 };
 
 // Creates a new Create header and its entry in the source chain

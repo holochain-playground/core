@@ -3,6 +3,8 @@ export * from './core/cell/index';
 export * from './core/network';
 export * from './core/conductor';
 
+export * from './core/hdk/index';
+
 export * from './dnas/simulated-dna';
 export * from './dnas/sample-dna';
 
