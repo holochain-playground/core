@@ -9,14 +9,18 @@ export const sampleZome: SimulatedZome = {
     },
   ],
   zome_functions: {
-    create_entry: ({ create_entry }) => ({ content }) => {
-      return create_entry(content, 'sample_entry');
+    create_entry: {
+      call: ({ create_entry }) => ({ content }) => {
+        return create_entry(content, 'sample_entry');
+      },
+      arguments: [{ name: 'content', type: 'any' }],
     },
-/*     update_entry: ({ content, type, original_header_hash }) => [],
+    /*     update_entry: ({ content, type, original_header_hash }) => [],
     delete_entry: ({ deletes_address }) => [],
     create_link: ({ base, target, tag }) => [],
     delete_link: ({ link_add_address }) => [],
- */  },
+ */
+  },
 };
 
 export function sampleDnaTemplate(): SimulatedDnaTemplate {

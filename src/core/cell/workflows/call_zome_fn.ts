@@ -32,7 +32,7 @@ export const callZomeFn = (
 
   const context = buildZomeFunctionContext(zomeIndex, cell);
 
-  const result = dna.zomes[zomeIndex].zome_functions[fnName](context)(payload);
+  const result = dna.zomes[zomeIndex].zome_functions[fnName].call(context)(payload);
 
   if (getTipOfChain(cell.state) != currentHeader) {
     // Do validation
