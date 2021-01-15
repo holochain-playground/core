@@ -7,8 +7,11 @@ export const sampleZome = {
         },
     ],
     zome_functions: {
-        create_entry: ({ create_entry }) => ({ content }) => {
-            return create_entry(content, 'sample_entry');
+        create_entry: {
+            call: ({ create_entry }) => ({ content }) => {
+                return create_entry(content, 'sample_entry');
+            },
+            arguments: [{ name: 'content', type: 'any' }],
         },
     },
 };

@@ -16,7 +16,7 @@ export const callZomeFn = (zomeName, fnName, payload, cap) => async (cell) => {
     if (!dna.zomes[zomeIndex].zome_functions[fnName])
         throw new Error(`There is function with the name ${fnName} in this zome with the name ${zomeName}`);
     const context = buildZomeFunctionContext(zomeIndex, cell);
-    const result = dna.zomes[zomeIndex].zome_functions[fnName](context)(payload);
+    const result = dna.zomes[zomeIndex].zome_functions[fnName].call(context)(payload);
     if (getTipOfChain(cell.state) != currentHeader) {
         // Do validation
         // Trigger production of DHT Ops
