@@ -1,5 +1,5 @@
 import { AgentPubKey, CellId, DHTOp, Dictionary, Hash } from '@holochain-open-dev/core-types';
-import { Network } from '../network';
+import { Network } from './network';
 export declare type P2pCellState = {
     peers: Hash[];
     redundancyFactor: number;

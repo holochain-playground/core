@@ -15,3 +15,4 @@ export * from './workflows/sys_validation';
 export * from './workflows/workflows';
 export * from './state';
 export * from './utils';
+export * from './cell';

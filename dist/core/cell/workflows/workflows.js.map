@@ -1,1 +1,0 @@
-{"version":3,"file":"workflows.js","sourceRoot":"","sources":["../../../../src/core/cell/workflows/workflows.ts"],"names":[],"mappings":"","sourcesContent":["import { Cell } from '../../cell';\n\nexport type WorkFlow = (cell: Cell) => Promise<void>;\n"]}

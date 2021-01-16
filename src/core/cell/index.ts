@@ -18,3 +18,4 @@ export * from './workflows/workflows';
 
 export * from './state';
 export * from './utils';
+export * from './cell';

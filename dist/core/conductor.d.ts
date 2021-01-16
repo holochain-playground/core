@@ -1,6 +1,6 @@
 import { CellId, Dictionary, Hash } from '@holochain-open-dev/core-types';
 import { Cell } from '../core/cell';
-import { Network, NetworkState } from './network';
+import { Network, NetworkState } from './network/network';
 import { SimulatedDna, SimulatedDnaTemplate } from '../dnas/simulated-dna';
 import { CellState } from './cell/state';
 export interface ConductorState {
