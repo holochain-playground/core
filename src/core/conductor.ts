@@ -2,7 +2,7 @@ import { CellId, Dictionary, Hash } from '@holochain-open-dev/core-types';
 import { serializeHash } from '@holochain-open-dev/common';
 import { Cell } from '../core/cell';
 import { hash } from '../processors/hash';
-import { Network, NetworkState } from './network';
+import { Network, NetworkState } from './network/network';
 
 import { SimulatedDna, SimulatedDnaTemplate } from '../dnas/simulated-dna';
 import { CellState } from './cell/state';

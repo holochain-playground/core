@@ -6,7 +6,7 @@ import {
   Hash,
 } from '@holochain-open-dev/core-types';
 import { compareBigInts, distance } from '../../processors/hash';
-import { Network, NetworkMessage } from '../network';
+import { Network, NetworkMessage } from './network';
 
 export type P2pCellState = {
   peers: Hash[];

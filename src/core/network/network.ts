@@ -1,8 +1,8 @@
 import { deserializeHash, serializeHash } from '@holochain-open-dev/common';
 import { CellId, Dictionary, Hash } from '@holochain-open-dev/core-types';
-import { Cell } from './cell';
-import { Conductor } from './conductor';
-import { P2pCell, P2pCellState } from './network/p2p-cell';
+import { Cell } from '../cell';
+import { Conductor } from '../conductor';
+import { P2pCell, P2pCellState } from '../network/p2p-cell';
 
 export interface NetworkState {
   p2pCellsState: Array<{ id: CellId; state: P2pCellState }>; // P2pCellState by dna hash

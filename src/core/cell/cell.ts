@@ -7,16 +7,15 @@ import {
   Dictionary,
   DHTOp,
 } from '@holochain-open-dev/core-types';
-import { Conductor } from './conductor';
-import { genesis } from './cell/workflows/genesis';
-import { Executor, Task } from '../executor/executor';
-import { ImmediateExecutor } from '../executor/immediate-executor';
-import { callZomeFn } from './cell/workflows/call_zome_fn';
-import { SimulatedDna } from '../dnas/simulated-dna';
-import { getCellId, getDnaHash } from './cell/source-chain/utils';
-import { P2pCell } from './network/p2p-cell';
-import { incoming_dht_ops } from './cell/workflows/incoming_dht_ops';
-import { CellState } from './cell/state';
+import { Conductor } from '../conductor';
+import { genesis } from './workflows/genesis';
+import { Executor, Task } from '../../executor/executor';
+import { ImmediateExecutor } from '../../executor/immediate-executor';
+import { callZomeFn } from './workflows/call_zome_fn';
+import { getCellId, getDnaHash } from './source-chain/utils';
+import { P2pCell } from '../network/p2p-cell';
+import { incoming_dht_ops } from './workflows/incoming_dht_ops';
+import { CellState } from './state';
 import { serializeHash } from '@holochain-open-dev/common';
 
 export type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
