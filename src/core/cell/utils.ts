@@ -1,5 +1,7 @@
 import {
+  AgentPubKey,
   AppEntryType,
+  CellId,
   DHTOp,
   DHTOpType,
   Entry,
