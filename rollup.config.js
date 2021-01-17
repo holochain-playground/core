@@ -9,6 +9,7 @@ export default {
   output: {
     dir: './dist',
     format: 'es',
+    sourcemap: true,
   },
   external: [...Object.keys(pkg.dependencies).filter(key => key !== 'blakejs')],
   plugins: [
