@@ -8,16 +8,21 @@ import { Cell } from '../cell';
 import { buildCreate, buildShh } from '../cell/source-chain/builder-headers';
 import { putElement } from '../cell/source-chain/put';
 
-export type HostFunction<A, R> = (
+export type HostFunction<Fn extends Function> = (
   zome_index: number,
   cell: Cell
-) => (args: A) => Promise<R>;
+) => Fn;
+
+export type CreateEntry = (args: {
+  content: any;
+  entry_def_id: string;
+}) => Promise<Hash>;
 
 // Creates a new Create header and its entry in the source chain
-export const create_entry: HostFunction<
-  { content: any; entry_def_id: string },
-  Hash
-> = (zome_index: number, cell: Cell) => async (args: {
+export const create_entry: HostFunction<CreateEntry> = (
+  zome_index: number,
+  cell: Cell
+): CreateEntry => async (args: {
   content: any;
   entry_def_id: string;
 }): Promise<Hash> => {

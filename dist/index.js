@@ -1468,7 +1468,7 @@ const sampleZome = {
     zome_functions: {
         create_entry: {
             call: ({ create_entry }) => ({ content }) => {
-                return create_entry(content, 'sample_entry');
+                return create_entry({ content, entry_def_id: 'sample_entry' });
             },
             arguments: [{ name: 'content', type: 'any' }],
         },
@@ -1512,3 +1512,4 @@ async function buildSimulatedPlayground(numConductors) {
 }
 
 export { Cell, Conductor, ImmediateExecutor, Network, P2pCell, ValidationLimboStatus, ValidationStatus, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildDna, buildShh, buildSimulatedPlayground, buildUpdate, buildZomeFunctionContext, callZomeFn, compareBigInts, createConductors, create_entry, deleteValidationLimboValue, distance, genesis, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHeaderAt, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, hashLocation, incoming_dht_ops, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sys_validation, sys_validation_task };
+//# sourceMappingURL=index.js.map

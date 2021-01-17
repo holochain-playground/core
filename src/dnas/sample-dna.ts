@@ -11,7 +11,7 @@ export const sampleZome: SimulatedZome = {
   zome_functions: {
     create_entry: {
       call: ({ create_entry }) => ({ content }) => {
-        return create_entry(content, 'sample_entry');
+        return create_entry({ content, entry_def_id: 'sample_entry' });
       },
       arguments: [{ name: 'content', type: 'any' }],
     },

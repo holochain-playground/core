@@ -1,7 +1,8 @@
 import { Hash } from '@holochain-open-dev/core-types';
 import { Cell } from '../cell';
-export declare type HostFunction<A, R> = (zome_index: number, cell: Cell) => (args: A) => Promise<R>;
-export declare const create_entry: HostFunction<{
+export declare type HostFunction<Fn extends Function> = (zome_index: number, cell: Cell) => Fn;
+export declare type CreateEntry = (args: {
     content: any;
     entry_def_id: string;
-}, Hash>;
+}) => Promise<Hash>;
+export declare const create_entry: HostFunction<CreateEntry>;
