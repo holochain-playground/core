@@ -2,7 +2,6 @@ import { Observable, Subject } from 'rxjs';
 import {
   CellId,
   AgentPubKey,
-  getAgentPubKey,
   Hash,
   Dictionary,
   DHTOp,
@@ -42,11 +41,11 @@ export class Cell {
   }
 
   get agentPubKey(): AgentPubKey {
-    return getAgentPubKey(this.cellId);
+    return this.cellId[1];
   }
 
   get dnaHash(): Hash {
-    return getDnaHash(this.state);
+    return this.cellId[0];
   }
 
   get signals() {

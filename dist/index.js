@@ -1,5 +1,5 @@
 import { serializeHash, deserializeHash, now } from '@holochain-open-dev/common';
-import { getSysMetaValHeaderHash, DHTOpType, getEntry, HeaderType, EntryDhtStatus, ChainStatus, elementToDHTOps, getAgentPubKey } from '@holochain-open-dev/core-types';
+import { getSysMetaValHeaderHash, DHTOpType, getEntry, HeaderType, EntryDhtStatus, ChainStatus, elementToDHTOps } from '@holochain-open-dev/core-types';
 import { uniq } from 'lodash-es';
 import { Subject } from 'rxjs';
 
@@ -1218,10 +1218,10 @@ class Cell {
         return getCellId(this.state);
     }
     get agentPubKey() {
-        return getAgentPubKey(this.cellId);
+        return this.cellId[1];
     }
     get dnaHash() {
-        return getDnaHash(this.state);
+        return this.cellId[0];
     }
     get signals() {
         return this.#signals;
