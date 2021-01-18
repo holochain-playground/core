@@ -1,5 +1,6 @@
 import { deserializeHash, serializeHash } from '@holochain-open-dev/common';
 import { CellId, Dictionary, Hash } from '@holochain-open-dev/core-types';
+import { isEqual } from 'lodash-es';
 import { Cell } from '../cell';
 import { Conductor } from '../conductor';
 import { P2pCell, P2pCellState } from '../network/p2p-cell';
@@ -15,7 +16,7 @@ export class Network {
   // Cell connection segmentated by [dna][agent_pub_key]
   peerCells: Dictionary<Dictionary<Cell>>;
 
-  constructor(state: NetworkState) {
+  constructor(state: NetworkState, public conductor: Conductor) {
     this.p2pCells = state.p2pCellsState.map(s => ({
       id: s.id,
       p2pCell: new P2pCell(s.state, s.id, this),
@@ -71,6 +72,12 @@ export class Network {
     toAgent: Hash,
     message: NetworkMessage<T>
   ): Promise<T> {
+    const localCell = this.conductor.cells.find(
+      cell => isEqual(cell.id[0], dna) && isEqual(cell.id[1], toAgent)
+    );
+
+    if (localCell) return message(localCell.cell);
+
     return message(this.peerCells[serializeHash(dna)][serializeHash(toAgent)]);
   }
 }

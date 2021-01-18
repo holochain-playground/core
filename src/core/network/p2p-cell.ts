@@ -70,11 +70,13 @@ export class P2pCell {
     basisHash: Hash,
     neighborCount: number
   ): Array<AgentPubKey> {
-    const sortedPeers = this.peers.sort((agentA: Hash, agentB: Hash) => {
-      const distanceA = distance(basisHash, agentA);
-      const distanceB = distance(basisHash, agentB);
-      return compareBigInts(distanceA, distanceB);
-    });
+    const sortedPeers = [...this.peers, this.cellId[1]].sort(
+      (agentA: Hash, agentB: Hash) => {
+        const distanceA = distance(basisHash, agentA);
+        const distanceB = distance(basisHash, agentB);
+        return compareBigInts(distanceA, distanceB);
+      }
+    );
 
     return sortedPeers.slice(0, neighborCount);
   }
@@ -83,17 +85,10 @@ export class P2pCell {
     toAgent: AgentPubKey,
     message: NetworkMessage<T>
   ): Promise<T> {
-    const agentId = this.peers.find(agent => agent === toAgent);
-
-    if (!agentId) {
-      debugger;
-      throw new Error('Agent was not found');
-    }
-
     return this.network.sendMessage(
       this.cellId[0],
       this.cellId[1],
-      agentId,
+      toAgent,
       message
     );
   }
