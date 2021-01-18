@@ -1075,16 +1075,18 @@ const hash_entry = (zome_index, cell) => async (args) => {
 };
 
 async function ensure(path, hdk) {
-    const components = path.split('.');
-    const parent = components.splice(components.length - 1, 1).join('.');
-    await ensure(parent, hdk);
     const headerHash = await hdk.create_entry({
         content: path,
         entry_def_id: 'path',
     });
-    const parentHash = await hdk.hash_entry({ content: parent });
-    const pathHash = await hdk.hash_entry({ content: parent });
-    await hdk.create_link({ base: parentHash, target: pathHash, tag: null });
+    const components = path.split('.');
+    if (components.length > 1) {
+        const parent = components.splice(components.length - 1, 1).join('.');
+        await ensure(parent, hdk);
+        const pathHash = await hdk.hash_entry({ content: path });
+        const parentHash = await hdk.hash_entry({ content: parent });
+        await hdk.create_link({ base: parentHash, target: pathHash, tag: null });
+    }
 }
 const path = {
     ensure,

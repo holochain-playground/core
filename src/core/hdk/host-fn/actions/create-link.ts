@@ -1,6 +1,4 @@
 import {
-  Entry,
-  EntryType,
   Element,
   Hash,
 } from '@holochain-open-dev/core-types';
