@@ -9,6 +9,7 @@ import {
   EntryDetails,
   NewEntryHeader,
   SignedHeaderHashed,
+  DHTOpType,
 } from '@holochain-open-dev/core-types';
 import { uniq } from 'lodash-es';
 import {
@@ -98,19 +99,15 @@ export function getEntryDetails(
 }
 
 export function getAllHeldEntries(state: CellState): Hash[] {
-  const allHeaders = Object.values(state.integratedDHTOps).map(
-    dhtOpValue => dhtOpValue.op.header
-  );
-
-  const newEntryHeaders = allHeaders.filter(
-    h => (h.header.content as NewEntryHeader).entry_hash
-  );
+  const newEntryHeaders = Object.values(state.integratedDHTOps)
+    .filter(dhtOpValue => dhtOpValue.op.type === DHTOpType.StoreEntry)
+    .map(dhtOpValue => dhtOpValue.op.header);
 
   const allEntryHashes = newEntryHeaders.map(
     h => (h.header.content as NewEntryHeader).entry_hash
   );
 
-  return uniq(allEntryHashes.map(serializeHash)).map(deserializeHash);
+  return uniq(allEntryHashes);
 }
 
 export function getAllAuthoredEntries(state: CellState): Hash[] {
