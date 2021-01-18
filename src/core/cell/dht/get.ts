@@ -113,6 +113,18 @@ export function getAllHeldEntries(state: CellState): Hash[] {
   return uniq(allEntryHashes.map(serializeHash)).map(deserializeHash);
 }
 
+export function getAllAuthoredEntries(state: CellState): Hash[] {
+  const allHeaders = Object.values(state.authoredDHTOps).map(
+    dhtOpValue => dhtOpValue.op.header
+  );
+
+  const newEntryHeaders: SignedHeaderHashed<NewEntryHeader>[] = allHeaders.filter(
+    h => (h.header.content as NewEntryHeader).entry_hash
+  ) as SignedHeaderHashed<NewEntryHeader>[];
+
+  return newEntryHeaders.map(h => h.header.content.entry_hash);
+}
+
 export function isHoldingEntry(state: CellState, entryHash: Hash): boolean {
   return state.metadata.system_meta[serializeHash(entryHash)] !== undefined;
 }
