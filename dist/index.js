@@ -851,7 +851,7 @@ const putElement = (element) => (state) => {
     state.CAS[serializeHash(headerHash)] = element.signed_header;
     // Put entry in CAS if it exist
     if (element.entry) {
-        const entryHash = hash(element.entry);
+        const entryHash = hashEntry(element.entry);
         state.CAS[serializeHash(entryHash)] = element.entry;
     }
     state.sourceChain.unshift(headerHash);
