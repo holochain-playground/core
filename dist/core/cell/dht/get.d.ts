@@ -7,6 +7,7 @@ export declare function getLinksForEntry(state: CellState, entryHash: Hash): Lin
 export declare function getEntryDhtStatus(state: CellState, entryHash: Hash): EntryDhtStatus | undefined;
 export declare function getEntryDetails(state: CellState, entryHash: Hash): EntryDetails;
 export declare function getAllHeldEntries(state: CellState): Hash[];
+export declare function getAllAuthoredEntries(state: CellState): Hash[];
 export declare function isHoldingEntry(state: CellState, entryHash: Hash): boolean;
 export interface EntryDHTInfo {
     details: EntryDetails;

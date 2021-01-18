@@ -56,6 +56,11 @@ function getAllHeldEntries(state) {
     const allEntryHashes = newEntryHeaders.map(h => h.header.content.entry_hash);
     return uniq(allEntryHashes.map(serializeHash)).map(deserializeHash);
 }
+function getAllAuthoredEntries(state) {
+    const allHeaders = Object.values(state.authoredDHTOps).map(dhtOpValue => dhtOpValue.op.header);
+    const newEntryHeaders = allHeaders.filter(h => h.header.content.entry_hash);
+    return newEntryHeaders.map(h => h.header.content.entry_hash);
+}
 function isHoldingEntry(state, entryHash) {
     return state.metadata.system_meta[serializeHash(entryHash)] !== undefined;
 }
@@ -1511,5 +1516,5 @@ async function buildSimulatedPlayground(numConductors) {
     return createConductors(numConductors, [], sampleDnaTemplate());
 }
 
-export { Cell, Conductor, ImmediateExecutor, Network, P2pCell, ValidationLimboStatus, ValidationStatus, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildDna, buildShh, buildSimulatedPlayground, buildUpdate, buildZomeFunctionContext, callZomeFn, compareBigInts, createConductors, create_entry, deleteValidationLimboValue, distance, genesis, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHeaderAt, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, hashLocation, incoming_dht_ops, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sys_validation, sys_validation_task };
+export { Cell, Conductor, ImmediateExecutor, Network, P2pCell, ValidationLimboStatus, ValidationStatus, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildDna, buildShh, buildSimulatedPlayground, buildUpdate, buildZomeFunctionContext, callZomeFn, compareBigInts, createConductors, create_entry, deleteValidationLimboValue, distance, genesis, getAllAuthoredEntries, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHeaderAt, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, hashLocation, incoming_dht_ops, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sys_validation, sys_validation_task };
 //# sourceMappingURL=index.js.map
