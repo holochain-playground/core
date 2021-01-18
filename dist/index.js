@@ -1355,13 +1355,13 @@ class Network {
     // TODO: change this to simulate networking if necessary
     connectWith(conductor) {
         for (const myCell of this.p2pCells) {
-            const cellDna = serializeHash(myCell.id[1]);
+            const cellDna = serializeHash(myCell.id[0]);
             for (const cell of conductor.cells) {
-                if (serializeHash(cell.id[1]) === cellDna) {
+                if (serializeHash(cell.id[0]) === cellDna) {
                     if (!this.peerCells[cellDna])
                         this.peerCells[cellDna] = {};
-                    this.peerCells[cellDna][serializeHash(cell.id[0])] = cell.cell;
-                    myCell.p2pCell.peers.push(cell.id[0]);
+                    this.peerCells[cellDna][serializeHash(cell.id[1])] = cell.cell;
+                    myCell.p2pCell.peers.push(cell.id[1]);
                 }
             }
         }
