@@ -1,6 +1,5 @@
-import { Hash } from '@holochain-open-dev/core-types';
-import { hash } from '../../../processors/hash';
-import { Cell } from '../../cell';
+import { Entry, Hash } from '@holochain-open-dev/core-types';
+import { Cell, hashEntry } from '../../cell';
 import { HostFn } from '../host-fn';
 
 export type HashEntry = (args: { content: any }) => Promise<Hash>;
@@ -9,6 +8,7 @@ export type HashEntry = (args: { content: any }) => Promise<Hash>;
 export const hash_entry: HostFn<HashEntry> = (
   zome_index: number,
   cell: Cell
-): HashEntry => async (args: { content: any }): Promise<Hash> => {
-  return hash(args.content);
+): HashEntry => async (args): Promise<Hash> => {
+  const entry: Entry = { entry_type: 'App', content: args.content };
+  return hashEntry(entry);
 };

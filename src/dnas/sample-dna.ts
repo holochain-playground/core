@@ -7,6 +7,10 @@ export const sampleZome: SimulatedZome = {
       id: 'sample_entry',
       visibility: 'Public',
     },
+    {
+      id: 'path',
+      visibility: 'Public',
+    },
   ],
   zome_functions: {
     create_entry: {
