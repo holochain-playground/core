@@ -7,8 +7,11 @@ import {
   Entry,
   EntryType,
   Hash,
+  NewEntryHeader,
 } from '@holochain-open-dev/core-types';
+import { head } from 'lodash-es';
 import { hash } from '../../processors/hash';
+import { Cell } from './cell';
 
 export function hashEntry(entry: Entry): Hash {
   if (entry.entry_type === 'Agent') return entry.content;
@@ -23,10 +26,13 @@ export function getAppEntryType(
   return undefined;
 }
 
-export function getEntryTypeString(entryType: EntryType): string {
+export function getEntryTypeString(cell: Cell, entryType: EntryType): string {
   const appEntryType = getAppEntryType(entryType);
-  // TODO: FIX
-  if (appEntryType) return appEntryType.id.toString();
+
+  if (appEntryType) {
+    const dna = cell.getSimulatedDna();
+    return dna.zomes[appEntryType.zome_id].entry_defs[appEntryType.id].id;
+  }
 
   return entryType as string;
 }

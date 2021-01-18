@@ -691,11 +691,12 @@ function getAppEntryType(entryType) {
         return entryType.App;
     return undefined;
 }
-function getEntryTypeString(entryType) {
+function getEntryTypeString(cell, entryType) {
     const appEntryType = getAppEntryType(entryType);
-    // TODO: FIX
-    if (appEntryType)
-        return appEntryType.id.toString();
+    if (appEntryType) {
+        const dna = cell.getSimulatedDna();
+        return dna.zomes[appEntryType.zome_id].entry_defs[appEntryType.id].id;
+    }
     return entryType;
 }
 function getDHTOpBasis(dhtOp) {
