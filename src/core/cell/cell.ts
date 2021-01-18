@@ -31,8 +31,8 @@ export class Cell {
   };
 
   constructor(
-    public conductor: Conductor,
     public state: CellState,
+    public conductor: Conductor,
     public p2p: P2pCell
   ) {}
 
@@ -77,7 +77,7 @@ export class Cell {
 
     const p2p = conductor.network.createP2pCell(cellId);
 
-    const cell = new Cell(conductor, newCellState, p2p);
+    const cell = new Cell(newCellState, conductor, p2p);
 
     await cell.executor.execute({
       name: 'Genesis Workflow',

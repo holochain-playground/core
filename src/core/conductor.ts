@@ -22,10 +22,10 @@ export class Conductor {
   network: Network;
 
   constructor(state: ConductorState) {
-    this.network = new Network(state.networkState);
+    this.network = new Network(state.networkState, this);
     this.cells = state.cellsState.map(({ id, state }) => ({
       id,
-      cell: new Cell(this, state, this.network.createP2pCell(id)),
+      cell: new Cell(state, this, this.network.createP2pCell(id)),
     }));
     this.registeredDnas = state.registeredDnas;
     this.registeredTemplates = state.registeredTemplates;

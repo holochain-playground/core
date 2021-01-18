@@ -1,6 +1,6 @@
 import { serializeHash, deserializeHash, now } from '@holochain-open-dev/common';
 import { getSysMetaValHeaderHash, DHTOpType, getEntry, HeaderType, EntryDhtStatus, ChainStatus, elementToDHTOps } from '@holochain-open-dev/core-types';
-import { uniq } from 'lodash-es';
+import { uniq, isEqual } from 'lodash-es';
 import { Subject } from 'rxjs';
 
 function getValidationLimboDhtOps(state, status) {
@@ -1206,9 +1206,9 @@ class ImmediateExecutor {
 }
 
 class Cell {
-    constructor(conductor, state, p2p) {
-        this.conductor = conductor;
+    constructor(state, conductor, p2p) {
         this.state = state;
+        this.conductor = conductor;
         this.p2p = p2p;
         this.executor = new ImmediateExecutor();
         this.#pendingWorkflows = [];
@@ -1249,7 +1249,7 @@ class Cell {
             sourceChain: [],
         };
         const p2p = conductor.network.createP2pCell(cellId);
-        const cell = new Cell(conductor, newCellState, p2p);
+        const cell = new Cell(newCellState, conductor, p2p);
         await cell.executor.execute({
             name: 'Genesis Workflow',
             description: 'Initialize the cell with all the needed databases',
@@ -1319,7 +1319,7 @@ class P2pCell {
         return this.peers;
     }
     _getClosestNeighbors(basisHash, neighborCount) {
-        const sortedPeers = this.peers.sort((agentA, agentB) => {
+        const sortedPeers = [...this.peers, this.cellId[1]].sort((agentA, agentB) => {
             const distanceA = distance(basisHash, agentA);
             const distanceB = distance(basisHash, agentB);
             return compareBigInts(distanceA, distanceB);
@@ -1327,17 +1327,13 @@ class P2pCell {
         return sortedPeers.slice(0, neighborCount);
     }
     _sendMessage(toAgent, message) {
-        const agentId = this.peers.find(agent => agent === toAgent);
-        if (!agentId) {
-            debugger;
-            throw new Error('Agent was not found');
-        }
-        return this.network.sendMessage(this.cellId[0], this.cellId[1], agentId, message);
+        return this.network.sendMessage(this.cellId[0], this.cellId[1], toAgent, message);
     }
 }
 
 class Network {
-    constructor(state) {
+    constructor(state, conductor) {
+        this.conductor = conductor;
         this.p2pCells = state.p2pCellsState.map(s => ({
             id: s.id,
             p2pCell: new P2pCell(s.state, s.id, this),
@@ -1380,16 +1376,19 @@ class Network {
         return p2pCell;
     }
     sendMessage(dna, fromAgent, toAgent, message) {
+        const localCell = this.conductor.cells.find(cell => isEqual(cell.id[0], dna) && isEqual(cell.id[1], toAgent));
+        if (localCell)
+            return message(localCell.cell);
         return message(this.peerCells[serializeHash(dna)][serializeHash(toAgent)]);
     }
 }
 
 class Conductor {
     constructor(state) {
-        this.network = new Network(state.networkState);
+        this.network = new Network(state.networkState, this);
         this.cells = state.cellsState.map(({ id, state }) => ({
             id,
-            cell: new Cell(this, state, this.network.createP2pCell(id)),
+            cell: new Cell(state, this, this.network.createP2pCell(id)),
         }));
         this.registeredDnas = state.registeredDnas;
         this.registeredTemplates = state.registeredTemplates;

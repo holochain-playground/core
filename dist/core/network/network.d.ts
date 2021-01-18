@@ -9,12 +9,13 @@ export interface NetworkState {
     }>;
 }
 export declare class Network {
+    conductor: Conductor;
     p2pCells: Array<{
         id: CellId;
         p2pCell: P2pCell;
     }>;
     peerCells: Dictionary<Dictionary<Cell>>;
-    constructor(state: NetworkState);
+    constructor(state: NetworkState, conductor: Conductor);
     getState(): NetworkState;
     connectWith(conductor: Conductor): void;
     createP2pCell(cellId: CellId): P2pCell;

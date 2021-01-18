@@ -8,11 +8,11 @@ export declare type CellSignal = 'after-workflow-executed' | 'before-workflow-ex
 export declare type CellSignalListener = (payload: any) => void;
 export declare class Cell {
     #private;
-    conductor: Conductor;
     state: CellState;
+    conductor: Conductor;
     p2p: P2pCell;
     executor: Executor;
-    constructor(conductor: Conductor, state: CellState, p2p: P2pCell);
+    constructor(state: CellState, conductor: Conductor, p2p: P2pCell);
     get cellId(): CellId;
     get agentPubKey(): AgentPubKey;
     get dnaHash(): Hash;
