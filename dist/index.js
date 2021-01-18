@@ -1,4 +1,4 @@
-import { serializeHash, deserializeHash, now } from '@holochain-open-dev/common';
+import { serializeHash, now, deserializeHash } from '@holochain-open-dev/common';
 import { getSysMetaValHeaderHash, DHTOpType, getEntry, HeaderType, EntryDhtStatus, ChainStatus, elementToDHTOps } from '@holochain-open-dev/core-types';
 import { uniq, isEqual } from 'lodash-es';
 import { Subject } from 'rxjs';
@@ -51,10 +51,11 @@ function getEntryDetails(state, entryHash) {
     };
 }
 function getAllHeldEntries(state) {
-    const allHeaders = Object.values(state.integratedDHTOps).map(dhtOpValue => dhtOpValue.op.header);
-    const newEntryHeaders = allHeaders.filter(h => h.header.content.entry_hash);
+    const newEntryHeaders = Object.values(state.integratedDHTOps)
+        .filter(dhtOpValue => dhtOpValue.op.type === DHTOpType.StoreEntry)
+        .map(dhtOpValue => dhtOpValue.op.header);
     const allEntryHashes = newEntryHeaders.map(h => h.header.content.entry_hash);
-    return uniq(allEntryHashes.map(serializeHash)).map(deserializeHash);
+    return uniq(allEntryHashes);
 }
 function getAllAuthoredEntries(state) {
     const allHeaders = Object.values(state.authoredDHTOps).map(dhtOpValue => dhtOpValue.op.header);
