@@ -684,7 +684,7 @@ function compareBigInts(a, b) {
 function hashEntry(entry) {
     if (entry.entry_type === 'Agent')
         return entry.content;
-    return hash(entry);
+    return hash(entry.content);
 }
 function getAppEntryType(entryType) {
     if (entryType.App)
@@ -1071,7 +1071,8 @@ const create_link = (zome_id, cell) => async (args) => {
 
 // Creates a new Create header and its entry in the source chain
 const hash_entry = (zome_index, cell) => async (args) => {
-    return hash(args.content);
+    const entry = { entry_type: 'App', content: args.content };
+    return hashEntry(entry);
 };
 
 async function ensure(path, hdk) {

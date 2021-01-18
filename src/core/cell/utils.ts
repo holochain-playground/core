@@ -15,7 +15,7 @@ import { Cell } from './cell';
 
 export function hashEntry(entry: Entry): Hash {
   if (entry.entry_type === 'Agent') return entry.content;
-  return hash(entry);
+  return hash(entry.content);
 }
 
 export function getAppEntryType(
