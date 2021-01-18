@@ -935,6 +935,17 @@ function buildCreate(state, entry, entry_type) {
     };
     return create;
 }
+function buildCreateLink(state, zome_id, base, target, tag) {
+    const create_link = {
+        ...buildCommon(state),
+        base_address: base,
+        target_address: target,
+        tag,
+        zome_id,
+        type: HeaderType.CreateLink,
+    };
+    return create_link;
+}
 function buildUpdate(state, entry, entry_type, original_entry_address, original_header_address) {
     const entry_hash = hashEntry(entry);
     const update = {
@@ -1046,24 +1057,45 @@ const create_entry = (zome_index, cell) => async (args) => {
     putElement(element)(cell.state);
     return element.signed_header.header.hash;
 };
-// Creates a new Create header and its entry in the source chain
-/* export const update = (entry: Entry, entry_type: EntryType, original_header_hash: Hash): HdkAction => (
-  state: CellState
-): Element => {
-  const create = buildUpdate(state, entry, entry_type, null, original_header_hash);
 
-  const element: Element = {
-    header: create,
-    maybe_entry: entry,
-  };
-
-  return element;
+// Creates a new CreateLink header in the source chain
+const create_link = (zome_id, cell) => async (args) => {
+    const createLink = buildCreateLink(cell.state, zome_id, args.base, args.target, args.tag);
+    const element = {
+        signed_header: buildShh(createLink),
+        entry: undefined,
+    };
+    putElement(element)(cell.state);
+    return element.signed_header.header.hash;
 };
- */
+
+// Creates a new Create header and its entry in the source chain
+const hash_entry = (zome_index, cell) => async (args) => {
+    return hash(args.content);
+};
+
+async function ensure(path, hdk) {
+    const components = path.split('.');
+    const parent = components.splice(components.length - 1, 1).join('.');
+    await ensure(parent, hdk);
+    const headerHash = await hdk.create_entry({
+        content: path,
+        entry_def_id: 'path',
+    });
+    const parentHash = await hdk.hash_entry({ content: parent });
+    const pathHash = await hdk.hash_entry({ content: parent });
+    await hdk.create_link({ base: parentHash, target: pathHash, tag: null });
+}
+const path = {
+    ensure,
+};
 
 function buildZomeFunctionContext(zome_index, cell) {
     return {
         create_entry: create_entry(zome_index, cell),
+        hash_entry: hash_entry(),
+        create_link: create_link(zome_index, cell),
+        path,
     };
 }
 
@@ -1462,11 +1494,21 @@ class Conductor {
     }
 }
 
+var index = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    create_entry: create_entry,
+    buildZomeFunctionContext: buildZomeFunctionContext
+});
+
 const sampleZome = {
     name: 'sample',
     entry_defs: [
         {
             id: 'sample_entry',
+            visibility: 'Public',
+        },
+        {
+            id: 'path',
             visibility: 'Public',
         },
     ],
@@ -1476,6 +1518,22 @@ const sampleZome = {
                 return create_entry({ content, entry_def_id: 'sample_entry' });
             },
             arguments: [{ name: 'content', type: 'any' }],
+        },
+        create_link: {
+            call: ({ create_link }) => ({ base, target, tag }) => {
+                return create_link({ base, target, tag });
+            },
+            arguments: [
+                { name: 'base', type: 'EntryHash' },
+                { name: 'target', type: 'EntryHash' },
+                { name: 'any', type: 'EntryHash' },
+            ],
+        },
+        create_path: {
+            call: hdk => ({ pathContent }) => {
+                return hdk.path.ensure(pathContent, hdk);
+            },
+            arguments: [{ name: 'pathContent', type: 'String' }],
         },
     },
 };
@@ -1516,5 +1574,5 @@ async function buildSimulatedPlayground(numConductors) {
     return createConductors(numConductors, [], sampleDnaTemplate());
 }
 
-export { Cell, Conductor, ImmediateExecutor, Network, P2pCell, ValidationLimboStatus, ValidationStatus, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildDna, buildShh, buildSimulatedPlayground, buildUpdate, buildZomeFunctionContext, callZomeFn, compareBigInts, createConductors, create_entry, deleteValidationLimboValue, distance, genesis, getAllAuthoredEntries, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHeaderAt, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, hashLocation, incoming_dht_ops, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sys_validation, sys_validation_task };
+export { Cell, Conductor, index as Hdk, ImmediateExecutor, Network, P2pCell, ValidationLimboStatus, ValidationStatus, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDna, buildShh, buildSimulatedPlayground, buildUpdate, callZomeFn, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, getAllAuthoredEntries, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHeaderAt, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, hashLocation, incoming_dht_ops, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sys_validation, sys_validation_task };
 //# sourceMappingURL=index.js.map

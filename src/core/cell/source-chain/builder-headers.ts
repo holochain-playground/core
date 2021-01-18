@@ -11,6 +11,7 @@ import {
   Update,
   SignedHeaderHashed,
   Header,
+  CreateLink,
 } from '@holochain-open-dev/core-types';
 import { hash } from '../../../processors/hash';
 import { CellState } from '../state';
@@ -64,6 +65,24 @@ export function buildCreate(
     type: HeaderType.Create,
   };
   return create;
+}
+
+export function buildCreateLink(
+  state: CellState,
+  zome_id: number,
+  base: Hash,
+  target: Hash,
+  tag: any
+): CreateLink {
+  const create_link: CreateLink = {
+    ...buildCommon(state),
+    base_address: base,
+    target_address: target,
+    tag,
+    zome_id,
+    type: HeaderType.CreateLink,
+  };
+  return create_link;
 }
 
 export function buildUpdate(

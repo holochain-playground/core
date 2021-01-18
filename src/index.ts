@@ -3,7 +3,7 @@ export * from './core/network/network';
 export * from './core/network/p2p-cell';
 export * from './core/conductor';
 
-export * from './core/hdk/index';
+export * as Hdk from './core/hdk/index';
 
 export * from './dnas/simulated-dna';
 export * from './dnas/sample-dna';

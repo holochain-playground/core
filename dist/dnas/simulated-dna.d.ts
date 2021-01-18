@@ -1,8 +1,5 @@
 import { Dictionary, EntryVisibility } from '@holochain-open-dev/core-types';
-import { CreateEntry } from '../core/hdk/actions';
-export interface SimulatedZomeFunctionContext {
-    create_entry: CreateEntry;
-}
+import { SimulatedZomeFunctionContext } from '../core/hdk';
 export interface SimulatedZomeFunctionArgument {
     name: string;
     type: string;
