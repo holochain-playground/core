@@ -1,6 +1,6 @@
 import { serializeHash, now, deserializeHash } from '@holochain-open-dev/common';
 import { getSysMetaValHeaderHash, DHTOpType, getEntry, HeaderType, EntryDhtStatus, ChainStatus, elementToDHTOps } from '@holochain-open-dev/core-types';
-import { uniq, isEqual } from 'lodash-es';
+import { isEqual, uniq } from 'lodash-es';
 import { Subject } from 'rxjs';
 
 function getValidationLimboDhtOps(state, status) {
@@ -31,7 +31,7 @@ function getHeadersForEntry(state, entryHash) {
 }
 function getLinksForEntry(state, entryHash) {
     return state.metadata.link_meta
-        .filter(({ key, value }) => (key.base = entryHash))
+        .filter(({ key, value }) => isEqual(key.base, entryHash))
         .map(({ key, value }) => value);
 }
 function getEntryDhtStatus(state, entryHash) {

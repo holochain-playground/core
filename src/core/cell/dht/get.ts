@@ -11,7 +11,7 @@ import {
   SignedHeaderHashed,
   DHTOpType,
 } from '@holochain-open-dev/core-types';
-import { uniq } from 'lodash-es';
+import { isEqual, uniq } from 'lodash-es';
 import {
   CellState,
   ValidationLimboStatus,
@@ -66,7 +66,7 @@ export function getLinksForEntry(
   entryHash: Hash
 ): LinkMetaVal[] {
   return state.metadata.link_meta
-    .filter(({ key, value }) => (key.base = entryHash))
+    .filter(({ key, value }) => isEqual(key.base, entryHash))
     .map(({ key, value }) => value);
 }
 
