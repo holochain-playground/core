@@ -19,7 +19,7 @@ async function ensure(
     const pathHash = await hdk.hash_entry({ content: path });
     const parentHash = await hdk.hash_entry({ content: parent });
 
-    await hdk.create_link({ base: parentHash, target: pathHash, tag: null });
+    await hdk.create_link({ base: parentHash, target: pathHash, tag: path });
   }
 }
 
