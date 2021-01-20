@@ -1083,7 +1083,8 @@ async function ensure(path, hdk) {
     });
     const components = path.split('.');
     if (components.length > 1) {
-        const parent = components.splice(components.length - 1, 1).join('.');
+        components.splice(components.length - 1, 1);
+        const parent = components.join('.');
         await ensure(parent, hdk);
         const pathHash = await hdk.hash_entry({ content: path });
         const parentHash = await hdk.hash_entry({ content: parent });

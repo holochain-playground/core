@@ -12,7 +12,8 @@ async function ensure(
   const components = path.split('.');
 
   if (components.length > 1) {
-    const parent = components.splice(components.length - 1, 1).join('.');
+    components.splice(components.length - 1, 1);
+    const parent = components.join('.');
 
     await ensure(parent, hdk);
 
