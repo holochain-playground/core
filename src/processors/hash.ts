@@ -27,7 +27,8 @@ export const hashLocation: Dictionary<number> = {};
 export function location(hash: string): number {
   if (hashLocation[hash]) return hashLocation[hash];
 
-  const hash128: Uint8Array = blake.blake2b(hash, null, 16);
+  const hashable = new Uint8Array(str2ab(hash));
+  const hash128: Uint8Array = blake.blake2b(hashable, null, 16);
 
   const out = [hash128[0], hash128[1], hash128[2], hash128[3]];
 

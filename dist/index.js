@@ -655,7 +655,8 @@ const hashLocation = {};
 function location(hash) {
     if (hashLocation[hash])
         return hashLocation[hash];
-    const hash128 = blakejs.blake2b(hash, null, 16);
+    const hashable = new Uint8Array(str2ab(hash));
+    const hash128 = blakejs.blake2b(hashable, null, 16);
     const out = [hash128[0], hash128[1], hash128[2], hash128[3]];
     for (let i = 4; i < 16; i += 4) {
         out[0] ^= hash128[i];
