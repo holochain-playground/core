@@ -136,6 +136,10 @@ export class Cell {
     dht_hash: Hash, // The basis for the DHTOps
     ops: Dictionary<DHTOp>
   ): Promise<void> {
-    return incoming_dht_ops(dht_hash, ops, from_agent)(this);
+    return this._runWorkflow({
+      name: 'Incoming DHT Ops',
+      description: 'Persist the recieved DHT Ops to validate them later',
+      task: () => incoming_dht_ops(dht_hash, ops, from_agent)(this),
+    });
   }
 }

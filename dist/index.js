@@ -645,16 +645,21 @@ function str2ab(str) {
     }
     return buf;
 }
+const hashCache = {};
 // From https://github.com/holochain/holochain/blob/dc0cb61d0603fa410ac5f024ed6ccfdfc29715b3/crates/holo_hash/src/encode.rs
 function hash(content) {
     const contentString = typeof content === 'string' ? content : JSON.stringify(content);
+    if (hashCache[contentString])
+        return hashCache[contentString];
     const hashable = new Uint8Array(str2ab(contentString));
-    return blakejs.blake2b(hashable, null, 32);
+    const hash = blakejs.blake2b(hashable, null, 32);
+    hashCache[contentString] = hash;
+    return hash;
 }
-const hashLocation = {};
+const hashLocationCache = {};
 function location(hash) {
-    if (hashLocation[hash])
-        return hashLocation[hash];
+    if (hashLocationCache[hash])
+        return hashLocationCache[hash];
     const hashable = new Uint8Array(str2ab(hash));
     const hash128 = blakejs.blake2b(hashable, null, 16);
     const out = [hash128[0], hash128[1], hash128[2], hash128[3]];
@@ -665,7 +670,9 @@ function location(hash) {
         out[3] ^= hash128[i + 3];
     }
     const view = new DataView(new Uint8Array(out).buffer, 0);
-    return view.getUint32(0, false);
+    const location = view.getUint32(0, false);
+    hashLocationCache[hash] = location;
+    return location;
 }
 // We return the distance as the shortest distance between two hashes in the circle
 function distance(hash1, hash2) {
@@ -1319,7 +1326,11 @@ class Cell {
     // https://github.com/holochain/holochain/blob/develop/crates/holochain/src/conductor/cell.rs#L429
     handle_publish(from_agent, dht_hash, // The basis for the DHTOps
     ops) {
-        return incoming_dht_ops(dht_hash, ops, from_agent)(this);
+        return this._runWorkflow({
+            name: 'Incoming DHT Ops',
+            description: 'Persist the recieved DHT Ops to validate them later',
+            task: () => incoming_dht_ops(dht_hash, ops, from_agent)(this),
+        });
     }
 }
 
@@ -1583,5 +1594,5 @@ async function createConductors(conductorsToCreate, executor, currentConductors,
     return allConductors;
 }
 
-export { Cell, Conductor, DelayExecutor, index as Hdk, ImmediateExecutor, Network, P2pCell, ValidationLimboStatus, ValidationStatus, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDna, buildShh, buildUpdate, callZomeFn, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, getAllAuthoredEntries, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHeaderAt, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, hashLocation, incoming_dht_ops, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sys_validation, sys_validation_task };
+export { Cell, Conductor, DelayExecutor, index as Hdk, ImmediateExecutor, Network, P2pCell, ValidationLimboStatus, ValidationStatus, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDna, buildShh, buildUpdate, callZomeFn, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, getAllAuthoredEntries, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHeaderAt, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sys_validation, sys_validation_task };
 //# sourceMappingURL=index.js.map

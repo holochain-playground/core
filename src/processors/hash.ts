@@ -12,20 +12,28 @@ function str2ab(str: string) {
   return buf;
 }
 
+const hashCache: Dictionary<Hash> = {};
+
 // From https://github.com/holochain/holochain/blob/dc0cb61d0603fa410ac5f024ed6ccfdfc29715b3/crates/holo_hash/src/encode.rs
 export function hash(content: any): Hash {
   const contentString =
     typeof content === 'string' ? content : JSON.stringify(content);
 
+  if (hashCache[contentString]) return hashCache[contentString];
+
   const hashable = new Uint8Array(str2ab(contentString));
 
-  return blake.blake2b(hashable, null, 32);
+  const hash = blake.blake2b(hashable, null, 32);
+
+  hashCache[contentString] = hash;
+
+  return hash;
 }
 
-export const hashLocation: Dictionary<number> = {};
+const hashLocationCache: Dictionary<number> = {};
 
 export function location(hash: string): number {
-  if (hashLocation[hash]) return hashLocation[hash];
+  if (hashLocationCache[hash]) return hashLocationCache[hash];
 
   const hashable = new Uint8Array(str2ab(hash));
   const hash128: Uint8Array = blake.blake2b(hashable, null, 16);
@@ -40,7 +48,11 @@ export function location(hash: string): number {
   }
 
   const view = new DataView(new Uint8Array(out).buffer, 0);
-  return view.getUint32(0, false);
+  const location = view.getUint32(0, false);
+
+  hashLocationCache[hash] = location;
+
+  return location;
 }
 
 // We return the distance as the shortest distance between two hashes in the circle
