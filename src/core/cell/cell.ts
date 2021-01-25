@@ -100,14 +100,17 @@ export class Cell {
     const workflowsToRun = this.#pendingWorkflows;
     this.#pendingWorkflows = [];
 
-    const promises = workflowsToRun.map(w => {
-      this.#signals['before-workflow-executed'].next(w);
-      this.conductor.executor
-        .execute(w)
-        .then(() => this.#signals['after-workflow-executed'].next(w));
-    });
+    const promises = workflowsToRun.map(w => this._runWorkflow(w));
 
     await Promise.all(promises);
+  }
+
+  async _runWorkflow(workflow: Task<any>): Promise<any> {
+    this.#signals['before-workflow-executed'].next(workflow);
+    const result = await this.conductor.executor.execute(workflow);
+
+    this.#signals['after-workflow-executed'].next(workflow);
+    return result;
   }
 
   /** Workflows */
@@ -118,7 +121,7 @@ export class Cell {
     payload: any;
     cap: string;
   }): Promise<any> {
-    return this.conductor.executor.execute({
+    return this._runWorkflow({
       name: 'Call Zome Function Workflow',
       description: `Zome: ${args.zome}, Function name: ${args.fnName}`,
       task: () =>
