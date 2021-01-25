@@ -10,6 +10,7 @@ export * from './dnas/sample-dna';
 
 export * from './executor/executor';
 export * from './executor/immediate-executor';
+export * from './executor/delay-executor';
 
 export * from './processors/hash';
 export * from './processors/create-conductors';

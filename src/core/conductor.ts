@@ -6,6 +6,8 @@ import { Network, NetworkState } from './network/network';
 
 import { SimulatedDna, SimulatedDnaTemplate } from '../dnas/simulated-dna';
 import { CellState } from './cell/state';
+import { Executor } from '../executor/executor';
+import { ImmediateExecutor } from '../executor/immediate-executor';
 
 export interface ConductorState {
   cellsState: Array<{ id: CellId; state: CellState }>;
@@ -21,7 +23,7 @@ export class Conductor {
 
   network: Network;
 
-  constructor(state: ConductorState) {
+  constructor(state: ConductorState, public executor: Executor) {
     this.network = new Network(state.networkState, this);
     this.cells = state.cellsState.map(({ id, state }) => ({
       id,
@@ -31,7 +33,9 @@ export class Conductor {
     this.registeredTemplates = state.registeredTemplates;
   }
 
-  static async create(): Promise<Conductor> {
+  static async create(
+    executor: Executor = new ImmediateExecutor()
+  ): Promise<Conductor> {
     const state: ConductorState = {
       cellsState: [],
       networkState: {
@@ -41,7 +45,7 @@ export class Conductor {
       registeredTemplates: {},
     };
 
-    return new Conductor(state);
+    return new Conductor(state, executor);
   }
 
   getState(): ConductorState {

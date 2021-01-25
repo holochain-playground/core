@@ -1237,19 +1237,11 @@ const incoming_dht_ops = (basis, dhtOps, from_agent) => async (cell) => {
     cell.triggerWorkflow(sys_validation_task(cell));
 };
 
-class ImmediateExecutor {
-    async execute(task) {
-        const result = await task.task();
-        return result;
-    }
-}
-
 class Cell {
     constructor(state, conductor, p2p) {
         this.state = state;
         this.conductor = conductor;
         this.p2p = p2p;
-        this.executor = new ImmediateExecutor();
         this.#pendingWorkflows = [];
         this.#signals = {
             'after-workflow-executed': new Subject(),
@@ -1289,7 +1281,7 @@ class Cell {
         };
         const p2p = conductor.network.createP2pCell(cellId);
         const cell = new Cell(newCellState, conductor, p2p);
-        await cell.executor.execute({
+        await conductor.executor.execute({
             name: 'Genesis Workflow',
             description: 'Initialize the cell with all the needed databases',
             task: () => genesis(cellId[1], cellId[0], membrane_proof)(cell),
@@ -1308,7 +1300,7 @@ class Cell {
         this.#pendingWorkflows = [];
         const promises = workflowsToRun.map(w => {
             this.#signals['before-workflow-executed'].next(w);
-            this.executor
+            this.conductor.executor
                 .execute(w)
                 .then(() => this.#signals['after-workflow-executed'].next(w));
         });
@@ -1316,7 +1308,7 @@ class Cell {
     }
     /** Workflows */
     callZomeFn(args) {
-        return this.executor.execute({
+        return this.conductor.executor.execute({
             name: 'Call Zome Function Workflow',
             description: `Zome: ${args.zome}, Function name: ${args.fnName}`,
             task: () => callZomeFn(args.zome, args.fnName, args.payload, args.cap)(this),
@@ -1422,8 +1414,16 @@ class Network {
     }
 }
 
+class ImmediateExecutor {
+    async execute(task) {
+        const result = await task.task();
+        return result;
+    }
+}
+
 class Conductor {
-    constructor(state) {
+    constructor(state, executor) {
+        this.executor = executor;
         this.network = new Network(state.networkState, this);
         this.cells = state.cellsState.map(({ id, state }) => ({
             id,
@@ -1432,7 +1432,7 @@ class Conductor {
         this.registeredDnas = state.registeredDnas;
         this.registeredTemplates = state.registeredTemplates;
     }
-    static async create() {
+    static async create(executor = new ImmediateExecutor()) {
         const state = {
             cellsState: [],
             networkState: {
@@ -1441,7 +1441,7 @@ class Conductor {
             registeredDnas: {},
             registeredTemplates: {},
         };
-        return new Conductor(state);
+        return new Conductor(state, executor);
     }
     getState() {
         return {
@@ -1544,6 +1544,18 @@ function sampleDnaTemplate() {
     };
 }
 
+const sleep = (ms) => new Promise(resolve => setTimeout(() => resolve(null), ms));
+class DelayExecutor {
+    constructor(delayMillis) {
+        this.delayMillis = delayMillis;
+    }
+    async execute(task) {
+        await sleep(this.delayMillis);
+        const result = await task.task();
+        return result;
+    }
+}
+
 function hookUpConductors(conductors) {
     for (let i = 0; i < conductors.length; i += 1) {
         for (let j = 0; j < conductors.length; j += 1) {
@@ -1554,10 +1566,10 @@ function hookUpConductors(conductors) {
     }
 }
 
-async function createConductors(conductorsToCreate, currentConductors, dnaTemplate) {
+async function createConductors(conductorsToCreate, executor, currentConductors, dnaTemplate) {
     const newConductorsPromises = [];
     for (let i = 0; i < conductorsToCreate; i++) {
-        const conductor = Conductor.create();
+        const conductor = Conductor.create(executor);
         newConductorsPromises.push(conductor);
     }
     const newConductors = await Promise.all(newConductorsPromises);
@@ -1570,5 +1582,5 @@ async function createConductors(conductorsToCreate, currentConductors, dnaTempla
     return allConductors;
 }
 
-export { Cell, Conductor, index as Hdk, ImmediateExecutor, Network, P2pCell, ValidationLimboStatus, ValidationStatus, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDna, buildShh, buildUpdate, callZomeFn, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, getAllAuthoredEntries, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHeaderAt, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, hashLocation, incoming_dht_ops, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sys_validation, sys_validation_task };
+export { Cell, Conductor, DelayExecutor, index as Hdk, ImmediateExecutor, Network, P2pCell, ValidationLimboStatus, ValidationStatus, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDna, buildShh, buildUpdate, callZomeFn, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, getAllAuthoredEntries, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHeaderAt, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, hashLocation, incoming_dht_ops, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sys_validation, sys_validation_task };
 //# sourceMappingURL=index.js.map

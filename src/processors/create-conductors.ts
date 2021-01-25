@@ -1,15 +1,17 @@
 import { Conductor } from '../core/conductor';
-import { SimulatedDna, SimulatedDnaTemplate } from '../dnas/simulated-dna';
+import { SimulatedDnaTemplate } from '../dnas/simulated-dna';
+import { Executor } from '../executor/executor';
 import { hookUpConductors } from './message';
 
 export async function createConductors(
   conductorsToCreate: number,
+  executor: Executor,
   currentConductors: Conductor[],
   dnaTemplate: SimulatedDnaTemplate
 ): Promise<Conductor[]> {
   const newConductorsPromises: Promise<Conductor>[] = [];
   for (let i = 0; i < conductorsToCreate; i++) {
-    const conductor = Conductor.create();
+    const conductor = Conductor.create(executor);
     newConductorsPromises.push(conductor);
   }
 
