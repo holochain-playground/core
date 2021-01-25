@@ -24,6 +24,7 @@ export declare class Cell {
     getState(): CellState;
     triggerWorkflow(workflow: Task<any>): void;
     _runPendingWorkflows(): Promise<void>;
+    _runWorkflow(workflow: Task<any>): Promise<any>;
     /** Workflows */
     callZomeFn(args: {
         zome: string;
