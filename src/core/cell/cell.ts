@@ -21,8 +21,6 @@ export type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export type CellSignalListener = (payload: any) => void;
 
 export class Cell {
-  executor: Executor = new ImmediateExecutor();
-
   #pendingWorkflows: Array<Task<any>> = [];
 
   #signals = {
@@ -79,7 +77,7 @@ export class Cell {
 
     const cell = new Cell(newCellState, conductor, p2p);
 
-    await cell.executor.execute({
+    await conductor.executor.execute({
       name: 'Genesis Workflow',
       description: 'Initialize the cell with all the needed databases',
       task: () => genesis(cellId[1], cellId[0], membrane_proof)(cell),
@@ -104,7 +102,7 @@ export class Cell {
 
     const promises = workflowsToRun.map(w => {
       this.#signals['before-workflow-executed'].next(w);
-      this.executor
+      this.conductor.executor
         .execute(w)
         .then(() => this.#signals['after-workflow-executed'].next(w));
     });
@@ -120,7 +118,7 @@ export class Cell {
     payload: any;
     cap: string;
   }): Promise<any> {
-    return this.executor.execute({
+    return this.conductor.executor.execute({
       name: 'Call Zome Function Workflow',
       description: `Zome: ${args.zome}, Function name: ${args.fnName}`,
       task: () =>
