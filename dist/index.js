@@ -1300,7 +1300,7 @@ class Cell {
     }
     triggerWorkflow(workflow) {
         this.#pendingWorkflows.push(workflow);
-        setTimeout(() => this._runPendingWorkflows());
+        this._runPendingWorkflows();
     }
     async _runPendingWorkflows() {
         const workflowsToRun = this.#pendingWorkflows;

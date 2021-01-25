@@ -93,7 +93,7 @@ export class Cell {
   triggerWorkflow(workflow: Task<any>) {
     this.#pendingWorkflows.push(workflow);
 
-    setTimeout(() => this._runPendingWorkflows());
+    this._runPendingWorkflows();
   }
 
   async _runPendingWorkflows() {
