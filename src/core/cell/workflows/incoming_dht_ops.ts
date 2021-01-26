@@ -1,4 +1,3 @@
-import { deserializeHash } from '@holochain-open-dev/common';
 import {
   Hash,
   Dictionary,
@@ -9,7 +8,6 @@ import { Cell } from '../../cell';
 import { ValidationLimboValue, ValidationLimboStatus } from '../state';
 import { putValidationLimboValue } from '../dht/put';
 import { sys_validation_task } from './sys_validation';
-import { Task } from '../../../executor/executor';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/incoming_dht_ops_workflow.rs
 export const incoming_dht_ops = (
@@ -30,9 +28,8 @@ export const incoming_dht_ops = (
       time_added: Date.now(),
     };
 
-    putValidationLimboValue(deserializeHash(dhtOpHash), validationLimboValue)(cell.state);
+    putValidationLimboValue(dhtOpHash, validationLimboValue)(cell.state);
   }
 
   cell.triggerWorkflow(sys_validation_task(cell));
 };
-

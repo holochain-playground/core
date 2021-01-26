@@ -1,7 +1,7 @@
+import { BootstrapService } from '../bootstrap/bootstrap-service';
 import { Conductor } from '../core/conductor';
 import { SimulatedDnaTemplate } from '../dnas/simulated-dna';
 import { Executor } from '../executor/executor';
-import { hookUpConductors } from './message';
 
 export async function createConductors(
   conductorsToCreate: number,
@@ -9,9 +9,14 @@ export async function createConductors(
   currentConductors: Conductor[],
   dnaTemplate: SimulatedDnaTemplate
 ): Promise<Conductor[]> {
+  const bootstrapService =
+    currentConductors.length === 0
+      ? new BootstrapService()
+      : currentConductors[0].bootstrapService;
+
   const newConductorsPromises: Promise<Conductor>[] = [];
   for (let i = 0; i < conductorsToCreate; i++) {
-    const conductor = Conductor.create(executor);
+    const conductor = Conductor.create(bootstrapService, executor);
     newConductorsPromises.push(conductor);
   }
 
@@ -25,8 +30,6 @@ export async function createConductors(
       await c.installApp(dnaHash, null, null, '');
     })
   );
-
-  hookUpConductors(allConductors);
 
   return allConductors;
 }

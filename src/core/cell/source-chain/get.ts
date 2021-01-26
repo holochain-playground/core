@@ -1,4 +1,3 @@
-import { serializeHash } from '@holochain-open-dev/common';
 import { Hash } from '@holochain-open-dev/core-types';
 import { CellState } from '../state';
 
@@ -7,7 +6,6 @@ import { CellState } from '../state';
  */
 export function getNewHeaders(state: CellState): Array<Hash> {
   return state.sourceChain.filter(
-    headerHash =>
-      !Object.keys(state.authoredDHTOps).includes(serializeHash(headerHash))
+    headerHash => !Object.keys(state.authoredDHTOps).includes(headerHash)
   );
 }

@@ -27,7 +27,7 @@ export const integrate_dht_ops = async (cell: Cell): Promise<void> => {
       when_integrated: Date.now(),
     };
 
-    putDhtOpToIntegrated(deserializeHash(dhtOpHash), value)(cell.state);
+    putDhtOpToIntegrated(dhtOpHash, value)(cell.state);
   }
 };
 

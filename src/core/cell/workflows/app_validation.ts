@@ -1,4 +1,3 @@
-import { deserializeHash } from '@holochain-open-dev/common';
 import { Task } from '../../../executor/executor';
 import { Cell } from '../../cell';
 import {
@@ -21,11 +20,10 @@ export const app_validation = async (cell: Cell): Promise<void> => {
   );
 
   // TODO: actually validate
-  for (const dhtOpHashStr of Object.keys(pendingDhtOps)) {
-    const dhtOpHash = deserializeHash(dhtOpHashStr);
+  for (const dhtOpHash of Object.keys(pendingDhtOps)) {
     deleteValidationLimboValue(dhtOpHash)(cell.state);
 
-    const validationLimboValue = pendingDhtOps[dhtOpHashStr];
+    const validationLimboValue = pendingDhtOps[dhtOpHash];
 
     const value: IntegrationLimboValue = {
       op: validationLimboValue.op,

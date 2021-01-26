@@ -23,7 +23,7 @@ export function hash(content: any): Hash {
 
   const hashable = new Uint8Array(str2ab(contentString));
 
-  const hash = blake.blake2b(hashable, null, 32);
+  const hash = serializeHash(blake.blake2b(hashable, null, 32));
 
   hashCache[contentString] = hash;
 
@@ -57,8 +57,8 @@ export function location(hash: string): number {
 
 // We return the distance as the shortest distance between two hashes in the circle
 export function distance(hash1: Hash, hash2: Hash): number {
-  const location1 = location(serializeHash(hash1));
-  const location2 = location(serializeHash(hash2));
+  const location1 = location(hash1);
+  const location2 = location(hash2);
 
   return Math.min(location1 - location2, location2 - location1);
 }

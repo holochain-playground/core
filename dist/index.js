@@ -1,6 +1,6 @@
-import { serializeHash, now, deserializeHash } from '@holochain-open-dev/common';
 import { getSysMetaValHeaderHash, DHTOpType, getEntry, HeaderType, EntryDhtStatus, ChainStatus, elementToDHTOps } from '@holochain-open-dev/core-types';
 import { isEqual, uniq } from 'lodash-es';
+import { serializeHash, now } from '@holochain-open-dev/common';
 import { Subject } from 'rxjs';
 
 function getValidationLimboDhtOps(state, status) {
@@ -19,11 +19,11 @@ function pullAllIntegrationLimboDhtOps(state) {
     return dhtOps;
 }
 function getHeadersForEntry(state, entryHash) {
-    return state.metadata.system_meta[serializeHash(entryHash)]
+    return state.metadata.system_meta[entryHash]
         .map(h => {
         const hash = getSysMetaValHeaderHash(h);
         if (hash) {
-            return state.CAS[serializeHash(hash)];
+            return state.CAS[hash];
         }
         return undefined;
     })
@@ -35,13 +35,13 @@ function getLinksForEntry(state, entryHash) {
         .map(({ key, value }) => value);
 }
 function getEntryDhtStatus(state, entryHash) {
-    const meta = state.metadata.misc_meta[serializeHash(entryHash)];
+    const meta = state.metadata.misc_meta[entryHash];
     return meta
         ? meta.EntryStatus
         : undefined;
 }
 function getEntryDetails(state, entryHash) {
-    const entry = state.CAS[serializeHash(entryHash)];
+    const entry = state.CAS[entryHash];
     const headers = getHeadersForEntry(state, entryHash);
     const dhtStatus = getEntryDhtStatus(state, entryHash);
     return {
@@ -63,13 +63,13 @@ function getAllAuthoredEntries(state) {
     return newEntryHeaders.map(h => h.header.content.entry_hash);
 }
 function isHoldingEntry(state, entryHash) {
-    return state.metadata.system_meta[serializeHash(entryHash)] !== undefined;
+    return state.metadata.system_meta[entryHash] !== undefined;
 }
 function getDhtShard(state) {
     const heldEntries = getAllHeldEntries(state);
     const dhtShard = {};
     for (const entryHash of heldEntries) {
-        dhtShard[serializeHash(entryHash)] = {
+        dhtShard[entryHash] = {
             details: getEntryDetails(state, entryHash),
             links: getLinksForEntry(state, entryHash),
         };
@@ -652,7 +652,7 @@ function hash(content) {
     if (hashCache[contentString])
         return hashCache[contentString];
     const hashable = new Uint8Array(str2ab(contentString));
-    const hash = blakejs.blake2b(hashable, null, 32);
+    const hash = serializeHash(blakejs.blake2b(hashable, null, 32));
     hashCache[contentString] = hash;
     return hash;
 }
@@ -676,8 +676,8 @@ function location(hash) {
 }
 // We return the distance as the shortest distance between two hashes in the circle
 function distance(hash1, hash2) {
-    const location1 = location(serializeHash(hash1));
-    const location2 = location(serializeHash(hash2));
+    const location1 = location(hash1);
+    const location2 = location(hash2);
     return Math.min(location1 - location2, location2 - location1);
 }
 function compareBigInts(a, b) {
@@ -732,28 +732,27 @@ function getDHTOpBasis(dhtOp) {
 }
 
 const putValidationLimboValue = (dhtOpHash, validationLimboValue) => (state) => {
-    state.validationLimbo[serializeHash(dhtOpHash)] = validationLimboValue;
+    state.validationLimbo[dhtOpHash] = validationLimboValue;
 };
 const deleteValidationLimboValue = (dhtOpHash) => (state) => {
-    const hash = serializeHash(dhtOpHash);
-    delete state.validationLimbo[hash];
+    delete state.validationLimbo[dhtOpHash];
 };
 const putIntegrationLimboValue = (dhtOpHash, integrationLimboValue) => (state) => {
-    state.integrationLimbo[serializeHash(dhtOpHash)] = integrationLimboValue;
+    state.integrationLimbo[dhtOpHash] = integrationLimboValue;
 };
 const putDhtOpData = (dhtOp) => async (state) => {
     const headerHash = hash(dhtOp.header);
-    state.CAS[serializeHash(headerHash)] = dhtOp.header;
+    state.CAS[headerHash] = dhtOp.header;
     const entry = getEntry(dhtOp);
     if (entry) {
         const entryHash = hashEntry(entry);
-        state.CAS[serializeHash(entryHash)] = entry;
+        state.CAS[entryHash] = entry;
     }
 };
 const putDhtOpMetadata = (dhtOp) => (state) => {
     const headerHash = hash(dhtOp.header);
     if (dhtOp.type === DHTOpType.StoreElement) {
-        state.metadata.misc_meta[serializeHash(headerHash)] = 'StoreElement';
+        state.metadata.misc_meta[headerHash] = 'StoreElement';
     }
     else if (dhtOp.type === DHTOpType.StoreEntry) {
         const entryHash = dhtOp.header.header.content.entry_hash;
@@ -765,10 +764,10 @@ const putDhtOpMetadata = (dhtOp) => (state) => {
         update_entry_dht_status(entryHash)(state);
     }
     else if (dhtOp.type === DHTOpType.RegisterAgentActivity) {
-        state.metadata.misc_meta[serializeHash(headerHash)] = {
+        state.metadata.misc_meta[headerHash] = {
             ChainItem: dhtOp.header.header.content.timestamp,
         };
-        state.metadata.misc_meta[serializeHash(dhtOp.header.header.content.author)] = {
+        state.metadata.misc_meta[dhtOp.header.header.content.author] = {
             ChainStatus: ChainStatus.Valid,
         };
     }
@@ -810,12 +809,12 @@ const putDhtOpMetadata = (dhtOp) => (state) => {
 const update_entry_dht_status = (entryHash) => (state) => {
     const headers = getHeadersForEntry(state, entryHash);
     const entryIsAlive = headers.some(header => {
-        const dhtHeaders = state.metadata.system_meta[serializeHash(hash(header))];
+        const dhtHeaders = state.metadata.system_meta[hash(header)];
         return dhtHeaders
             ? dhtHeaders.find(metaVal => metaVal.Delete)
             : true;
     });
-    state.metadata.misc_meta[serializeHash(entryHash)] = {
+    state.metadata.misc_meta[entryHash] = {
         EntryStatus: entryIsAlive ? EntryDhtStatus.Live : EntryDhtStatus.Dead,
     };
 };
@@ -836,31 +835,30 @@ const register_header_on_basis = (basis, header) => (state) => {
     }
 };
 const putSystemMetadata = (basis, value) => (state) => {
-    const basisStr = serializeHash(basis);
-    if (!state.metadata.system_meta[basisStr]) {
-        state.metadata.system_meta[basisStr] = [];
+    if (!state.metadata.system_meta[basis]) {
+        state.metadata.system_meta[basis] = [];
     }
-    state.metadata.system_meta[basisStr].push(value);
+    state.metadata.system_meta[basis].push(value);
 };
 const putDhtOpToIntegrated = (dhtOpHash, integratedValue) => (state) => {
-    state.integratedDHTOps[serializeHash(dhtOpHash)] = integratedValue;
+    state.integratedDHTOps[dhtOpHash] = integratedValue;
 };
 
 /**
  * Returns the header hashes which don't have their DHTOps in the authoredDHTOps DB
  */
 function getNewHeaders(state) {
-    return state.sourceChain.filter(headerHash => !Object.keys(state.authoredDHTOps).includes(serializeHash(headerHash)));
+    return state.sourceChain.filter(headerHash => !Object.keys(state.authoredDHTOps).includes(headerHash));
 }
 
 const putElement = (element) => (state) => {
     // Put header in CAS
     const headerHash = element.signed_header.header.hash;
-    state.CAS[serializeHash(headerHash)] = element.signed_header;
+    state.CAS[headerHash] = element.signed_header;
     // Put entry in CAS if it exist
     if (element.entry) {
         const entryHash = hashEntry(element.entry);
-        state.CAS[serializeHash(entryHash)] = element.entry;
+        state.CAS[entryHash] = element.entry;
     }
     state.sourceChain.unshift(headerHash);
 };
@@ -873,22 +871,22 @@ function getAuthor(cellState) {
 }
 function getDnaHash(state) {
     const firstHeaderHash = state.sourceChain[state.sourceChain.length - 1];
-    const dna = state.CAS[serializeHash(firstHeaderHash)];
+    const dna = state.CAS[firstHeaderHash];
     return dna.header.content.hash;
 }
 function getHeaderAt(cellState, index) {
     const headerHash = cellState.sourceChain[index];
-    return cellState.CAS[serializeHash(headerHash)];
+    return cellState.CAS[headerHash];
 }
 function getNextHeaderSeq(cellState) {
     return cellState.sourceChain.length;
 }
 function getElement(state, headerHash) {
-    const signed_header = state.CAS[serializeHash(headerHash)];
+    const signed_header = state.CAS[headerHash];
     let entry;
     if (signed_header.header.content.type == HeaderType.Create ||
         signed_header.header.content.type == HeaderType.Update) {
-        entry = state.CAS[serializeHash(signed_header.header.content.entry_hash)];
+        entry = state.CAS[signed_header.header.content.entry_hash];
     }
     return { signed_header, entry };
 }
@@ -1008,7 +1006,7 @@ const integrate_dht_ops = async (cell) => {
             validation_status: integrationLimboValue.validation_status,
             when_integrated: Date.now(),
         };
-        putDhtOpToIntegrated(deserializeHash(dhtOpHash), value)(cell.state);
+        putDhtOpToIntegrated(dhtOpHash, value)(cell.state);
     }
 };
 function integrate_dht_ops_task(cell) {
@@ -1023,10 +1021,9 @@ function integrate_dht_ops_task(cell) {
 const app_validation = async (cell) => {
     const pendingDhtOps = getValidationLimboDhtOps(cell.state, ValidationLimboStatus.SysValidated);
     // TODO: actually validate
-    for (const dhtOpHashStr of Object.keys(pendingDhtOps)) {
-        const dhtOpHash = deserializeHash(dhtOpHashStr);
+    for (const dhtOpHash of Object.keys(pendingDhtOps)) {
         deleteValidationLimboValue(dhtOpHash)(cell.state);
-        const validationLimboValue = pendingDhtOps[dhtOpHashStr];
+        const validationLimboValue = pendingDhtOps[dhtOpHash];
         const value = {
             op: validationLimboValue.op,
             validation_status: ValidationStatus.Valid,
@@ -1125,14 +1122,14 @@ const publish_dht_ops = async (cell) => {
     const dhtOpsByBasis = {};
     for (const dhtOpHash of Object.keys(dhtOps)) {
         const dhtOp = dhtOps[dhtOpHash];
-        const basis = serializeHash(getDHTOpBasis(dhtOp));
+        const basis = getDHTOpBasis(dhtOp);
         if (!dhtOpsByBasis[basis])
             dhtOpsByBasis[basis] = {};
         dhtOpsByBasis[basis][dhtOpHash] = dhtOp;
     }
     const promises = Object.entries(dhtOpsByBasis).map(async ([basis, dhtOps]) => {
         // Publish the operations
-        await cell.p2p.publish(deserializeHash(basis), dhtOps);
+        await cell.p2p.publish(basis, dhtOps);
         for (const dhtOpHash of Object.keys(dhtOps)) {
             cell.state.authoredDHTOps[dhtOpHash].last_publish_time = Date.now();
         }
@@ -1160,7 +1157,7 @@ const produce_dht_ops = async (cell) => {
                 last_publish_time: undefined,
                 receipt_count: 0,
             };
-            cell.state.authoredDHTOps[serializeHash(dhtOpHash)] = dhtOpValue;
+            cell.state.authoredDHTOps[dhtOpHash] = dhtOpValue;
         }
     }
     cell.triggerWorkflow(publish_dht_ops_task(cell));
@@ -1214,7 +1211,6 @@ const sys_validation = async (cell) => {
     for (const dhtOpHash of Object.keys(pendingDhtOps)) {
         const limboValue = pendingDhtOps[dhtOpHash];
         limboValue.status = ValidationLimboStatus.SysValidated;
-        putValidationLimboValue(deserializeHash(dhtOpHash), limboValue);
     }
     cell.triggerWorkflow(app_validation_task(cell));
 };
@@ -1239,7 +1235,7 @@ const incoming_dht_ops = (basis, dhtOps, from_agent) => async (cell) => {
             status: ValidationLimboStatus.Pending,
             time_added: Date.now(),
         };
-        putValidationLimboValue(deserializeHash(dhtOpHash), validationLimboValue)(cell.state);
+        putValidationLimboValue(dhtOpHash, validationLimboValue)(cell.state);
     }
     cell.triggerWorkflow(sys_validation_task(cell));
 };
@@ -1254,6 +1250,10 @@ class Cell {
             'after-workflow-executed': new Subject(),
             'before-workflow-executed': new Subject(),
         };
+        // Let genesis be run before actually joining
+        setTimeout(() => {
+            this.p2p.join(this);
+        });
     }
     #pendingWorkflows;
     #signals;
@@ -1270,7 +1270,7 @@ class Cell {
         return this.#signals;
     }
     getSimulatedDna() {
-        return this.conductor.registeredDnas[serializeHash(this.dnaHash)];
+        return this.conductor.registeredDnas[this.dnaHash];
     }
     static async create(conductor, cellId, membrane_proof) {
         const newCellState = {
@@ -1300,7 +1300,7 @@ class Cell {
     }
     triggerWorkflow(workflow) {
         this.#pendingWorkflows.push(workflow);
-        this._runPendingWorkflows();
+        setTimeout(() => this._runPendingWorkflows());
     }
     async _runPendingWorkflows() {
         const workflowsToRun = this.#pendingWorkflows;
@@ -1334,6 +1334,15 @@ class Cell {
     }
 }
 
+function getClosestNeighbors(peers, targetHash, numNeighbors) {
+    const sortedPeers = peers.sort((agentA, agentB) => {
+        const distanceA = distance(targetHash, agentA);
+        const distanceB = distance(targetHash, agentB);
+        return compareBigInts(distanceA, distanceB);
+    });
+    return sortedPeers.slice(0, numNeighbors);
+}
+
 // From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/types/actor.rs
 class P2pCell {
     constructor(state, cellId, network) {
@@ -1347,8 +1356,14 @@ class P2pCell {
             redundancyFactor: this.redundancyFactor,
         };
     }
-    async join(dnaHash, agent_pub_key) { }
-    async leave(dnaHash, agent_pub_key) { }
+    async join(containerCell) {
+        const dnaHash = this.cellId[0];
+        const agentPubKey = this.cellId[1];
+        this.network.conductor.bootstrapService.announceCell(containerCell);
+        const neighbors = this.network.conductor.bootstrapService.getNeighbors(dnaHash, agentPubKey, this.redundancyFactor);
+        this.peers = neighbors.map(cell => cell.agentPubKey);
+    }
+    async leave() { }
     async publish(dht_hash, ops) {
         const neighbors = this._getClosestNeighbors(dht_hash, this.redundancyFactor);
         const promises = neighbors.map(neighbor => this._sendMessage(neighbor, cell => cell.handle_publish(this.cellId[1], dht_hash, ops)));
@@ -1362,12 +1377,7 @@ class P2pCell {
         return this.peers;
     }
     _getClosestNeighbors(basisHash, neighborCount) {
-        const sortedPeers = [...this.peers, this.cellId[1]].sort((agentA, agentB) => {
-            const distanceA = distance(basisHash, agentA);
-            const distanceB = distance(basisHash, agentB);
-            return compareBigInts(distanceA, distanceB);
-        });
-        return sortedPeers.slice(0, neighborCount);
+        return getClosestNeighbors([...this.peers, this.cellId[1]], basisHash, neighborCount);
     }
     _sendMessage(toAgent, message) {
         return this.network.sendMessage(this.cellId[0], this.cellId[1], toAgent, message);
@@ -1377,52 +1387,49 @@ class P2pCell {
 class Network {
     constructor(state, conductor) {
         this.conductor = conductor;
-        this.p2pCells = state.p2pCellsState.map(s => ({
-            id: s.id,
-            p2pCell: new P2pCell(s.state, s.id, this),
-        }));
-        this.peerCells = {};
-    }
-    getState() {
-        return {
-            p2pCellsState: this.p2pCells.map(c => ({
-                id: c.id,
-                state: c.p2pCell.getState(),
-            })),
-        };
-    }
-    // TODO: change this to simulate networking if necessary
-    connectWith(conductor) {
-        for (const myCell of this.p2pCells) {
-            const cellDna = serializeHash(myCell.id[0]);
-            for (const cell of conductor.cells) {
-                if (serializeHash(cell.id[0]) === cellDna) {
-                    if (!this.peerCells[cellDna])
-                        this.peerCells[cellDna] = {};
-                    this.peerCells[cellDna][serializeHash(cell.id[1])] = cell.cell;
-                    myCell.p2pCell.peers.push(cell.id[1]);
-                }
+        this.p2pCells = {};
+        for (const [dnaHash, p2pState] of Object.entries(state.p2pCellsState)) {
+            if (!this.p2pCells[dnaHash])
+                this.p2pCells[dnaHash];
+            for (const [agentPubKey, p2pCellState] of Object.entries(p2pState)) {
+                this.p2pCells[dnaHash][agentPubKey] = new P2pCell(p2pCellState, [dnaHash, agentPubKey], this);
             }
         }
     }
+    getState() {
+        const p2pCellsState = {};
+        for (const [dnaHash, dnaP2pCells] of Object.entries(this.p2pCells)) {
+            if (!p2pCellsState[dnaHash])
+                p2pCellsState[dnaHash] = {};
+            for (const [agentPubKey, p2pCell] of Object.entries(dnaP2pCells)) {
+                p2pCellsState[dnaHash][agentPubKey] = p2pCell.getState();
+            }
+        }
+        return {
+            p2pCellsState,
+        };
+    }
+    getAllP2pCells() {
+        const nestedCells = Object.values(this.p2pCells).map(dnaCells => Object.values(dnaCells));
+        return [].concat(...nestedCells);
+    }
     createP2pCell(cellId) {
-        const peersOfTheSameDna = this.peerCells[serializeHash(cellId[0])];
-        const peersAlreadyKnown = peersOfTheSameDna
-            ? Object.keys(peersOfTheSameDna).map(deserializeHash)
-            : [];
+        const dnaHash = cellId[0];
         const state = {
-            peers: peersAlreadyKnown,
-            redundancyFactor: 3,
+            peers: [],
+            redundancyFactor: 20,
         };
         const p2pCell = new P2pCell(state, cellId, this);
-        this.p2pCells.push({ id: cellId, p2pCell });
+        if (!this.p2pCells[dnaHash])
+            this.p2pCells[dnaHash] = {};
+        this.p2pCells[dnaHash][cellId[1]] = p2pCell;
         return p2pCell;
     }
     sendMessage(dna, fromAgent, toAgent, message) {
-        const localCell = this.conductor.cells.find(cell => isEqual(cell.id[0], dna) && isEqual(cell.id[1], toAgent));
+        const localCell = this.conductor.cells[dna] && this.conductor.cells[dna][toAgent];
         if (localCell)
-            return message(localCell.cell);
-        return message(this.peerCells[serializeHash(dna)][serializeHash(toAgent)]);
+            return message(localCell);
+        return message(this.conductor.bootstrapService.cells[dna][toAgent]);
     }
 }
 
@@ -1434,53 +1441,65 @@ class ImmediateExecutor {
 }
 
 class Conductor {
-    constructor(state, executor) {
+    constructor(state, bootstrapService, executor) {
+        this.bootstrapService = bootstrapService;
         this.executor = executor;
         this.network = new Network(state.networkState, this);
-        this.cells = state.cellsState.map(({ id, state }) => ({
-            id,
-            cell: new Cell(state, this, this.network.createP2pCell(id)),
-        }));
         this.registeredDnas = state.registeredDnas;
         this.registeredTemplates = state.registeredTemplates;
+        this.cells = {};
+        for (const [dnaHash, dnaCellsStates] of Object.entries(state.cellsState)) {
+            if (!this.cells[dnaHash])
+                this.cells[dnaHash] = {};
+            for (const [agentPubKey, cellState] of Object.entries(dnaCellsStates)) {
+                this.cells[dnaHash][agentPubKey] = new Cell(cellState, this, this.network.createP2pCell(getCellId(cellState)));
+            }
+        }
     }
-    static async create(executor = new ImmediateExecutor()) {
+    static async create(bootstrapService, executor = new ImmediateExecutor()) {
         const state = {
-            cellsState: [],
+            cellsState: {},
             networkState: {
-                p2pCellsState: [],
+                p2pCellsState: {},
             },
             registeredDnas: {},
             registeredTemplates: {},
         };
-        return new Conductor(state, executor);
+        return new Conductor(state, bootstrapService, executor);
     }
     getState() {
+        const cellsState = {};
+        for (const [dnaHash, dnaCells] of Object.entries(this.cells)) {
+            for (const [agentPubKey, cell] of Object.entries(dnaCells)) {
+                cellsState[dnaHash][agentPubKey] = cell.getState();
+            }
+        }
         return {
             networkState: this.network.getState(),
-            cellsState: this.cells.map(c => ({
-                id: c.id,
-                state: c.cell.getState(),
-            })),
+            cellsState,
             registeredDnas: this.registeredDnas,
             registeredTemplates: this.registeredTemplates,
         };
     }
+    getAllCells() {
+        const nestedCells = Object.values(this.cells).map(dnaCells => Object.values(dnaCells));
+        return [].concat(...nestedCells);
+    }
     getCells(dnaHash) {
-        const dnaHashStr = serializeHash(dnaHash);
-        return this.cells
-            .filter(cell => serializeHash(cell.id[1]) === dnaHashStr)
-            .map(c => c.cell);
+        return Object.values(this.cells[dnaHash]);
+    }
+    getCell(dnaHash, agentPubKey) {
+        return this.cells[dnaHash][agentPubKey];
     }
     async registerDna(dna_template) {
         const templateHash = hash(dna_template);
-        this.registeredTemplates[serializeHash(templateHash)] = dna_template;
+        this.registeredTemplates[templateHash] = dna_template;
         return templateHash;
     }
     async installApp(dna_hash, membrane_proof, properties, uuid) {
         const rand = `${Math.random().toString()}/${Date.now()}`;
         const agentId = hash(rand);
-        const template = this.registeredTemplates[serializeHash(dna_hash)];
+        const template = this.registeredTemplates[dna_hash];
         if (!template) {
             throw new Error(`The given dna is not registered on this conductor`);
         }
@@ -1490,20 +1509,21 @@ class Conductor {
             uuid,
         };
         const dnaHash = hash(dna);
-        this.registeredDnas[serializeHash(dnaHash)] = dna;
+        this.registeredDnas[dnaHash] = dna;
         const cellId = [dnaHash, agentId];
         const cell = await Cell.create(this, cellId, membrane_proof);
-        this.cells.push({ id: cell.cellId, cell });
+        if (!this.cells[cell.dnaHash])
+            this.cells[cell.dnaHash] = {};
+        this.cells[cell.dnaHash][cell.agentPubKey] = cell;
         return cell;
     }
     callZomeFn(args) {
-        const dnaHashStr = serializeHash(args.cellId[0]);
-        const agentPubKeyStr = serializeHash(args.cellId[1]);
-        const cell = this.cells.find(cell => serializeHash(cell.id[0]) === dnaHashStr &&
-            serializeHash(cell.id[1]) === agentPubKeyStr);
+        const dnaHash = args.cellId[0];
+        const agentPubKey = args.cellId[1];
+        const cell = this.cells[dnaHash][agentPubKey];
         if (!cell)
-            throw new Error(`No cells existst with cellId ${dnaHashStr}:${agentPubKeyStr}`);
-        return cell.cell.callZomeFn({
+            throw new Error(`No cells existst with cellId ${dnaHash}:${agentPubKey}`);
+        return cell.callZomeFn({
             zome: args.zome,
             cap: args.cap,
             fnName: args.fnName,
@@ -1568,20 +1588,29 @@ class DelayExecutor {
     }
 }
 
-function hookUpConductors(conductors) {
-    for (let i = 0; i < conductors.length; i += 1) {
-        for (let j = 0; j < conductors.length; j += 1) {
-            if (i !== j) {
-                conductors[i].network.connectWith(conductors[j]);
-            }
-        }
+class BootstrapService {
+    constructor() {
+        this.cells = {};
+    }
+    announceCell(cell) {
+        if (!this.cells[cell.dnaHash])
+            this.cells[cell.dnaHash] = {};
+        this.cells[cell.dnaHash][cell.agentPubKey] = cell;
+    }
+    getNeighbors(dnaHash, agentPubKey, numNeighbors) {
+        const cells = Object.keys(this.cells[dnaHash]).filter(cellPubKey => cellPubKey !== agentPubKey);
+        const neighborsKeys = getClosestNeighbors(cells, agentPubKey, numNeighbors);
+        return neighborsKeys.map(pubKey => this.cells[dnaHash][pubKey]);
     }
 }
 
 async function createConductors(conductorsToCreate, executor, currentConductors, dnaTemplate) {
+    const bootstrapService = currentConductors.length === 0
+        ? new BootstrapService()
+        : currentConductors[0].bootstrapService;
     const newConductorsPromises = [];
     for (let i = 0; i < conductorsToCreate; i++) {
-        const conductor = Conductor.create(executor);
+        const conductor = Conductor.create(bootstrapService, executor);
         newConductorsPromises.push(conductor);
     }
     const newConductors = await Promise.all(newConductorsPromises);
@@ -1590,7 +1619,6 @@ async function createConductors(conductorsToCreate, executor, currentConductors,
         const dnaHash = await c.registerDna(dnaTemplate);
         await c.installApp(dnaHash, null, null, '');
     }));
-    hookUpConductors(allConductors);
     return allConductors;
 }
 

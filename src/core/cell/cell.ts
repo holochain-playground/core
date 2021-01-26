@@ -8,14 +8,12 @@ import {
 } from '@holochain-open-dev/core-types';
 import { Conductor } from '../conductor';
 import { genesis } from './workflows/genesis';
-import { Executor, Task } from '../../executor/executor';
-import { ImmediateExecutor } from '../../executor/immediate-executor';
+import { Task } from '../../executor/executor';
 import { callZomeFn } from './workflows/call_zome_fn';
-import { getCellId, getDnaHash } from './source-chain/utils';
+import { getCellId } from './source-chain/utils';
 import { P2pCell } from '../network/p2p-cell';
 import { incoming_dht_ops } from './workflows/incoming_dht_ops';
 import { CellState } from './state';
-import { serializeHash } from '@holochain-open-dev/common';
 
 export type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export type CellSignalListener = (payload: any) => void;
@@ -32,7 +30,12 @@ export class Cell {
     public state: CellState,
     public conductor: Conductor,
     public p2p: P2pCell
-  ) {}
+  ) {
+    // Let genesis be run before actually joining
+    setTimeout(() => {
+      this.p2p.join(this);
+    });
+  }
 
   get cellId(): CellId {
     return getCellId(this.state);
@@ -51,7 +54,7 @@ export class Cell {
   }
 
   getSimulatedDna() {
-    return this.conductor.registeredDnas[serializeHash(this.dnaHash)];
+    return this.conductor.registeredDnas[this.dnaHash];
   }
 
   static async create(
@@ -93,7 +96,7 @@ export class Cell {
   triggerWorkflow(workflow: Task<any>) {
     this.#pendingWorkflows.push(workflow);
 
-    this._runPendingWorkflows();
+    setTimeout(() => this._runPendingWorkflows());
   }
 
   async _runPendingWorkflows() {

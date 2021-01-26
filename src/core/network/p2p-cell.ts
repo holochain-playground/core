@@ -6,7 +6,9 @@ import {
   Hash,
 } from '@holochain-open-dev/core-types';
 import { compareBigInts, distance } from '../../processors/hash';
+import { Cell } from '../cell';
 import { Network, NetworkMessage } from './network';
+import { getClosestNeighbors } from './utils';
 
 export type P2pCellState = {
   peers: Hash[];
@@ -34,9 +36,22 @@ export class P2pCell {
     };
   }
 
-  async join(dnaHash: Hash, agent_pub_key: AgentPubKey): Promise<void> {}
+  async join(containerCell: Cell): Promise<void> {
+    const dnaHash = this.cellId[0];
+    const agentPubKey = this.cellId[1];
 
-  async leave(dnaHash: Hash, agent_pub_key: AgentPubKey): Promise<void> {}
+    this.network.conductor.bootstrapService.announceCell(containerCell);
+
+    const neighbors = this.network.conductor.bootstrapService.getNeighbors(
+      dnaHash,
+      agentPubKey,
+      this.redundancyFactor
+    );
+
+    this.peers = neighbors.map(cell => cell.agentPubKey);
+  }
+
+  async leave(): Promise<void> {}
 
   async publish(dht_hash: Hash, ops: Dictionary<DHTOp>): Promise<void> {
     const neighbors = this._getClosestNeighbors(
@@ -70,15 +85,11 @@ export class P2pCell {
     basisHash: Hash,
     neighborCount: number
   ): Array<AgentPubKey> {
-    const sortedPeers = [...this.peers, this.cellId[1]].sort(
-      (agentA: Hash, agentB: Hash) => {
-        const distanceA = distance(basisHash, agentA);
-        const distanceB = distance(basisHash, agentB);
-        return compareBigInts(distanceA, distanceB);
-      }
+    return getClosestNeighbors(
+      [...this.peers, this.cellId[1]],
+      basisHash,
+      neighborCount
     );
-
-    return sortedPeers.slice(0, neighborCount);
   }
 
   private _sendMessage<T>(
