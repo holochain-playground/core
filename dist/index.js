@@ -1246,7 +1246,7 @@ class Cell {
         this.conductor = conductor;
         this.p2p = p2p;
         this.#pendingWorkflows = [];
-        this.#signals = {
+        this.signals = {
             'after-workflow-executed': new Subject(),
             'before-workflow-executed': new Subject(),
         };
@@ -1256,7 +1256,6 @@ class Cell {
         });
     }
     #pendingWorkflows;
-    #signals;
     get cellId() {
         return getCellId(this.state);
     }
@@ -1265,9 +1264,6 @@ class Cell {
     }
     get dnaHash() {
         return this.cellId[0];
-    }
-    get signals() {
-        return this.#signals;
     }
     getSimulatedDna() {
         return this.conductor.registeredDnas[this.dnaHash];
@@ -1309,9 +1305,9 @@ class Cell {
         await Promise.all(promises);
     }
     async _runWorkflow(workflow) {
-        this.#signals['before-workflow-executed'].next(workflow);
+        this.signals['before-workflow-executed'].next(workflow);
         const result = await this.conductor.executor.execute(workflow);
-        this.#signals['after-workflow-executed'].next(workflow);
+        this.signals['after-workflow-executed'].next(workflow);
         return result;
     }
     /** Workflows */
@@ -1348,6 +1344,9 @@ class P2pCell {
     constructor(state, cellId, network) {
         this.cellId = cellId;
         this.network = network;
+        this.signals = {
+            'before-network-request': new Subject(),
+        };
         this.peers = state.peers;
     }
     getState() {
@@ -1366,7 +1365,9 @@ class P2pCell {
     async leave() { }
     async publish(dht_hash, ops) {
         const neighbors = this._getClosestNeighbors(dht_hash, this.redundancyFactor);
-        const promises = neighbors.map(neighbor => this._sendMessage(neighbor, cell => cell.handle_publish(this.cellId[1], dht_hash, ops)));
+        if (neighbors.length < this.redundancyFactor)
+            throw new Error(`Couldn't publish dht ops: too few neighbors`);
+        const promises = neighbors.map(neighbor => this._sendRequest(neighbor, cell => cell.handle_publish(this.cellId[1], dht_hash, ops)));
         await Promise.all(promises);
     }
     async get(dna_hash, from_agent, dht_hash, _options // TODO: complete?
@@ -1379,8 +1380,12 @@ class P2pCell {
     _getClosestNeighbors(basisHash, neighborCount) {
         return getClosestNeighbors([...this.peers, this.cellId[1]], basisHash, neighborCount);
     }
-    _sendMessage(toAgent, message) {
-        return this.network.sendMessage(this.cellId[0], this.cellId[1], toAgent, message);
+    _sendRequest(toAgent, message) {
+        this.signals['before-network-request'].next({
+            fromAgent: this.cellId[0],
+            toAgent: toAgent,
+        });
+        return this.network.sendRequest(this.cellId[0], this.cellId[1], toAgent, message);
     }
 }
 
@@ -1425,11 +1430,17 @@ class Network {
         this.p2pCells[dnaHash][cellId[1]] = p2pCell;
         return p2pCell;
     }
-    sendMessage(dna, fromAgent, toAgent, message) {
-        const localCell = this.conductor.cells[dna] && this.conductor.cells[dna][toAgent];
-        if (localCell)
-            return message(localCell);
-        return message(this.conductor.bootstrapService.cells[dna][toAgent]);
+    sendRequest(dna, fromAgent, toAgent, message) {
+        return this.conductor.executor.execute({
+            name: 'Send Network Request',
+            description: `From: ${fromAgent}, To: ${toAgent}`,
+            task: () => {
+                const localCell = this.conductor.cells[dna] && this.conductor.cells[dna][toAgent];
+                if (localCell)
+                    return message(localCell);
+                return message(this.conductor.bootstrapService.cells[dna][toAgent]);
+            },
+        });
     }
 }
 

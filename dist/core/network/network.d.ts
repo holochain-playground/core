@@ -12,6 +12,6 @@ export declare class Network {
     getState(): NetworkState;
     getAllP2pCells(): P2pCell[];
     createP2pCell(cellId: CellId): P2pCell;
-    sendMessage<T>(dna: Hash, fromAgent: Hash, toAgent: Hash, message: NetworkMessage<T>): Promise<T>;
+    sendRequest<T>(dna: Hash, fromAgent: Hash, toAgent: Hash, message: NetworkRequest<T>): Promise<T>;
 }
-export declare type NetworkMessage<T> = (cell: Cell) => Promise<T>;
+export declare type NetworkRequest<T> = (cell: Cell) => Promise<T>;

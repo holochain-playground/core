@@ -11,14 +11,14 @@ export declare class Cell {
     state: CellState;
     conductor: Conductor;
     p2p: P2pCell;
+    signals: {
+        'after-workflow-executed': Subject<Task<any>>;
+        'before-workflow-executed': Subject<Task<any>>;
+    };
     constructor(state: CellState, conductor: Conductor, p2p: P2pCell);
     get cellId(): CellId;
     get agentPubKey(): AgentPubKey;
     get dnaHash(): Hash;
-    get signals(): {
-        'after-workflow-executed': Subject<Task<any>>;
-        'before-workflow-executed': Subject<Task<any>>;
-    };
     getSimulatedDna(): import("../..").SimulatedDna;
     static create(conductor: Conductor, cellId: CellId, membrane_proof: any): Promise<Cell>;
     getState(): CellState;
