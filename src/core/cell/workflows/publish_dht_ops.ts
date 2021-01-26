@@ -22,7 +22,7 @@ export const publish_dht_ops = async (cell: Cell): Promise<void> => {
 
   for (const dhtOpHash of Object.keys(dhtOps)) {
     const dhtOp = dhtOps[dhtOpHash];
-    const basis = serializeHash(getDHTOpBasis(dhtOp));
+    const basis = getDHTOpBasis(dhtOp);
 
     if (!dhtOpsByBasis[basis]) dhtOpsByBasis[basis] = {};
 
@@ -32,7 +32,7 @@ export const publish_dht_ops = async (cell: Cell): Promise<void> => {
   const promises = Object.entries(dhtOpsByBasis).map(
     async ([basis, dhtOps]) => {
       // Publish the operations
-      await cell.p2p.publish(deserializeHash(basis), dhtOps);
+      await cell.p2p.publish(basis, dhtOps);
 
       for (const dhtOpHash of Object.keys(dhtOps)) {
         cell.state.authoredDHTOps[dhtOpHash].last_publish_time = Date.now();

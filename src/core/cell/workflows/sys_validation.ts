@@ -1,4 +1,3 @@
-import { deserializeHash } from '@holochain-open-dev/common';
 import { Task } from '../../../executor/executor';
 import { Cell } from '../../cell';
 import { ValidationLimboStatus } from '../state';
@@ -19,7 +18,7 @@ export const sys_validation = async (cell: Cell): Promise<void> => {
 
     limboValue.status = ValidationLimboStatus.SysValidated;
 
-    putValidationLimboValue(deserializeHash(dhtOpHash), limboValue);
+    putValidationLimboValue(dhtOpHash, limboValue);
   }
 
   cell.triggerWorkflow(app_validation_task(cell));

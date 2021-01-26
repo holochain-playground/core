@@ -27,32 +27,31 @@ export const putValidationLimboValue = (
   dhtOpHash: Hash,
   validationLimboValue: ValidationLimboValue
 ) => (state: CellState) => {
-  state.validationLimbo[serializeHash(dhtOpHash)] = validationLimboValue;
+  state.validationLimbo[dhtOpHash] = validationLimboValue;
 };
 
 export const deleteValidationLimboValue = (dhtOpHash: Hash) => (
   state: CellState
 ) => {
-  const hash = serializeHash(dhtOpHash);
-  delete state.validationLimbo[hash];
+  delete state.validationLimbo[dhtOpHash];
 };
 
 export const putIntegrationLimboValue = (
   dhtOpHash: Hash,
   integrationLimboValue: IntegrationLimboValue
 ) => (state: CellState) => {
-  state.integrationLimbo[serializeHash(dhtOpHash)] = integrationLimboValue;
+  state.integrationLimbo[dhtOpHash] = integrationLimboValue;
 };
 
 export const putDhtOpData = (dhtOp: DHTOp) => async (state: CellState) => {
   const headerHash = hash(dhtOp.header);
-  state.CAS[serializeHash(headerHash)] = dhtOp.header;
+  state.CAS[headerHash] = dhtOp.header;
 
   const entry = getEntry(dhtOp);
 
   if (entry) {
     const entryHash = hashEntry(entry);
-    state.CAS[serializeHash(entryHash)] = entry;
+    state.CAS[entryHash] = entry;
   }
 };
 
@@ -60,7 +59,7 @@ export const putDhtOpMetadata = (dhtOp: DHTOp) => (state: CellState) => {
   const headerHash = hash(dhtOp.header);
 
   if (dhtOp.type === DHTOpType.StoreElement) {
-    state.metadata.misc_meta[serializeHash(headerHash)] = 'StoreElement';
+    state.metadata.misc_meta[headerHash] = 'StoreElement';
   } else if (dhtOp.type === DHTOpType.StoreEntry) {
     const entryHash = dhtOp.header.header.content.entry_hash;
 
@@ -72,13 +71,11 @@ export const putDhtOpMetadata = (dhtOp: DHTOp) => (state: CellState) => {
     register_header_on_basis(entryHash, dhtOp.header.header.content)(state);
     update_entry_dht_status(entryHash)(state);
   } else if (dhtOp.type === DHTOpType.RegisterAgentActivity) {
-    state.metadata.misc_meta[serializeHash(headerHash)] = {
+    state.metadata.misc_meta[headerHash] = {
       ChainItem: dhtOp.header.header.content.timestamp,
     };
 
-    state.metadata.misc_meta[
-      serializeHash(dhtOp.header.header.content.author)
-    ] = {
+    state.metadata.misc_meta[dhtOp.header.header.content.author] = {
       ChainStatus: ChainStatus.Valid,
     };
   } else if (
@@ -140,7 +137,7 @@ const update_entry_dht_status = (entryHash: Hash) => (state: CellState) => {
   const headers = getHeadersForEntry(state, entryHash);
 
   const entryIsAlive = headers.some(header => {
-    const dhtHeaders = state.metadata.system_meta[serializeHash(hash(header))];
+    const dhtHeaders = state.metadata.system_meta[hash(header)];
     return dhtHeaders
       ? dhtHeaders.find(
           metaVal =>
@@ -151,7 +148,7 @@ const update_entry_dht_status = (entryHash: Hash) => (state: CellState) => {
       : true;
   });
 
-  state.metadata.misc_meta[serializeHash(entryHash)] = {
+  state.metadata.misc_meta[entryHash] = {
     EntryStatus: entryIsAlive ? EntryDhtStatus.Live : EntryDhtStatus.Dead,
   };
 };
@@ -177,17 +174,16 @@ export const register_header_on_basis = (basis: Hash, header: Header) => (
 export const putSystemMetadata = (basis: Hash, value: SysMetaVal) => (
   state: CellState
 ) => {
-  const basisStr = serializeHash(basis);
-  if (!state.metadata.system_meta[basisStr]) {
-    state.metadata.system_meta[basisStr] = [];
+  if (!state.metadata.system_meta[basis]) {
+    state.metadata.system_meta[basis] = [];
   }
 
-  state.metadata.system_meta[basisStr].push(value);
+  state.metadata.system_meta[basis].push(value);
 };
 
 export const putDhtOpToIntegrated = (
   dhtOpHash: Hash,
   integratedValue: IntegratedDhtOpsValue
 ) => (state: CellState) => {
-  state.integratedDHTOps[serializeHash(dhtOpHash)] = integratedValue;
+  state.integratedDHTOps[dhtOpHash] = integratedValue;
 };

@@ -50,11 +50,11 @@ export function getHeadersForEntry(
   state: CellState,
   entryHash: Hash
 ): SignedHeaderHashed[] {
-  return state.metadata.system_meta[serializeHash(entryHash)]
+  return state.metadata.system_meta[entryHash]
     .map(h => {
       const hash = getSysMetaValHeaderHash(h);
       if (hash) {
-        return state.CAS[serializeHash(hash)];
+        return state.CAS[hash];
       }
       return undefined;
     })
@@ -74,7 +74,7 @@ export function getEntryDhtStatus(
   state: CellState,
   entryHash: Hash
 ): EntryDhtStatus | undefined {
-  const meta = state.metadata.misc_meta[serializeHash(entryHash)];
+  const meta = state.metadata.misc_meta[entryHash];
 
   return meta
     ? (meta as {
@@ -87,7 +87,7 @@ export function getEntryDetails(
   state: CellState,
   entryHash: Hash
 ): EntryDetails {
-  const entry = state.CAS[serializeHash(entryHash)];
+  const entry = state.CAS[entryHash];
   const headers = getHeadersForEntry(state, entryHash);
   const dhtStatus = getEntryDhtStatus(state, entryHash);
 
@@ -123,7 +123,7 @@ export function getAllAuthoredEntries(state: CellState): Hash[] {
 }
 
 export function isHoldingEntry(state: CellState, entryHash: Hash): boolean {
-  return state.metadata.system_meta[serializeHash(entryHash)] !== undefined;
+  return state.metadata.system_meta[entryHash] !== undefined;
 }
 
 export interface EntryDHTInfo {
@@ -137,7 +137,7 @@ export function getDhtShard(state: CellState): Dictionary<EntryDHTInfo> {
   const dhtShard: Dictionary<EntryDHTInfo> = {};
 
   for (const entryHash of heldEntries) {
-    dhtShard[serializeHash(entryHash)] = {
+    dhtShard[entryHash] = {
       details: getEntryDetails(state, entryHash),
       links: getLinksForEntry(state, entryHash),
     };

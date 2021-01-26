@@ -24,8 +24,7 @@ export function getAuthor(cellState: CellState): AgentPubKey {
 export function getDnaHash(state: CellState): Hash {
   const firstHeaderHash = state.sourceChain[state.sourceChain.length - 1];
 
-  const dna: SignedHeaderHashed<Dna> =
-    state.CAS[serializeHash(firstHeaderHash)];
+  const dna: SignedHeaderHashed<Dna> = state.CAS[firstHeaderHash];
   return dna.header.content.hash;
 }
 
@@ -34,7 +33,7 @@ export function getHeaderAt(
   index: number
 ): SignedHeaderHashed {
   const headerHash = cellState.sourceChain[index];
-  return cellState.CAS[serializeHash(headerHash)];
+  return cellState.CAS[headerHash];
 }
 
 export function getNextHeaderSeq(cellState: CellState): number {
@@ -42,15 +41,14 @@ export function getNextHeaderSeq(cellState: CellState): number {
 }
 
 export function getElement(state: CellState, headerHash: Hash): Element {
-  const signed_header: SignedHeaderHashed =
-    state.CAS[serializeHash(headerHash)];
+  const signed_header: SignedHeaderHashed = state.CAS[headerHash];
 
   let entry;
   if (
     signed_header.header.content.type == HeaderType.Create ||
     signed_header.header.content.type == HeaderType.Update
   ) {
-    entry = state.CAS[serializeHash(signed_header.header.content.entry_hash)];
+    entry = state.CAS[signed_header.header.content.entry_hash];
   }
   return { signed_header, entry };
 }

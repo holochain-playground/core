@@ -32,7 +32,7 @@ export const produce_dht_ops = async (cell: Cell): Promise<void> => {
         receipt_count: 0,
       };
 
-      cell.state.authoredDHTOps[serializeHash(dhtOpHash)] = dhtOpValue;
+      cell.state.authoredDHTOps[dhtOpHash] = dhtOpValue;
     }
   }
 

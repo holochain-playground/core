@@ -1,6 +1,10 @@
-import { CellId, Dictionary, Hash } from '@holochain-open-dev/core-types';
-import { serializeHash } from '@holochain-open-dev/common';
-import { Cell } from '../core/cell';
+import {
+  AgentPubKey,
+  CellId,
+  Dictionary,
+  Hash,
+} from '@holochain-open-dev/core-types';
+import { Cell, getCellId } from '../core/cell';
 import { hash } from '../processors/hash';
 import { Network, NetworkState } from './network/network';
 
@@ -8,69 +12,101 @@ import { SimulatedDna, SimulatedDnaTemplate } from '../dnas/simulated-dna';
 import { CellState } from './cell/state';
 import { Executor } from '../executor/executor';
 import { ImmediateExecutor } from '../executor/immediate-executor';
+import { BootstrapService } from '../bootstrap/bootstrap-service';
 
 export interface ConductorState {
-  cellsState: Array<{ id: CellId; state: CellState }>;
+  // DnaHash / AgentPubKey
+  cellsState: Dictionary<Dictionary<CellState>>;
   networkState: NetworkState;
   registeredTemplates: Dictionary<SimulatedDnaTemplate>;
   registeredDnas: Dictionary<SimulatedDna>;
 }
 
 export class Conductor {
-  readonly cells: Array<{ id: CellId; cell: Cell }>;
+  readonly cells: Dictionary<Dictionary<Cell>>;
   registeredTemplates!: Dictionary<SimulatedDnaTemplate>;
   registeredDnas!: Dictionary<SimulatedDna>;
 
   network: Network;
 
-  constructor(state: ConductorState, public executor: Executor) {
+  constructor(
+    state: ConductorState,
+    public bootstrapService: BootstrapService,
+    public executor: Executor
+  ) {
     this.network = new Network(state.networkState, this);
-    this.cells = state.cellsState.map(({ id, state }) => ({
-      id,
-      cell: new Cell(state, this, this.network.createP2pCell(id)),
-    }));
     this.registeredDnas = state.registeredDnas;
     this.registeredTemplates = state.registeredTemplates;
+
+    this.cells = {};
+    for (const [dnaHash, dnaCellsStates] of Object.entries(state.cellsState)) {
+      if (!this.cells[dnaHash]) this.cells[dnaHash] = {};
+
+      for (const [agentPubKey, cellState] of Object.entries(dnaCellsStates)) {
+        this.cells[dnaHash][agentPubKey] = new Cell(
+          cellState,
+          this,
+          this.network.createP2pCell(getCellId(cellState))
+        );
+      }
+    }
   }
 
   static async create(
+    bootstrapService: BootstrapService,
     executor: Executor = new ImmediateExecutor()
   ): Promise<Conductor> {
     const state: ConductorState = {
-      cellsState: [],
+      cellsState: {},
       networkState: {
-        p2pCellsState: [],
+        p2pCellsState: {},
       },
       registeredDnas: {},
       registeredTemplates: {},
     };
 
-    return new Conductor(state, executor);
+    return new Conductor(state, bootstrapService, executor);
   }
 
   getState(): ConductorState {
+    const cellsState: Dictionary<Dictionary<CellState>> = {};
+
+    for (const [dnaHash, dnaCells] of Object.entries(this.cells)) {
+      if (!cellsState[dnaHash]) cellsState[dnaHash];
+
+      for (const [agentPubKey, cell] of Object.entries(dnaCells)) {
+        cellsState[dnaHash][agentPubKey] = cell.getState();
+      }
+    }
+
     return {
       networkState: this.network.getState(),
-      cellsState: this.cells.map(c => ({
-        id: c.id,
-        state: c.cell.getState(),
-      })),
+      cellsState,
       registeredDnas: this.registeredDnas,
       registeredTemplates: this.registeredTemplates,
     };
   }
 
+  getAllCells(): Cell[] {
+    const nestedCells = Object.values(this.cells).map(dnaCells =>
+      Object.values(dnaCells)
+    );
+
+    return ([] as Cell[]).concat(...nestedCells);
+  }
+
   getCells(dnaHash: Hash): Cell[] {
-    const dnaHashStr = serializeHash(dnaHash);
-    return this.cells
-      .filter(cell => serializeHash(cell.id[1]) === dnaHashStr)
-      .map(c => c.cell);
+    return Object.values(this.cells[dnaHash]);
+  }
+
+  getCell(dnaHash: Hash, agentPubKey: AgentPubKey): Cell {
+    return this.cells[dnaHash][agentPubKey];
   }
 
   async registerDna(dna_template: SimulatedDnaTemplate): Promise<Hash> {
     const templateHash = hash(dna_template);
 
-    this.registeredTemplates[serializeHash(templateHash)] = dna_template;
+    this.registeredTemplates[templateHash] = dna_template;
     return templateHash;
   }
 
@@ -83,7 +119,7 @@ export class Conductor {
     const rand = `${Math.random().toString()}/${Date.now()}`;
     const agentId = hash(rand);
 
-    const template = this.registeredTemplates[serializeHash(dna_hash)];
+    const template = this.registeredTemplates[dna_hash];
     if (!template) {
       throw new Error(`The given dna is not registered on this conductor`);
     }
@@ -94,12 +130,14 @@ export class Conductor {
       uuid,
     };
     const dnaHash = hash(dna);
-    this.registeredDnas[serializeHash(dnaHash)] = dna;
+    this.registeredDnas[dnaHash] = dna;
 
     const cellId: CellId = [dnaHash, agentId];
     const cell = await Cell.create(this, cellId, membrane_proof);
 
-    this.cells.push({ id: cell.cellId, cell });
+    if (!this.cells[cell.dnaHash]) this.cells[cell.dnaHash] = {};
+
+    this.cells[cell.dnaHash][cell.agentPubKey] = cell;
 
     return cell;
   }
@@ -111,20 +149,14 @@ export class Conductor {
     payload: any;
     cap: string;
   }): Promise<any> {
-    const dnaHashStr = serializeHash(args.cellId[0]);
-    const agentPubKeyStr = serializeHash(args.cellId[1]);
-    const cell = this.cells.find(
-      cell =>
-        serializeHash(cell.id[0]) === dnaHashStr &&
-        serializeHash(cell.id[1]) === agentPubKeyStr
-    );
+    const dnaHash = args.cellId[0];
+    const agentPubKey = args.cellId[1];
+    const cell = this.cells[dnaHash][agentPubKey];
 
     if (!cell)
-      throw new Error(
-        `No cells existst with cellId ${dnaHashStr}:${agentPubKeyStr}`
-      );
+      throw new Error(`No cells existst with cellId ${dnaHash}:${agentPubKey}`);
 
-    return cell.cell.callZomeFn({
+    return cell.callZomeFn({
       zome: args.zome,
       cap: args.cap,
       fnName: args.fnName,
