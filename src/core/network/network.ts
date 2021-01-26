@@ -65,19 +65,25 @@ export class Network {
     return p2pCell;
   }
 
-  public sendMessage<T>(
+  public sendRequest<T>(
     dna: Hash,
     fromAgent: Hash,
     toAgent: Hash,
-    message: NetworkMessage<T>
+    message: NetworkRequest<T>
   ): Promise<T> {
-    const localCell =
-      this.conductor.cells[dna] && this.conductor.cells[dna][toAgent];
+    return this.conductor.executor.execute({
+      name: 'Send Network Request',
+      description: `From: ${fromAgent}, To: ${toAgent}`,
+      task: () => {
+        const localCell =
+          this.conductor.cells[dna] && this.conductor.cells[dna][toAgent];
 
-    if (localCell) return message(localCell);
+        if (localCell) return message(localCell);
 
-    return message(this.conductor.bootstrapService.cells[dna][toAgent]);
+        return message(this.conductor.bootstrapService.cells[dna][toAgent]);
+      },
+    });
   }
 }
 
-export type NetworkMessage<T> = (cell: Cell) => Promise<T>;
+export type NetworkRequest<T> = (cell: Cell) => Promise<T>;

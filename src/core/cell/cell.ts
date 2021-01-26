@@ -21,7 +21,7 @@ export type CellSignalListener = (payload: any) => void;
 export class Cell {
   #pendingWorkflows: Array<Task<any>> = [];
 
-  #signals = {
+  signals = {
     'after-workflow-executed': new Subject<Task<any>>(),
     'before-workflow-executed': new Subject<Task<any>>(),
   };
@@ -47,10 +47,6 @@ export class Cell {
 
   get dnaHash(): Hash {
     return this.cellId[0];
-  }
-
-  get signals() {
-    return this.#signals;
   }
 
   getSimulatedDna() {
@@ -109,10 +105,10 @@ export class Cell {
   }
 
   async _runWorkflow(workflow: Task<any>): Promise<any> {
-    this.#signals['before-workflow-executed'].next(workflow);
+    this.signals['before-workflow-executed'].next(workflow);
     const result = await this.conductor.executor.execute(workflow);
 
-    this.#signals['after-workflow-executed'].next(workflow);
+    this.signals['after-workflow-executed'].next(workflow);
     return result;
   }
 

@@ -5,9 +5,9 @@ import {
   Dictionary,
   Hash,
 } from '@holochain-open-dev/core-types';
-import { compareBigInts, distance } from '../../processors/hash';
+import { Subject } from 'rxjs';
 import { Cell } from '../cell';
-import { Network, NetworkMessage } from './network';
+import { Network, NetworkRequest } from './network';
 import { getClosestNeighbors } from './utils';
 
 export type P2pCellState = {
@@ -15,11 +15,20 @@ export type P2pCellState = {
   redundancyFactor: number;
 };
 
+export type P2pCellSignals = 'before-network-request';
+
 // From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/types/actor.rs
 export class P2pCell {
   peers: Hash[];
 
   redundancyFactor!: number;
+
+  signals = {
+    'before-network-request': new Subject<{
+      fromAgent: AgentPubKey;
+      toAgent: AgentPubKey;
+    }>(),
+  };
 
   constructor(
     state: P2pCellState,
@@ -59,8 +68,11 @@ export class P2pCell {
       this.redundancyFactor
     );
 
+    if (neighbors.length < this.redundancyFactor)
+      throw new Error(`Couldn't publish dht ops: too few neighbors`);
+
     const promises = neighbors.map(neighbor =>
-      this._sendMessage(neighbor, cell =>
+      this._sendRequest(neighbor, cell =>
         cell.handle_publish(this.cellId[1], dht_hash, ops)
       )
     );
@@ -92,11 +104,15 @@ export class P2pCell {
     );
   }
 
-  private _sendMessage<T>(
+  private _sendRequest<T>(
     toAgent: AgentPubKey,
-    message: NetworkMessage<T>
+    message: NetworkRequest<T>
   ): Promise<T> {
-    return this.network.sendMessage(
+    this.signals['before-network-request'].next({
+      fromAgent: this.cellId[0],
+      toAgent: toAgent,
+    });
+    return this.network.sendRequest(
       this.cellId[0],
       this.cellId[1],
       toAgent,
