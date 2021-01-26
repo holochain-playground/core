@@ -1257,7 +1257,7 @@ class Cell {
     }
     #pendingWorkflows;
     get cellId() {
-        return getCellId(this.state);
+        return [this.state.dnaHash, this.state.agentPubKey];
     }
     get agentPubKey() {
         return this.cellId[1];
@@ -1270,6 +1270,8 @@ class Cell {
     }
     static async create(conductor, cellId, membrane_proof) {
         const newCellState = {
+            dnaHash: cellId[0],
+            agentPubKey: cellId[1],
             CAS: {},
             integrationLimbo: {},
             metadata: {

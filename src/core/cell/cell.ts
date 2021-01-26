@@ -38,7 +38,7 @@ export class Cell {
   }
 
   get cellId(): CellId {
-    return getCellId(this.state);
+    return [this.state.dnaHash, this.state.agentPubKey];
   }
 
   get agentPubKey(): AgentPubKey {
@@ -59,6 +59,8 @@ export class Cell {
     membrane_proof: any
   ): Promise<Cell> {
     const newCellState: CellState = {
+      dnaHash: cellId[0],
+      agentPubKey: cellId[1],
       CAS: {},
       integrationLimbo: {},
       metadata: {
