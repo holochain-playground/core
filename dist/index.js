@@ -1358,7 +1358,7 @@ class P2pCell {
     async join(containerCell) {
         const dnaHash = this.cellId[0];
         const agentPubKey = this.cellId[1];
-        this.network.conductor.bootstrapService.announceCell(containerCell);
+        this.network.conductor.bootstrapService.announceCell(this.cellId, containerCell);
         const neighbors = this.network.conductor.bootstrapService.getNeighbors(dnaHash, agentPubKey, this.redundancyFactor);
         this.peers = neighbors.map(cell => cell.agentPubKey);
     }
@@ -1603,10 +1603,12 @@ class BootstrapService {
     constructor() {
         this.cells = {};
     }
-    announceCell(cell) {
-        if (!this.cells[cell.dnaHash])
-            this.cells[cell.dnaHash] = {};
-        this.cells[cell.dnaHash][cell.agentPubKey] = cell;
+    announceCell(cellId, cell) {
+        const dnaHash = cellId[0];
+        const agentPubKey = cellId[1];
+        if (!this.cells[dnaHash])
+            this.cells[dnaHash] = {};
+        this.cells[dnaHash][agentPubKey] = cell;
     }
     getNeighbors(dnaHash, agentPubKey, numNeighbors) {
         const cells = Object.keys(this.cells[dnaHash]).filter(cellPubKey => cellPubKey !== agentPubKey);

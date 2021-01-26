@@ -1,14 +1,20 @@
-import { AgentPubKey, Dictionary, Hash } from '@holochain-open-dev/core-types';
+import {
+  AgentPubKey,
+  CellId,
+  Dictionary,
+  Hash,
+} from '@holochain-open-dev/core-types';
 import { Cell } from '../core/cell';
-import { Conductor } from '../core/conductor';
 import { getClosestNeighbors } from '../core/network/utils';
 
 export class BootstrapService {
   cells: Dictionary<Dictionary<Cell>> = {};
 
-  announceCell(cell: Cell) {
-    if (!this.cells[cell.dnaHash]) this.cells[cell.dnaHash] = {};
-    this.cells[cell.dnaHash][cell.agentPubKey] = cell;
+  announceCell(cellId: CellId, cell: Cell) {
+    const dnaHash = cellId[0];
+    const agentPubKey = cellId[1];
+    if (!this.cells[dnaHash]) this.cells[dnaHash] = {};
+    this.cells[dnaHash][agentPubKey] = cell;
   }
 
   getNeighbors(

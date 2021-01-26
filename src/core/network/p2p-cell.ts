@@ -49,7 +49,10 @@ export class P2pCell {
     const dnaHash = this.cellId[0];
     const agentPubKey = this.cellId[1];
 
-    this.network.conductor.bootstrapService.announceCell(containerCell);
+    this.network.conductor.bootstrapService.announceCell(
+      this.cellId,
+      containerCell
+    );
 
     const neighbors = this.network.conductor.bootstrapService.getNeighbors(
       dnaHash,
