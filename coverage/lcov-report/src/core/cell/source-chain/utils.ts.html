@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">87.5% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>72/72</span>
+                <span class='fraction'>63/72</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>11/11</span>
+                <span class='fraction'>9/9</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">75% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>8/8</span>
+                <span class='fraction'>6/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">87.5% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>72/72</span>
+                <span class='fraction'>63/72</span>
             </div>
         
             
@@ -149,23 +149,23 @@
 <span class="cline-any cline-yes">103x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1680x</span>
-<span class="cline-any cline-yes">1680x</span>
+<span class="cline-any cline-yes">101x</span>
+<span class="cline-any cline-yes">101x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1579x</span>
-<span class="cline-any cline-yes">1579x</span>
-<span class="cline-any cline-yes">1579x</span>
-<span class="cline-any cline-yes">1579x</span>
-<span class="cline-any cline-yes">1579x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1680x</span>
-<span class="cline-any cline-yes">1680x</span>
-<span class="cline-any cline-yes">1680x</span>
-<span class="cline-any cline-yes">1680x</span>
-<span class="cline-any cline-yes">1680x</span>
-<span class="cline-any cline-yes">1680x</span>
+<span class="cline-any cline-yes">101x</span>
+<span class="cline-any cline-yes">101x</span>
+<span class="cline-any cline-yes">101x</span>
+<span class="cline-any cline-yes">101x</span>
+<span class="cline-any cline-yes">101x</span>
+<span class="cline-any cline-yes">101x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">101x</span>
@@ -185,10 +185,10 @@
 <span class="cline-any cline-yes">155x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1579x</span>
-<span class="cline-any cline-yes">1579x</span>
-<span class="cline-any cline-yes">1579x</span>
-<span class="cline-any cline-yes">1579x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">51x</span>
@@ -224,12 +224,12 @@ export function getAuthor(cellState: CellState): AgentPubKey {
   return getHeaderAt(cellState, 0).header.content.author;
 }
 &nbsp;
-export function getDnaHash(state: CellState): Hash {
-  const firstHeaderHash = state.sourceChain[state.sourceChain.length - 1];
-&nbsp;
-  const dna: SignedHeaderHashed&lt;Dna&gt; = state.CAS[firstHeaderHash];
-  return dna.header.content.hash;
-}
+export<span class="fstat-no" title="function not covered" > function getDnaHash(state: CellState): Hash {</span>
+<span class="cstat-no" title="statement not covered" >  const firstHeaderHash = state.sourceChain[state.sourceChain.length - 1];</span>
+<span class="cstat-no" title="statement not covered" ></span>
+<span class="cstat-no" title="statement not covered" >  const dna: SignedHeaderHashed&lt;Dna&gt; = state.CAS[firstHeaderHash];</span>
+<span class="cstat-no" title="statement not covered" >  return dna.header.content.hash;</span>
+<span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;
 export function getHeaderAt(
   cellState: CellState,
@@ -256,11 +256,11 @@ export function getElement(state: CellState, headerHash: Hash): Element {
   return { signed_header, entry };
 }
 &nbsp;
-export function getCellId(state: CellState): CellId {
-  const author = getAuthor(state);
-  const dna = getDnaHash(state);
-  return [dna, author];
-}
+export<span class="fstat-no" title="function not covered" > function getCellId(state: CellState): CellId {</span>
+<span class="cstat-no" title="statement not covered" >  const author = getAuthor(state);</span>
+<span class="cstat-no" title="statement not covered" >  const dna = getDnaHash(state);</span>
+<span class="cstat-no" title="statement not covered" >  return [dna, author];</span>
+<span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;
 export function getNonPublishedDhtOps(state: CellState): Dictionary&lt;DHTOp&gt; {
   const nonPublishedDhtOps: Dictionary&lt;DHTOp&gt; = {};
@@ -280,7 +280,7 @@ export function getNonPublishedDhtOps(state: CellState): Dictionary&lt;DHTOp&gt;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank">istanbul</a>
-                at Tue Jan 26 2021 18:10:59 GMT+0100 (Hora estàndard del Centre d’Europa)
+                at Wed Jan 27 2021 12:34:19 GMT+0100 (Hora estàndard del Centre d’Europa)
             </div>
         </div>
         <script src="../../../../prettify.js"></script>

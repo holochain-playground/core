@@ -1,4 +1,9 @@
-import { CellId, Dictionary, Hash } from '@holochain-open-dev/core-types';
+import {
+  AgentPubKey,
+  CellId,
+  Dictionary,
+  Hash,
+} from '@holochain-open-dev/core-types';
 import { Cell } from '../cell';
 import { Conductor } from '../conductor';
 import { P2pCell, P2pCellState } from '../network/p2p-cell';
@@ -69,19 +74,15 @@ export class Network {
     dna: Hash,
     fromAgent: Hash,
     toAgent: Hash,
-    message: NetworkRequest<T>
+    request: NetworkRequest<T>
   ): Promise<T> {
-    return this.conductor.executor.execute({
-      name: 'Send Network Request',
-      description: `From: ${fromAgent}, To: ${toAgent}`,
-      task: () => {
-        const localCell =
-          this.conductor.cells[dna] && this.conductor.cells[dna][toAgent];
+    return this.conductor.executor.execute(() => {
+      const localCell =
+        this.conductor.cells[dna] && this.conductor.cells[dna][toAgent];
 
-        if (localCell) return message(localCell);
+      if (localCell) return request(localCell);
 
-        return message(this.conductor.bootstrapService.cells[dna][toAgent]);
-      },
+      return request(this.conductor.bootstrapService.cells[dna][toAgent]);
     });
   }
 }

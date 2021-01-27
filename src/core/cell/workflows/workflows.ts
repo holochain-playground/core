@@ -1,3 +1,7 @@
 import { Cell } from '../../cell';
 
-export type WorkFlow = (cell: Cell) => Promise<void>;
+export interface Workflow {
+  name: string;
+  description: string;
+  task: (cell: Cell) => Promise<any>;
+}

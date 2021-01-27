@@ -7,16 +7,20 @@ export declare type P2pCellState = {
     redundancyFactor: number;
 };
 export declare type P2pCellSignals = 'before-network-request';
+export interface NetworkRequestInfo {
+    duration: number;
+    dnaHash: Hash;
+    fromAgent: AgentPubKey;
+    toAgent: AgentPubKey;
+    name: string;
+}
 export declare class P2pCell {
     protected cellId: CellId;
     protected network: Network;
     peers: Hash[];
     redundancyFactor: number;
     signals: {
-        'before-network-request': Subject<{
-            fromAgent: AgentPubKey;
-            toAgent: AgentPubKey;
-        }>;
+        'before-network-request': Subject<NetworkRequestInfo>;
     };
     constructor(state: P2pCellState, cellId: CellId, network: Network);
     getState(): P2pCellState;

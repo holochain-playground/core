@@ -1,13 +1,12 @@
-import { serializeHash } from '@holochain-open-dev/common';
 import { elementToDHTOps } from '@holochain-open-dev/core-types';
 import { Task } from '../../../executor/executor';
 import { hash } from '../../../processors/hash';
-import { Cell } from '../../cell';
+import { Cell, Workflow } from '../../cell';
 import { getNewHeaders } from '../source-chain/get';
 import { getElement } from '../source-chain/utils';
 import { publish_dht_ops_task } from './publish_dht_ops';
 
-export function produce_dht_ops_task(cell: Cell): Task<void> {
+export function produce_dht_ops_task(cell: Cell): Workflow {
   return {
     name: 'Produce DHT Ops',
     description:

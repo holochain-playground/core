@@ -1,5 +1,5 @@
 import { Task } from '../../../executor/executor';
-import { Cell } from '../../cell';
+import { Cell, Workflow } from '../../cell';
 import {
   ValidationLimboStatus,
   IntegrationLimboValue,
@@ -36,7 +36,7 @@ export const app_validation = async (cell: Cell): Promise<void> => {
   cell.triggerWorkflow(integrate_dht_ops_task(cell));
 };
 
-export function app_validation_task(cell: Cell): Task<void> {
+export function app_validation_task(cell: Cell): Workflow {
   return {
     name: 'App Validation of the DHT Op',
     description: 'Running of the zome appropriate zome hook',

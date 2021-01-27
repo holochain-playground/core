@@ -2,8 +2,8 @@ import { Executor, Task } from './executor';
 
 export class ImmediateExecutor implements Executor {
   async execute<T>(task: Task<T>): Promise<T> {
-    const result = await task.task();
-    
+    const result = await task();
+
     return result;
   }
 }

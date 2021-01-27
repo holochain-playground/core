@@ -8,22 +8,21 @@ import {
 } from '@holochain-open-dev/core-types';
 import { Conductor } from '../conductor';
 import { genesis } from './workflows/genesis';
-import { Task } from '../../executor/executor';
 import { callZomeFn } from './workflows/call_zome_fn';
-import { getCellId } from './source-chain/utils';
 import { P2pCell } from '../network/p2p-cell';
 import { incoming_dht_ops } from './workflows/incoming_dht_ops';
 import { CellState } from './state';
+import { Workflow } from './workflows/workflows';
 
 export type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export type CellSignalListener = (payload: any) => void;
 
 export class Cell {
-  #pendingWorkflows: Array<Task<any>> = [];
+  #pendingWorkflows: Array<Workflow> = [];
 
   signals = {
-    'after-workflow-executed': new Subject<Task<any>>(),
-    'before-workflow-executed': new Subject<Task<any>>(),
+    'after-workflow-executed': new Subject<Workflow>(),
+    'before-workflow-executed': new Subject<Workflow>(),
   };
 
   constructor(
@@ -78,7 +77,7 @@ export class Cell {
 
     const cell = new Cell(newCellState, conductor, p2p);
 
-    await conductor.executor.execute({
+    await cell._runWorkflow({
       name: 'Genesis Workflow',
       description: 'Initialize the cell with all the needed databases',
       task: () => genesis(cellId[1], cellId[0], membrane_proof)(cell),
@@ -91,7 +90,7 @@ export class Cell {
     return this.state;
   }
 
-  triggerWorkflow(workflow: Task<any>) {
+  triggerWorkflow(workflow: Workflow) {
     this.#pendingWorkflows.push(workflow);
 
     setTimeout(() => this._runPendingWorkflows());
@@ -106,9 +105,12 @@ export class Cell {
     await Promise.all(promises);
   }
 
-  async _runWorkflow(workflow: Task<any>): Promise<any> {
+  async _runWorkflow(workflow: Workflow): Promise<any> {
     this.signals['before-workflow-executed'].next(workflow);
-    const result = await this.conductor.executor.execute(workflow);
+
+    const result = await this.conductor.executor.execute(() =>
+      workflow.task(this)
+    );
 
     this.signals['after-workflow-executed'].next(workflow);
     return result;
