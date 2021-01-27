@@ -1,11 +1,9 @@
-import { deserializeHash, serializeHash } from '@holochain-open-dev/common';
 import { DHTOp, Dictionary } from '@holochain-open-dev/core-types';
-import { Task } from '../../../executor/executor';
-import { Cell } from '../../cell';
+import { Cell, Workflow } from '../../cell';
 import { getNonPublishedDhtOps } from '../source-chain/utils';
 import { getDHTOpBasis } from '../utils';
 
-export function publish_dht_ops_task(cell: Cell): Task<void> {
+export function publish_dht_ops_task(cell: Cell): Workflow {
   return {
     name: 'Publish DHT Ops',
     description:

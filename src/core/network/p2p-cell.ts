@@ -6,6 +6,7 @@ import {
   Hash,
 } from '@holochain-open-dev/core-types';
 import { Subject } from 'rxjs';
+import { DelayExecutor } from '../../executor/delay-executor';
 import { Cell } from '../cell';
 import { Network, NetworkRequest } from './network';
 import { getClosestNeighbors } from './utils';
@@ -16,6 +17,13 @@ export type P2pCellState = {
 };
 
 export type P2pCellSignals = 'before-network-request';
+export interface NetworkRequestInfo {
+  duration: number;
+  dnaHash: Hash;
+  fromAgent: AgentPubKey;
+  toAgent: AgentPubKey;
+  name: string;
+}
 
 // From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/types/actor.rs
 export class P2pCell {
@@ -24,10 +32,7 @@ export class P2pCell {
   redundancyFactor!: number;
 
   signals = {
-    'before-network-request': new Subject<{
-      fromAgent: AgentPubKey;
-      toAgent: AgentPubKey;
-    }>(),
+    'before-network-request': new Subject<NetworkRequestInfo>(),
   };
 
   constructor(
@@ -49,7 +54,10 @@ export class P2pCell {
     const dnaHash = this.cellId[0];
     const agentPubKey = this.cellId[1];
 
-    this.network.conductor.bootstrapService.announceCell(containerCell);
+    this.network.conductor.bootstrapService.announceCell(
+      this.cellId,
+      containerCell
+    );
 
     const neighbors = this.network.conductor.bootstrapService.getNeighbors(
       dnaHash,
@@ -72,7 +80,7 @@ export class P2pCell {
       throw new Error(`Couldn't publish dht ops: too few neighbors`);
 
     const promises = neighbors.map(neighbor =>
-      this._sendRequest(neighbor, cell =>
+      this._sendRequest(neighbor, 'Publish Request', cell =>
         cell.handle_publish(this.cellId[1], dht_hash, ops)
       )
     );
@@ -106,11 +114,17 @@ export class P2pCell {
 
   private _sendRequest<T>(
     toAgent: AgentPubKey,
+    name: string,
     message: NetworkRequest<T>
   ): Promise<T> {
+    const duration =
+      (this.network.conductor.executor as DelayExecutor).delayMillis || 0;
     this.signals['before-network-request'].next({
-      fromAgent: this.cellId[0],
+      fromAgent: this.cellId[1],
       toAgent: toAgent,
+      duration,
+      dnaHash: this.cellId[0],
+      name,
     });
     return this.network.sendRequest(
       this.cellId[0],

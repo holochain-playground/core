@@ -1,6 +1,6 @@
 import { deserializeHash } from '@holochain-open-dev/common';
 import { Task } from '../../../executor/executor';
-import { Cell } from '../../cell';
+import { Cell, Workflow } from '../../cell';
 import { IntegratedDhtOpsValue } from '../state';
 import { pullAllIntegrationLimboDhtOps } from '../dht/get';
 import {
@@ -31,7 +31,7 @@ export const integrate_dht_ops = async (cell: Cell): Promise<void> => {
   }
 };
 
-export function integrate_dht_ops_task(cell: Cell): Task<void> {
+export function integrate_dht_ops_task(cell: Cell): Workflow {
   return {
     name: 'Integrate DHT Ops',
     description: 'Integration of the validated DHTOp in our DHT shard',

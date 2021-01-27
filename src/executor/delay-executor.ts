@@ -8,7 +8,7 @@ export class DelayExecutor implements Executor {
 
   async execute<T>(task: Task<T>): Promise<T> {
     await sleep(this.delayMillis);
-    const result = await task.task();
+    const result = await task();
 
     return result;
   }
