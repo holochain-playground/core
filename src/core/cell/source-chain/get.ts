@@ -5,7 +5,11 @@ import { CellState } from '../state';
  * Returns the header hashes which don't have their DHTOps in the authoredDHTOps DB
  */
 export function getNewHeaders(state: CellState): Array<Hash> {
+  const dhtOps = Object.values(state.authoredDHTOps);
+  const headerHashesAlreadyPublished = dhtOps.map(
+    dhtOp => dhtOp.op.header.header.hash
+  );
   return state.sourceChain.filter(
-    headerHash => !Object.keys(state.authoredDHTOps).includes(headerHash)
+    headerHash => !headerHashesAlreadyPublished.includes(headerHash)
   );
 }

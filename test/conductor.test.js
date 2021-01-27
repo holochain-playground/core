@@ -9,7 +9,7 @@ import { expect } from '@esm-bundle/chai';
 describe('Conductor', () => {
   it('create conductors and call zome fn', async () => {
     const conductors = await createConductors(
-      50,
+      10,
       new ImmediateExecutor(),
       [],
       sampleDnaTemplate()
@@ -28,7 +28,7 @@ describe('Conductor', () => {
     expect(result).to.be.ok;
     await sleep(1000);
     expect(Object.keys(cell.state.integratedDHTOps).length).to.be.greaterThan(
-      80
+      50
     );
   });
 });
