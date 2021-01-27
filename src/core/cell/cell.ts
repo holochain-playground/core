@@ -134,6 +134,10 @@ export class Cell {
 
   /** Network handlers */
   // https://github.com/holochain/holochain/blob/develop/crates/holochain/src/conductor/cell.rs#L429
+  public async handle_new_neighbor(neighborPubKey: AgentPubKey): Promise<void> {
+    this.p2p.addNeighbor(neighborPubKey);
+  }
+
   public handle_publish(
     from_agent: AgentPubKey,
     dht_hash: Hash, // The basis for the DHTOps

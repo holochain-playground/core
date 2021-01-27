@@ -12,7 +12,7 @@ import { Network, NetworkRequest } from './network';
 import { getClosestNeighbors } from './utils';
 
 export type P2pCellState = {
-  peers: Hash[];
+  neighbors: Hash[];
   redundancyFactor: number;
 };
 
@@ -27,7 +27,7 @@ export interface NetworkRequestInfo {
 
 // From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/types/actor.rs
 export class P2pCell {
-  peers: Hash[];
+  neighbors: Hash[];
 
   redundancyFactor!: number;
 
@@ -40,12 +40,12 @@ export class P2pCell {
     protected cellId: CellId,
     protected network: Network
   ) {
-    this.peers = state.peers;
+    this.neighbors = state.neighbors;
   }
 
   getState(): P2pCellState {
     return {
-      peers: this.peers,
+      neighbors: this.neighbors,
       redundancyFactor: this.redundancyFactor,
     };
   }
@@ -65,7 +65,14 @@ export class P2pCell {
       this.redundancyFactor
     );
 
-    this.peers = neighbors.map(cell => cell.agentPubKey);
+    this.neighbors = neighbors.map(cell => cell.agentPubKey);
+
+    const promises = this.neighbors.map(neighbor =>
+      this._sendRequest(neighbor, 'Add Neighbor', cell =>
+        cell.handle_new_neighbor(agentPubKey)
+      )
+    );
+    await Promise.all(promises);
   }
 
   async leave(): Promise<void> {}
@@ -76,9 +83,6 @@ export class P2pCell {
       this.redundancyFactor
     );
 
-    if (neighbors.length < this.redundancyFactor)
-      throw new Error(`Couldn't publish dht ops: too few neighbors`);
-
     const promises = neighbors.map(neighbor =>
       this._sendRequest(neighbor, 'Publish Request', cell =>
         cell.handle_publish(this.cellId[1], dht_hash, ops)
@@ -86,6 +90,11 @@ export class P2pCell {
     );
 
     await Promise.all(promises);
+  }
+
+  async addNeighbor(neighborPubKey: AgentPubKey) {
+    if (!this.neighbors.includes(neighborPubKey))
+      this.neighbors.push(neighborPubKey);
   }
 
   async get(
@@ -98,7 +107,7 @@ export class P2pCell {
   }
 
   public getNeighbors(): Array<AgentPubKey> {
-    return this.peers;
+    return this.neighbors;
   }
 
   private _getClosestNeighbors(
@@ -106,7 +115,7 @@ export class P2pCell {
     neighborCount: number
   ): Array<AgentPubKey> {
     return getClosestNeighbors(
-      [...this.peers, this.cellId[1]],
+      [...this.neighbors, this.cellId[1]],
       basisHash,
       neighborCount
     );
@@ -117,15 +126,19 @@ export class P2pCell {
     name: string,
     message: NetworkRequest<T>
   ): Promise<T> {
-    const duration =
-      (this.network.conductor.executor as DelayExecutor).delayMillis || 0;
-    this.signals['before-network-request'].next({
-      fromAgent: this.cellId[1],
-      toAgent: toAgent,
-      duration,
-      dnaHash: this.cellId[0],
-      name,
-    });
+    // Don't send signal if the message is for this same cell
+    if (this.cellId[1] !== toAgent) {
+      const duration =
+        (this.network.conductor.executor as DelayExecutor).delayMillis || 0;
+
+      this.signals['before-network-request'].next({
+        fromAgent: this.cellId[1],
+        toAgent: toAgent,
+        duration,
+        dnaHash: this.cellId[0],
+        name,
+      });
+    }
     return this.network.sendRequest(
       this.cellId[0],
       this.cellId[1],
