@@ -1,4 +1,3 @@
-import { Task } from '../../../executor/executor';
 import { Cell, Workflow } from '../../cell';
 import {
   ValidationLimboStatus,

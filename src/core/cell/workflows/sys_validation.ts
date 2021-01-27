@@ -19,7 +19,7 @@ export const sys_validation = async (cell: Cell): Promise<void> => {
 
     limboValue.status = ValidationLimboStatus.SysValidated;
 
-    putValidationLimboValue(dhtOpHash, limboValue);
+    putValidationLimboValue(dhtOpHash, limboValue)(cell.state);
   }
 
   cell.triggerWorkflow(app_validation_task(cell));

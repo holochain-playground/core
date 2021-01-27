@@ -1211,6 +1211,7 @@ const sys_validation = async (cell) => {
     for (const dhtOpHash of Object.keys(pendingDhtOps)) {
         const limboValue = pendingDhtOps[dhtOpHash];
         limboValue.status = ValidationLimboStatus.SysValidated;
+        putValidationLimboValue(dhtOpHash, limboValue)(cell.state);
     }
     cell.triggerWorkflow(app_validation_task(cell));
 };
