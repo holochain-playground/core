@@ -848,7 +848,9 @@ const putDhtOpToIntegrated = (dhtOpHash, integratedValue) => (state) => {
  * Returns the header hashes which don't have their DHTOps in the authoredDHTOps DB
  */
 function getNewHeaders(state) {
-    return state.sourceChain.filter(headerHash => !Object.keys(state.authoredDHTOps).includes(headerHash));
+    const dhtOps = Object.values(state.authoredDHTOps);
+    const headerHashesAlreadyPublished = dhtOps.map(dhtOp => dhtOp.op.header.header.hash);
+    return state.sourceChain.filter(headerHash => !headerHashesAlreadyPublished.includes(headerHash));
 }
 
 const putElement = (element) => (state) => {
