@@ -126,15 +126,19 @@ export class P2pCell {
     name: string,
     message: NetworkRequest<T>
   ): Promise<T> {
-    const duration =
-      (this.network.conductor.executor as DelayExecutor).delayMillis || 0;
-    this.signals['before-network-request'].next({
-      fromAgent: this.cellId[1],
-      toAgent: toAgent,
-      duration,
-      dnaHash: this.cellId[0],
-      name,
-    });
+    // Don't send signal if the message is for this same cell
+    if (this.cellId[1] !== toAgent) {
+      const duration =
+        (this.network.conductor.executor as DelayExecutor).delayMillis || 0;
+
+      this.signals['before-network-request'].next({
+        fromAgent: this.cellId[1],
+        toAgent: toAgent,
+        duration,
+        dnaHash: this.cellId[0],
+        name,
+      });
+    }
     return this.network.sendRequest(
       this.cellId[0],
       this.cellId[1],

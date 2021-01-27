@@ -1390,14 +1390,17 @@ class P2pCell {
         return getClosestNeighbors([...this.neighbors, this.cellId[1]], basisHash, neighborCount);
     }
     _sendRequest(toAgent, name, message) {
-        const duration = this.network.conductor.executor.delayMillis || 0;
-        this.signals['before-network-request'].next({
-            fromAgent: this.cellId[1],
-            toAgent: toAgent,
-            duration,
-            dnaHash: this.cellId[0],
-            name,
-        });
+        // Don't send signal if the message is for this same cell
+        if (this.cellId[1] !== toAgent) {
+            const duration = this.network.conductor.executor.delayMillis || 0;
+            this.signals['before-network-request'].next({
+                fromAgent: this.cellId[1],
+                toAgent: toAgent,
+                duration,
+                dnaHash: this.cellId[0],
+                name,
+            });
+        }
         return this.network.sendRequest(this.cellId[0], this.cellId[1], toAgent, message);
     }
 }
