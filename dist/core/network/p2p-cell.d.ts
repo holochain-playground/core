@@ -3,7 +3,7 @@ import { Subject } from 'rxjs';
 import { Cell } from '../cell';
 import { Network } from './network';
 export declare type P2pCellState = {
-    peers: Hash[];
+    neighbors: Hash[];
     redundancyFactor: number;
 };
 export declare type P2pCellSignals = 'before-network-request';
@@ -17,7 +17,7 @@ export interface NetworkRequestInfo {
 export declare class P2pCell {
     protected cellId: CellId;
     protected network: Network;
-    peers: Hash[];
+    neighbors: Hash[];
     redundancyFactor: number;
     signals: {
         'before-network-request': Subject<NetworkRequestInfo>;
@@ -27,6 +27,7 @@ export declare class P2pCell {
     join(containerCell: Cell): Promise<void>;
     leave(): Promise<void>;
     publish(dht_hash: Hash, ops: Dictionary<DHTOp>): Promise<void>;
+    addNeighbor(neighborPubKey: AgentPubKey): Promise<void>;
     get(dna_hash: Hash, from_agent: AgentPubKey, dht_hash: Hash, _options: any): Promise<Element | undefined>;
     getNeighbors(): Array<AgentPubKey>;
     private _getClosestNeighbors;

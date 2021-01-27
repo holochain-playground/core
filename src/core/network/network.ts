@@ -58,7 +58,7 @@ export class Network {
     const dnaHash = cellId[0];
 
     const state: P2pCellState = {
-      peers: [],
+      neighbors: [],
       redundancyFactor: 20,
     };
 

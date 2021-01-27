@@ -1322,6 +1322,9 @@ class Cell {
     }
     /** Network handlers */
     // https://github.com/holochain/holochain/blob/develop/crates/holochain/src/conductor/cell.rs#L429
+    async handle_new_neighbor(neighborPubKey) {
+        this.p2p.addNeighbor(neighborPubKey);
+    }
     handle_publish(from_agent, dht_hash, // The basis for the DHTOps
     ops) {
         return this._runWorkflow({
@@ -1349,11 +1352,11 @@ class P2pCell {
         this.signals = {
             'before-network-request': new Subject(),
         };
-        this.peers = state.peers;
+        this.neighbors = state.neighbors;
     }
     getState() {
         return {
-            peers: this.peers,
+            neighbors: this.neighbors,
             redundancyFactor: this.redundancyFactor,
         };
     }
@@ -1362,25 +1365,29 @@ class P2pCell {
         const agentPubKey = this.cellId[1];
         this.network.conductor.bootstrapService.announceCell(this.cellId, containerCell);
         const neighbors = this.network.conductor.bootstrapService.getNeighbors(dnaHash, agentPubKey, this.redundancyFactor);
-        this.peers = neighbors.map(cell => cell.agentPubKey);
+        this.neighbors = neighbors.map(cell => cell.agentPubKey);
+        const promises = this.neighbors.map(neighbor => this._sendRequest(neighbor, 'Add Neighbor', cell => cell.handle_new_neighbor(agentPubKey)));
+        await Promise.all(promises);
     }
     async leave() { }
     async publish(dht_hash, ops) {
         const neighbors = this._getClosestNeighbors(dht_hash, this.redundancyFactor);
-        if (neighbors.length < this.redundancyFactor)
-            throw new Error(`Couldn't publish dht ops: too few neighbors`);
         const promises = neighbors.map(neighbor => this._sendRequest(neighbor, 'Publish Request', cell => cell.handle_publish(this.cellId[1], dht_hash, ops)));
         await Promise.all(promises);
+    }
+    async addNeighbor(neighborPubKey) {
+        if (!this.neighbors.includes(neighborPubKey))
+            this.neighbors.push(neighborPubKey);
     }
     async get(dna_hash, from_agent, dht_hash, _options // TODO: complete?
     ) {
         return undefined;
     }
     getNeighbors() {
-        return this.peers;
+        return this.neighbors;
     }
     _getClosestNeighbors(basisHash, neighborCount) {
-        return getClosestNeighbors([...this.peers, this.cellId[1]], basisHash, neighborCount);
+        return getClosestNeighbors([...this.neighbors, this.cellId[1]], basisHash, neighborCount);
     }
     _sendRequest(toAgent, name, message) {
         const duration = this.network.conductor.executor.delayMillis || 0;
@@ -1427,7 +1434,7 @@ class Network {
     createP2pCell(cellId) {
         const dnaHash = cellId[0];
         const state = {
-            peers: [],
+            neighbors: [],
             redundancyFactor: 20,
         };
         const p2pCell = new P2pCell(state, cellId, this);

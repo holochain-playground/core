@@ -33,6 +33,7 @@ export declare class Cell {
         cap: string;
     }): Promise<any>;
     /** Network handlers */
+    handle_new_neighbor(neighborPubKey: AgentPubKey): Promise<void>;
     handle_publish(from_agent: AgentPubKey, dht_hash: Hash, // The basis for the DHTOps
     ops: Dictionary<DHTOp>): Promise<void>;
 }
