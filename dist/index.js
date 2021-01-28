@@ -1332,7 +1332,7 @@ class Cell {
     }
     triggerWorkflow(workflow) {
         this.#pendingWorkflows[workflow.name] = workflow;
-        setTimeout(() => this._runPendingWorkflows());
+        setTimeout(() => this._runPendingWorkflows(), 100);
     }
     async _runPendingWorkflows() {
         const workflowsToRun = this.#pendingWorkflows;
@@ -1463,7 +1463,7 @@ class Network {
         const dnaHash = cellId[0];
         const state = {
             neighbors: [],
-            redundancyFactor: 3,
+            redundancyFactor: 5,
         };
         const p2pCell = new P2pCell(state, cellId, this);
         if (!this.p2pCells[dnaHash])

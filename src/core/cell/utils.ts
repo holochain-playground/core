@@ -9,7 +9,6 @@ import {
   Hash,
   NewEntryHeader,
 } from '@holochain-open-dev/core-types';
-import { head } from 'lodash-es';
 import { hash } from '../../processors/hash';
 import { Cell } from './cell';
 
