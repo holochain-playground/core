@@ -3,7 +3,6 @@ import { Cell } from '../core/cell';
 import { Network, NetworkState } from './network/network';
 import { SimulatedDna, SimulatedDnaTemplate } from '../dnas/simulated-dna';
 import { CellState } from './cell/state';
-import { Executor } from '../executor/executor';
 import { BootstrapService } from '../bootstrap/bootstrap-service';
 export interface ConductorState {
     cellsState: Dictionary<Dictionary<CellState>>;
@@ -13,13 +12,12 @@ export interface ConductorState {
 }
 export declare class Conductor {
     bootstrapService: BootstrapService;
-    executor: Executor;
     readonly cells: Dictionary<Dictionary<Cell>>;
     registeredTemplates: Dictionary<SimulatedDnaTemplate>;
     registeredDnas: Dictionary<SimulatedDna>;
     network: Network;
-    constructor(state: ConductorState, bootstrapService: BootstrapService, executor: Executor);
-    static create(bootstrapService: BootstrapService, executor?: Executor): Promise<Conductor>;
+    constructor(state: ConductorState, bootstrapService: BootstrapService);
+    static create(bootstrapService: BootstrapService): Promise<Conductor>;
     getState(): ConductorState;
     getAllCells(): Cell[];
     getCells(dnaHash: Hash): Cell[];

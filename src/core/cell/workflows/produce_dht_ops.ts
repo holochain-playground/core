@@ -1,5 +1,4 @@
 import { elementToDHTOps } from '@holochain-open-dev/core-types';
-import { Task } from '../../../executor/executor';
 import { hash } from '../../../processors/hash';
 import { Cell, Workflow } from '../../cell';
 import { getNewHeaders } from '../source-chain/get';

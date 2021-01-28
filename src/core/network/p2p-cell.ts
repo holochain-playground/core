@@ -5,8 +5,7 @@ import {
   Dictionary,
   Hash,
 } from '@holochain-open-dev/core-types';
-import { Subject } from 'rxjs';
-import { DelayExecutor } from '../../executor/delay-executor';
+import { MiddlewareExecutor } from '../../executor/middleware-executor';
 import { Cell } from '../cell';
 import { Network, NetworkRequest } from './network';
 import { getClosestNeighbors } from './utils';
@@ -16,9 +15,7 @@ export type P2pCellState = {
   redundancyFactor: number;
 };
 
-export type P2pCellSignals = 'before-network-request';
 export interface NetworkRequestInfo {
-  duration: number;
   dnaHash: Hash;
   fromAgent: AgentPubKey;
   toAgent: AgentPubKey;
@@ -31,9 +28,7 @@ export class P2pCell {
 
   redundancyFactor!: number;
 
-  signals = {
-    'before-network-request': new Subject<NetworkRequestInfo>(),
-  };
+  networkRequestsExecutor = new MiddlewareExecutor<NetworkRequestInfo>();
 
   constructor(
     state: P2pCellState,
@@ -126,24 +121,21 @@ export class P2pCell {
     name: string,
     message: NetworkRequest<T>
   ): Promise<T> {
-    // Don't send signal if the message is for this same cell
-    if (this.cellId[1] !== toAgent) {
-      const duration =
-        (this.network.conductor.executor as DelayExecutor).delayMillis || 0;
-
-      this.signals['before-network-request'].next({
-        fromAgent: this.cellId[1],
-        toAgent: toAgent,
-        duration,
-        dnaHash: this.cellId[0],
-        name,
-      });
-    }
-    return this.network.sendRequest(
-      this.cellId[0],
-      this.cellId[1],
-      toAgent,
-      message
+    const networkRequest = {
+      fromAgent: this.cellId[1],
+      toAgent: toAgent,
+      dnaHash: this.cellId[0],
+      name,
+    };
+    return this.networkRequestsExecutor.execute(
+      () =>
+        this.network.sendRequest(
+          this.cellId[0],
+          this.cellId[1],
+          toAgent,
+          message
+        ),
+      networkRequest
     );
   }
 }

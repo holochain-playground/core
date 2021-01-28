@@ -76,14 +76,12 @@ export class Network {
     toAgent: Hash,
     request: NetworkRequest<T>
   ): Promise<T> {
-    return this.conductor.executor.execute(() => {
-      const localCell =
-        this.conductor.cells[dna] && this.conductor.cells[dna][toAgent];
+    const localCell =
+      this.conductor.cells[dna] && this.conductor.cells[dna][toAgent];
 
-      if (localCell) return request(localCell);
+    if (localCell) return request(localCell);
 
-      return request(this.conductor.bootstrapService.cells[dna][toAgent]);
-    });
+    return request(this.conductor.bootstrapService.cells[dna][toAgent]);
   }
 }
 

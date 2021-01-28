@@ -1,14 +1,12 @@
 import { AgentPubKey, CellId, DHTOp, Dictionary, Hash } from '@holochain-open-dev/core-types';
-import { Subject } from 'rxjs';
+import { MiddlewareExecutor } from '../../executor/middleware-executor';
 import { Cell } from '../cell';
 import { Network } from './network';
 export declare type P2pCellState = {
     neighbors: Hash[];
     redundancyFactor: number;
 };
-export declare type P2pCellSignals = 'before-network-request';
 export interface NetworkRequestInfo {
-    duration: number;
     dnaHash: Hash;
     fromAgent: AgentPubKey;
     toAgent: AgentPubKey;
@@ -19,9 +17,7 @@ export declare class P2pCell {
     protected network: Network;
     neighbors: Hash[];
     redundancyFactor: number;
-    signals: {
-        'before-network-request': Subject<NetworkRequestInfo>;
-    };
+    networkRequestsExecutor: MiddlewareExecutor<NetworkRequestInfo>;
     constructor(state: P2pCellState, cellId: CellId, network: Network);
     getState(): P2pCellState;
     join(containerCell: Cell): Promise<void>;

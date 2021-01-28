@@ -1,9 +1,9 @@
-import { Subject } from 'rxjs';
 import { CellId, AgentPubKey, Hash, Dictionary, DHTOp } from '@holochain-open-dev/core-types';
 import { Conductor } from '../conductor';
 import { P2pCell } from '../network/p2p-cell';
 import { CellState } from './state';
 import { Workflow } from './workflows/workflows';
+import { MiddlewareExecutor } from '../../executor/middleware-executor';
 export declare type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export declare type CellSignalListener = (payload: any) => void;
 export declare class Cell {
@@ -11,10 +11,7 @@ export declare class Cell {
     state: CellState;
     conductor: Conductor;
     p2p: P2pCell;
-    signals: {
-        'after-workflow-executed': Subject<Workflow>;
-        'before-workflow-executed': Subject<Workflow>;
-    };
+    workflowExecutor: MiddlewareExecutor<Workflow>;
     constructor(state: CellState, conductor: Conductor, p2p: P2pCell);
     get cellId(): CellId;
     get agentPubKey(): AgentPubKey;

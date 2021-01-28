@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">90.6% </span>
+                <span class="strong">90.07% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>135/149</span>
+                <span class='fraction'>127/141</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">90.6% </span>
+                <span class="strong">90.07% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>135/149</span>
+                <span class='fraction'>127/141</span>
             </div>
         
             
@@ -198,20 +198,7 @@
 <a name='L139'></a><a href='#L139'>139</a>
 <a name='L140'></a><a href='#L140'>140</a>
 <a name='L141'></a><a href='#L141'>141</a>
-<a name='L142'></a><a href='#L142'>142</a>
-<a name='L143'></a><a href='#L143'>143</a>
-<a name='L144'></a><a href='#L144'>144</a>
-<a name='L145'></a><a href='#L145'>145</a>
-<a name='L146'></a><a href='#L146'>146</a>
-<a name='L147'></a><a href='#L147'>147</a>
-<a name='L148'></a><a href='#L148'>148</a>
-<a name='L149'></a><a href='#L149'>149</a>
-<a name='L150'></a><a href='#L150'>150</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
+<a name='L142'></a><a href='#L142'>142</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -336,17 +323,14 @@
 <span class="cline-any cline-yes">525x</span>
 <span class="cline-any cline-yes">525x</span>
 <span class="cline-any cline-yes">525x</span>
-<span class="cline-any cline-yes">477x</span>
-<span class="cline-any cline-yes">477x</span>
-<span class="cline-any cline-yes">477x</span>
-<span class="cline-any cline-yes">477x</span>
-<span class="cline-any cline-yes">477x</span>
-<span class="cline-any cline-yes">477x</span>
-<span class="cline-any cline-yes">477x</span>
-<span class="cline-any cline-yes">477x</span>
-<span class="cline-any cline-yes">477x</span>
-<span class="cline-any cline-yes">477x</span>
-<span class="cline-any cline-yes">477x</span>
+<span class="cline-any cline-yes">525x</span>
+<span class="cline-any cline-yes">525x</span>
+<span class="cline-any cline-yes">525x</span>
+<span class="cline-any cline-yes">525x</span>
+<span class="cline-any cline-yes">525x</span>
+<span class="cline-any cline-yes">525x</span>
+<span class="cline-any cline-yes">525x</span>
+<span class="cline-any cline-yes">525x</span>
 <span class="cline-any cline-yes">525x</span>
 <span class="cline-any cline-yes">525x</span>
 <span class="cline-any cline-yes">525x</span>
@@ -362,8 +346,7 @@
   Dictionary,
   Hash,
 } from '@holochain-open-dev/core-types';
-import { Subject } from 'rxjs';
-import { DelayExecutor } from '../../executor/delay-executor';
+import { MiddlewareExecutor } from '../../executor/middleware-executor';
 import { Cell } from '../cell';
 import { Network, NetworkRequest } from './network';
 import { getClosestNeighbors } from './utils';
@@ -373,9 +356,7 @@ export type P2pCellState = {
   redundancyFactor: number;
 };
 &nbsp;
-export type P2pCellSignals = 'before-network-request';
 export interface NetworkRequestInfo {
-  duration: number;
   dnaHash: Hash;
   fromAgent: AgentPubKey;
   toAgent: AgentPubKey;
@@ -388,9 +369,7 @@ export class P2pCell {
 &nbsp;
   redundancyFactor!: number;
 &nbsp;
-  signals = {
-    'before-network-request': new Subject&lt;NetworkRequestInfo&gt;(),
-  };
+  networkRequestsExecutor = new MiddlewareExecutor&lt;NetworkRequestInfo&gt;();
 &nbsp;
   constructor(
     state: P2pCellState,
@@ -483,24 +462,21 @@ export class P2pCell {
     name: string,
     message: NetworkRequest&lt;T&gt;
   ): Promise&lt;T&gt; {
-    // Don't send signal if the message is for this same cell
-    if (this.cellId[1] !== toAgent) {
-      const duration =
-        (this.network.conductor.executor as DelayExecutor).delayMillis || 0;
-&nbsp;
-      this.signals['before-network-request'].next({
-        fromAgent: this.cellId[1],
-        toAgent: toAgent,
-        duration,
-        dnaHash: this.cellId[0],
-        name,
-      });
-    }
-    return this.network.sendRequest(
-      this.cellId[0],
-      this.cellId[1],
-      toAgent,
-      message
+    const networkRequest = {
+      fromAgent: this.cellId[1],
+      toAgent: toAgent,
+      dnaHash: this.cellId[0],
+      name,
+    };
+    return this.networkRequestsExecutor.execute(
+      () =&gt;
+        this.network.sendRequest(
+          this.cellId[0],
+          this.cellId[1],
+          toAgent,
+          message
+        ),
+      networkRequest
     );
   }
 }
@@ -511,7 +487,7 @@ export class P2pCell {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank">istanbul</a>
-                at Wed Jan 27 2021 14:07:37 GMT+0100 (Hora estàndard del Centre d’Europa)
+                at Wed Jan 27 2021 18:36:36 GMT+0100 (Hora estàndard del Centre d’Europa)
             </div>
         </div>
         <script src="../../../prettify.js"></script>

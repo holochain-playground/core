@@ -1,7 +1,6 @@
 import { getSysMetaValHeaderHash, DHTOpType, getEntry, HeaderType, EntryDhtStatus, ChainStatus, elementToDHTOps } from '@holochain-open-dev/core-types';
 import { isEqual, uniq } from 'lodash-es';
 import { serializeHash, now } from '@holochain-open-dev/common';
-import { Subject } from 'rxjs';
 
 function getValidationLimboDhtOps(state, status) {
     const pendingDhtOps = {};
@@ -1243,16 +1242,48 @@ const incoming_dht_ops = (basis, dhtOps, from_agent) => async (cell) => {
     cell.triggerWorkflow(sys_validation_task(cell));
 };
 
+class MiddlewareExecutor {
+    constructor() {
+        this._beforeMiddlewares = [];
+        this._afterMiddlewares = [];
+    }
+    async execute(task, payload) {
+        for (const middleware of this._beforeMiddlewares) {
+            await middleware(payload);
+        }
+        const result = await task();
+        for (const middleware of this._afterMiddlewares) {
+            await middleware(payload);
+        }
+        return result;
+    }
+    before(callback) {
+        this._beforeMiddlewares.push(callback);
+        return {
+            unsubscribe: () => {
+                const index = this._beforeMiddlewares.findIndex(c => c === callback);
+                this._beforeMiddlewares.splice(index, 1);
+            },
+        };
+    }
+    after(callback) {
+        this._afterMiddlewares.push(callback);
+        return {
+            unsubscribe: () => {
+                const index = this._afterMiddlewares.findIndex(c => c === callback);
+                this._afterMiddlewares.splice(index, 1);
+            },
+        };
+    }
+}
+
 class Cell {
     constructor(state, conductor, p2p) {
         this.state = state;
         this.conductor = conductor;
         this.p2p = p2p;
-        this.#pendingWorkflows = [];
-        this.signals = {
-            'after-workflow-executed': new Subject(),
-            'before-workflow-executed': new Subject(),
-        };
+        this.#pendingWorkflows = {};
+        this.workflowExecutor = new MiddlewareExecutor();
         // Let genesis be run before actually joining
         setTimeout(() => {
             this.p2p.join(this);
@@ -1290,7 +1321,7 @@ class Cell {
         const p2p = conductor.network.createP2pCell(cellId);
         const cell = new Cell(newCellState, conductor, p2p);
         await cell._runWorkflow({
-            name: 'Genesis Workflow',
+            name: 'Genesis',
             description: 'Initialize the cell with all the needed databases',
             task: () => genesis(cellId[1], cellId[0], membrane_proof)(cell),
         });
@@ -1300,25 +1331,22 @@ class Cell {
         return this.state;
     }
     triggerWorkflow(workflow) {
-        this.#pendingWorkflows.push(workflow);
+        this.#pendingWorkflows[workflow.name] = workflow;
         setTimeout(() => this._runPendingWorkflows());
     }
     async _runPendingWorkflows() {
         const workflowsToRun = this.#pendingWorkflows;
-        this.#pendingWorkflows = [];
-        const promises = workflowsToRun.map(w => this._runWorkflow(w));
+        this.#pendingWorkflows = {};
+        const promises = Object.values(workflowsToRun).map(w => this._runWorkflow(w));
         await Promise.all(promises);
     }
     async _runWorkflow(workflow) {
-        this.signals['before-workflow-executed'].next(workflow);
-        const result = await this.conductor.executor.execute(() => workflow.task(this));
-        this.signals['after-workflow-executed'].next(workflow);
-        return result;
+        return this.workflowExecutor.execute(() => workflow.task(this), workflow);
     }
     /** Workflows */
     callZomeFn(args) {
         return this._runWorkflow({
-            name: 'Call Zome Function Workflow',
+            name: 'Call Zome Function',
             description: `Zome: ${args.zome}, Function name: ${args.fnName}`,
             task: () => callZomeFn(args.zome, args.fnName, args.payload, args.cap)(this),
         });
@@ -1352,9 +1380,7 @@ class P2pCell {
     constructor(state, cellId, network) {
         this.cellId = cellId;
         this.network = network;
-        this.signals = {
-            'before-network-request': new Subject(),
-        };
+        this.networkRequestsExecutor = new MiddlewareExecutor();
         this.neighbors = state.neighbors;
     }
     getState() {
@@ -1393,18 +1419,13 @@ class P2pCell {
         return getClosestNeighbors([...this.neighbors, this.cellId[1]], basisHash, neighborCount);
     }
     _sendRequest(toAgent, name, message) {
-        // Don't send signal if the message is for this same cell
-        if (this.cellId[1] !== toAgent) {
-            const duration = this.network.conductor.executor.delayMillis || 0;
-            this.signals['before-network-request'].next({
-                fromAgent: this.cellId[1],
-                toAgent: toAgent,
-                duration,
-                dnaHash: this.cellId[0],
-                name,
-            });
-        }
-        return this.network.sendRequest(this.cellId[0], this.cellId[1], toAgent, message);
+        const networkRequest = {
+            fromAgent: this.cellId[1],
+            toAgent: toAgent,
+            dnaHash: this.cellId[0],
+            name,
+        };
+        return this.networkRequestsExecutor.execute(() => this.network.sendRequest(this.cellId[0], this.cellId[1], toAgent, message), networkRequest);
     }
 }
 
@@ -1450,26 +1471,16 @@ class Network {
         return p2pCell;
     }
     sendRequest(dna, fromAgent, toAgent, request) {
-        return this.conductor.executor.execute(() => {
-            const localCell = this.conductor.cells[dna] && this.conductor.cells[dna][toAgent];
-            if (localCell)
-                return request(localCell);
-            return request(this.conductor.bootstrapService.cells[dna][toAgent]);
-        });
-    }
-}
-
-class ImmediateExecutor {
-    async execute(task) {
-        const result = await task();
-        return result;
+        const localCell = this.conductor.cells[dna] && this.conductor.cells[dna][toAgent];
+        if (localCell)
+            return request(localCell);
+        return request(this.conductor.bootstrapService.cells[dna][toAgent]);
     }
 }
 
 class Conductor {
-    constructor(state, bootstrapService, executor) {
+    constructor(state, bootstrapService) {
         this.bootstrapService = bootstrapService;
-        this.executor = executor;
         this.network = new Network(state.networkState, this);
         this.registeredDnas = state.registeredDnas;
         this.registeredTemplates = state.registeredTemplates;
@@ -1482,7 +1493,7 @@ class Conductor {
             }
         }
     }
-    static async create(bootstrapService, executor = new ImmediateExecutor()) {
+    static async create(bootstrapService) {
         const state = {
             cellsState: {},
             networkState: {
@@ -1491,7 +1502,7 @@ class Conductor {
             registeredDnas: {},
             registeredTemplates: {},
         };
-        return new Conductor(state, bootstrapService, executor);
+        return new Conductor(state, bootstrapService);
     }
     getState() {
         const cellsState = {};
@@ -1602,17 +1613,8 @@ function sampleDnaTemplate() {
     };
 }
 
-const sleep = (ms) => new Promise(resolve => setTimeout(() => resolve(null), ms));
-class DelayExecutor {
-    constructor(delayMillis) {
-        this.delayMillis = delayMillis;
-    }
-    async execute(task) {
-        await sleep(this.delayMillis);
-        const result = await task();
-        return result;
-    }
-}
+const sleep = (ms) => new Promise(resolve => setTimeout(() => resolve(), ms));
+const DelayMiddleware = (ms) => () => sleep(ms);
 
 class BootstrapService {
     constructor() {
@@ -1632,13 +1634,13 @@ class BootstrapService {
     }
 }
 
-async function createConductors(conductorsToCreate, executor, currentConductors, dnaTemplate) {
+async function createConductors(conductorsToCreate, currentConductors, dnaTemplate) {
     const bootstrapService = currentConductors.length === 0
         ? new BootstrapService()
         : currentConductors[0].bootstrapService;
     const newConductorsPromises = [];
     for (let i = 0; i < conductorsToCreate; i++) {
-        const conductor = Conductor.create(bootstrapService, executor);
+        const conductor = Conductor.create(bootstrapService);
         newConductorsPromises.push(conductor);
     }
     const newConductors = await Promise.all(newConductorsPromises);
@@ -1650,5 +1652,5 @@ async function createConductors(conductorsToCreate, executor, currentConductors,
     return allConductors;
 }
 
-export { Cell, Conductor, DelayExecutor, index as Hdk, ImmediateExecutor, Network, P2pCell, ValidationLimboStatus, ValidationStatus, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDna, buildShh, buildUpdate, callZomeFn, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, getAllAuthoredEntries, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHeaderAt, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sys_validation, sys_validation_task };
+export { Cell, Conductor, DelayMiddleware, index as Hdk, MiddlewareExecutor, Network, P2pCell, ValidationLimboStatus, ValidationStatus, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDna, buildShh, buildUpdate, callZomeFn, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, getAllAuthoredEntries, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHeaderAt, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sys_validation, sys_validation_task };
 //# sourceMappingURL=index.js.map
