@@ -1,4 +1,4 @@
-import { Observable, Subject } from 'rxjs';
+import { Subject } from 'rxjs';
 import {
   CellId,
   AgentPubKey,
@@ -13,17 +13,15 @@ import { P2pCell } from '../network/p2p-cell';
 import { incoming_dht_ops } from './workflows/incoming_dht_ops';
 import { CellState } from './state';
 import { Workflow } from './workflows/workflows';
+import { MiddlewareExecutor } from '../../executor/middleware-executor';
 
 export type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export type CellSignalListener = (payload: any) => void;
 
 export class Cell {
-  #pendingWorkflows: Array<Workflow> = [];
+  #pendingWorkflows: Dictionary<Workflow> = {};
 
-  signals = {
-    'after-workflow-executed': new Subject<Workflow>(),
-    'before-workflow-executed': new Subject<Workflow>(),
-  };
+  workflowExecutor = new MiddlewareExecutor<Workflow>();
 
   constructor(
     public state: CellState,
@@ -78,7 +76,7 @@ export class Cell {
     const cell = new Cell(newCellState, conductor, p2p);
 
     await cell._runWorkflow({
-      name: 'Genesis Workflow',
+      name: 'Genesis',
       description: 'Initialize the cell with all the needed databases',
       task: () => genesis(cellId[1], cellId[0], membrane_proof)(cell),
     });
@@ -91,29 +89,24 @@ export class Cell {
   }
 
   triggerWorkflow(workflow: Workflow) {
-    this.#pendingWorkflows.push(workflow);
+    this.#pendingWorkflows[workflow.name] = workflow;
 
     setTimeout(() => this._runPendingWorkflows());
   }
 
   async _runPendingWorkflows() {
     const workflowsToRun = this.#pendingWorkflows;
-    this.#pendingWorkflows = [];
+    this.#pendingWorkflows = {};
 
-    const promises = workflowsToRun.map(w => this._runWorkflow(w));
+    const promises = Object.values(workflowsToRun).map(w =>
+      this._runWorkflow(w)
+    );
 
     await Promise.all(promises);
   }
 
   async _runWorkflow(workflow: Workflow): Promise<any> {
-    this.signals['before-workflow-executed'].next(workflow);
-
-    const result = await this.conductor.executor.execute(() =>
-      workflow.task(this)
-    );
-
-    this.signals['after-workflow-executed'].next(workflow);
-    return result;
+    return this.workflowExecutor.execute(() => workflow.task(this), workflow);
   }
 
   /** Workflows */
@@ -125,7 +118,7 @@ export class Cell {
     cap: string;
   }): Promise<any> {
     return this._runWorkflow({
-      name: 'Call Zome Function Workflow',
+      name: 'Call Zome Function',
       description: `Zome: ${args.zome}, Function name: ${args.fnName}`,
       task: () =>
         callZomeFn(args.zome, args.fnName, args.payload, args.cap)(this),

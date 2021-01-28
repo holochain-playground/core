@@ -1,4 +1,3 @@
-import { Task } from '../../../executor/executor';
 import { Cell } from '../../cell';
 import { ValidationLimboStatus } from '../state';
 import { getValidationLimboDhtOps } from '../dht/get';

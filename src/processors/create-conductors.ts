@@ -1,11 +1,9 @@
 import { BootstrapService } from '../bootstrap/bootstrap-service';
 import { Conductor } from '../core/conductor';
 import { SimulatedDnaTemplate } from '../dnas/simulated-dna';
-import { Executor } from '../executor/executor';
 
 export async function createConductors(
   conductorsToCreate: number,
-  executor: Executor,
   currentConductors: Conductor[],
   dnaTemplate: SimulatedDnaTemplate
 ): Promise<Conductor[]> {
@@ -16,7 +14,7 @@ export async function createConductors(
 
   const newConductorsPromises: Promise<Conductor>[] = [];
   for (let i = 0; i < conductorsToCreate; i++) {
-    const conductor = Conductor.create(bootstrapService, executor);
+    const conductor = Conductor.create(bootstrapService);
     newConductorsPromises.push(conductor);
   }
 

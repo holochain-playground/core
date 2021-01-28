@@ -10,8 +10,6 @@ import { Network, NetworkState } from './network/network';
 
 import { SimulatedDna, SimulatedDnaTemplate } from '../dnas/simulated-dna';
 import { CellState } from './cell/state';
-import { Executor } from '../executor/executor';
-import { ImmediateExecutor } from '../executor/immediate-executor';
 import { BootstrapService } from '../bootstrap/bootstrap-service';
 
 export interface ConductorState {
@@ -31,8 +29,7 @@ export class Conductor {
 
   constructor(
     state: ConductorState,
-    public bootstrapService: BootstrapService,
-    public executor: Executor
+    public bootstrapService: BootstrapService
   ) {
     this.network = new Network(state.networkState, this);
     this.registeredDnas = state.registeredDnas;
@@ -52,10 +49,7 @@ export class Conductor {
     }
   }
 
-  static async create(
-    bootstrapService: BootstrapService,
-    executor: Executor = new ImmediateExecutor()
-  ): Promise<Conductor> {
+  static async create(bootstrapService: BootstrapService): Promise<Conductor> {
     const state: ConductorState = {
       cellsState: {},
       networkState: {
@@ -65,7 +59,7 @@ export class Conductor {
       registeredTemplates: {},
     };
 
-    return new Conductor(state, bootstrapService, executor);
+    return new Conductor(state, bootstrapService);
   }
 
   getState(): ConductorState {

@@ -1,7 +1,6 @@
 import {
   Conductor,
   createConductors,
-  ImmediateExecutor,
   sampleDnaTemplate,
 } from '../dist';
 import { expect } from '@esm-bundle/chai';
@@ -10,7 +9,6 @@ describe('Conductor', () => {
   it('create conductors and call zome fn', async () => {
     const conductors = await createConductors(
       10,
-      new ImmediateExecutor(),
       [],
       sampleDnaTemplate()
     );
