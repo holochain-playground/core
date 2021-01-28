@@ -1,6 +1,7 @@
 import { Task } from './task';
 
 export type Middleware<P> = (payload: P) => Promise<void>;
+export type MiddlewareSubscription = { unsubscribe: () => void };
 
 export class MiddlewareExecutor<P> {
   _beforeMiddlewares: Array<Middleware<P>> = [];
@@ -19,7 +20,7 @@ export class MiddlewareExecutor<P> {
     return result;
   }
 
-  before(callback: Middleware<P>) {
+  before(callback: Middleware<P>): MiddlewareSubscription {
     this._beforeMiddlewares.push(callback);
 
     return {
@@ -29,7 +30,7 @@ export class MiddlewareExecutor<P> {
       },
     };
   }
-  after(callback: Middleware<P>) {
+  after(callback: Middleware<P>): MiddlewareSubscription {
     this._afterMiddlewares.push(callback);
 
     return {
