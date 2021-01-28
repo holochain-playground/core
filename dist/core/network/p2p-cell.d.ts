@@ -15,7 +15,7 @@ export interface NetworkRequestInfo {
 export declare class P2pCell {
     protected cellId: CellId;
     protected network: Network;
-    neighbors: Hash[];
+    neighbors: AgentPubKey[];
     redundancyFactor: number;
     networkRequestsExecutor: MiddlewareExecutor<NetworkRequestInfo>;
     constructor(state: P2pCellState, cellId: CellId, network: Network);

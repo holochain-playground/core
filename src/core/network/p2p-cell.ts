@@ -24,7 +24,7 @@ export interface NetworkRequestInfo {
 
 // From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/types/actor.rs
 export class P2pCell {
-  neighbors: Hash[];
+  neighbors: AgentPubKey[];
 
   redundancyFactor!: number;
 

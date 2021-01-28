@@ -1035,7 +1035,7 @@ const app_validation = async (cell) => {
 };
 function app_validation_task(cell) {
     return {
-        name: 'App Validation of the DHT Op',
+        name: 'App Validation',
         description: 'Running of the zome appropriate zome hook',
         task: () => app_validation(cell),
     };
@@ -1218,7 +1218,7 @@ const sys_validation = async (cell) => {
 };
 function sys_validation_task(cell) {
     return {
-        name: 'System Validation of the DHT Op',
+        name: 'System Validation',
         description: 'Subconscious checks of data integrity',
         task: () => sys_validation(cell),
     };

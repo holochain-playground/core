@@ -37,7 +37,7 @@ export const app_validation = async (cell: Cell): Promise<void> => {
 
 export function app_validation_task(cell: Cell): Workflow {
   return {
-    name: 'App Validation of the DHT Op',
+    name: 'App Validation',
     description: 'Running of the zome appropriate zome hook',
     task: () => app_validation(cell),
   };

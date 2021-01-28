@@ -26,7 +26,7 @@ export const sys_validation = async (cell: Cell): Promise<void> => {
 
 export function sys_validation_task(cell: Cell): Workflow {
   return {
-    name: 'System Validation of the DHT Op',
+    name: 'System Validation',
     description: 'Subconscious checks of data integrity',
     task: () => sys_validation(cell),
   };
