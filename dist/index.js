@@ -1463,7 +1463,7 @@ class Network {
         const dnaHash = cellId[0];
         const state = {
             neighbors: [],
-            redundancyFactor: 20,
+            redundancyFactor: 3,
         };
         const p2pCell = new P2pCell(state, cellId, this);
         if (!this.p2pCells[dnaHash])
