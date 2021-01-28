@@ -1382,6 +1382,7 @@ class P2pCell {
         this.network = network;
         this.networkRequestsExecutor = new MiddlewareExecutor();
         this.neighbors = state.neighbors;
+        this.redundancyFactor = state.redundancyFactor;
     }
     getState() {
         return {

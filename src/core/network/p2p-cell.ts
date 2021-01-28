@@ -26,7 +26,7 @@ export interface NetworkRequestInfo {
 export class P2pCell {
   neighbors: AgentPubKey[];
 
-  redundancyFactor!: number;
+  redundancyFactor: number;
 
   networkRequestsExecutor = new MiddlewareExecutor<NetworkRequestInfo>();
 
@@ -36,6 +36,7 @@ export class P2pCell {
     protected network: Network
   ) {
     this.neighbors = state.neighbors;
+    this.redundancyFactor = state.redundancyFactor;
   }
 
   getState(): P2pCellState {
