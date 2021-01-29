@@ -17,16 +17,18 @@ export class BootstrapService {
     this.cells[dnaHash][agentPubKey] = cell;
   }
 
-  getNeighbors(
+  getNeighborhood(
     dnaHash: Hash,
-    agentPubKey: AgentPubKey,
+    basis_dht_hash: Hash,
     numNeighbors: number
   ): Cell[] {
-    const cells = Object.keys(this.cells[dnaHash]).filter(
-      cellPubKey => cellPubKey !== agentPubKey
-    );
+    const cells = Object.keys(this.cells[dnaHash]);
 
-    const neighborsKeys = getClosestNeighbors(cells, agentPubKey, numNeighbors);
+    const neighborsKeys = getClosestNeighbors(
+      cells,
+      basis_dht_hash,
+      numNeighbors
+    );
 
     return neighborsKeys.map(pubKey => this.cells[dnaHash][pubKey]);
   }

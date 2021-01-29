@@ -1,12 +1,16 @@
 import {
   AgentPubKey,
+  CapSecret,
   CellId,
   DHTOp,
   Dictionary,
+  Element,
   Hash,
 } from '@holochain-open-dev/core-types';
 import { MiddlewareExecutor } from '../../executor/middleware-executor';
+import { GetOptions } from '../../types';
 import { Cell } from '../cell';
+import { GetElementFull, GetEntryFull } from '../cell/cascade/types';
 import { Network, NetworkRequest } from './network';
 import { getClosestNeighbors } from './utils';
 
@@ -22,7 +26,7 @@ export interface NetworkRequestInfo {
   name: string;
 }
 
-// From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/types/actor.rs
+// From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/lib.rs
 export class P2pCell {
   neighbors: AgentPubKey[];
 
@@ -46,25 +50,26 @@ export class P2pCell {
     };
   }
 
+  /** P2p actions */
+
   async join(containerCell: Cell): Promise<void> {
     const dnaHash = this.cellId[0];
     const agentPubKey = this.cellId[1];
 
-    this.network.conductor.bootstrapService.announceCell(
-      this.cellId,
-      containerCell
-    );
+    this.network.bootstrapService.announceCell(this.cellId, containerCell);
 
-    const neighbors = this.network.conductor.bootstrapService.getNeighbors(
+    const neighbors = this.network.bootstrapService.getNeighborhood(
       dnaHash,
       agentPubKey,
       this.redundancyFactor
     );
 
-    this.neighbors = neighbors.map(cell => cell.agentPubKey);
+    this.neighbors = neighbors
+      .filter(cell => cell.agentPubKey !== agentPubKey)
+      .map(cell => cell.agentPubKey);
 
-    const promises = this.neighbors.map(neighbor =>
-      this._sendRequest(neighbor, 'Add Neighbor', cell =>
+    const promises = neighbors.map(neighbor =>
+      this._executeNetworkRequest(neighbor, 'Add Neighbor', cell =>
         cell.handle_new_neighbor(agentPubKey)
       )
     );
@@ -74,18 +79,69 @@ export class P2pCell {
   async leave(): Promise<void> {}
 
   async publish(dht_hash: Hash, ops: Dictionary<DHTOp>): Promise<void> {
-    const neighbors = this._getClosestNeighbors(
+    await this.network.kitsune.rpc_multi(
+      this.cellId[0],
+      this.cellId[1],
       dht_hash,
-      this.redundancyFactor
+      this.redundancyFactor,
+      cell =>
+        this._executeNetworkRequest(cell, 'Publish Request', cell =>
+          cell.handle_publish(this.cellId[1], dht_hash, ops)
+        )
+    );
+  }
+
+  async get(dht_hash: Hash, options: GetOptions): Promise<Element | undefined> {
+    const gets = await this.network.kitsune.rpc_multi(
+      this.cellId[0],
+      this.cellId[1],
+      dht_hash,
+      0,
+      cell =>
+        this._executeNetworkRequest(cell, 'Get Request', cell =>
+          cell.handle_get(dht_hash, options)
+        )
     );
 
-    const promises = neighbors.map(neighbor =>
-      this._sendRequest(neighbor, 'Publish Request', cell =>
-        cell.handle_publish(this.cellId[1], dht_hash, ops)
-      )
-    );
+    const result = gets.find(get => !!get);
 
-    await Promise.all(promises);
+    if (!result) return undefined;
+
+    if ((result as GetElementFull).signed_header) {
+      return {
+        entry: (result as GetElementFull).maybe_entry,
+        signed_header: (result as GetElementFull).signed_header,
+      };
+    } else {
+      return {
+        signed_header: (result as GetEntryFull).live_headers[0],
+        entry: (result as GetEntryFull).entry,
+      };
+    }
+  }
+
+  async call_remote(
+    agent: AgentPubKey,
+    zome: string,
+    fnName: string,
+    cap: CapSecret | undefined,
+    payload: any
+  ): Promise<any> {
+    return this.network.kitsune.rpc_single(
+      this.cellId[0],
+      this.cellId[1],
+      agent,
+      cell =>
+        this._executeNetworkRequest(cell, 'Call Remote', cell =>
+          cell.handle_call_remote(this.cellId[1], zome, fnName, cap, payload)
+        )
+    );
+  }
+
+  /** Neighbor handling */
+
+  public getNeighbors(): Array<AgentPubKey> {
+    return this.neighbors;
   }
 
   async addNeighbor(neighborPubKey: AgentPubKey) {
@@ -93,49 +149,20 @@ export class P2pCell {
       this.neighbors.push(neighborPubKey);
   }
 
-  async get(
-    dna_hash: Hash,
-    from_agent: AgentPubKey,
-    dht_hash: Hash,
-    _options: any // TODO: complete?
-  ): Promise<Element | undefined> {
-    return undefined;
-  }
-
-  public getNeighbors(): Array<AgentPubKey> {
-    return this.neighbors;
-  }
-
-  private _getClosestNeighbors(
-    basisHash: Hash,
-    neighborCount: number
-  ): Array<AgentPubKey> {
-    return getClosestNeighbors(
-      [...this.neighbors, this.cellId[1]],
-      basisHash,
-      neighborCount
-    );
-  }
-
-  private _sendRequest<T>(
-    toAgent: AgentPubKey,
+  private _executeNetworkRequest<T>(
+    toCell: Cell,
     name: string,
-    message: NetworkRequest<T>
+    request: NetworkRequest<T>
   ): Promise<T> {
     const networkRequest = {
       fromAgent: this.cellId[1],
-      toAgent: toAgent,
+      toAgent: toCell.agentPubKey,
       dnaHash: this.cellId[0],
       name,
     };
+
     return this.networkRequestsExecutor.execute(
-      () =>
-        this.network.sendRequest(
-          this.cellId[0],
-          this.cellId[1],
-          toAgent,
-          message
-        ),
+      () => request(toCell),
       networkRequest
     );
   }

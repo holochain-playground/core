@@ -1,27 +1,36 @@
-import { Subject } from 'rxjs';
 import {
   CellId,
   AgentPubKey,
   Hash,
   Dictionary,
   DHTOp,
+  SignedHeaderHashed,
+  NewEntryHeader,
+  Element,
+  Entry,
+  CapSecret,
 } from '@holochain-open-dev/core-types';
 import { Conductor } from '../conductor';
-import { genesis } from './workflows/genesis';
-import { callZomeFn } from './workflows/call_zome_fn';
+import { genesis, genesis_task } from './workflows/genesis';
+import { call_zome_fn_workflow } from './workflows/call_zome_fn';
 import { P2pCell } from '../network/p2p-cell';
-import { incoming_dht_ops } from './workflows/incoming_dht_ops';
+import { incoming_dht_ops_task } from './workflows/incoming_dht_ops';
 import { CellState } from './state';
 import { Workflow } from './workflows/workflows';
 import { MiddlewareExecutor } from '../../executor/middleware-executor';
+import { GetResult } from './cascade/types';
+import { Authority } from './cascade/authority';
+import { getHashType, HashType } from '../../processors/hash';
+import { valid_cap_grant } from './source-chain/utils';
+import { GetOptions } from '../../types';
 
 export type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export type CellSignalListener = (payload: any) => void;
 
 export class Cell {
-  #pendingWorkflows: Dictionary<Workflow> = {};
+  #pendingWorkflows: Dictionary<Workflow<any, any>> = {};
 
-  workflowExecutor = new MiddlewareExecutor<Workflow>();
+  workflowExecutor = new MiddlewareExecutor<Workflow<any, any>>();
 
   constructor(
     public state: CellState,
@@ -75,11 +84,7 @@ export class Cell {
 
     const cell = new Cell(newCellState, conductor, p2p);
 
-    await cell._runWorkflow({
-      name: 'Genesis',
-      description: 'Initialize the cell with all the needed databases',
-      task: () => genesis(cellId[1], cellId[0], membrane_proof)(cell),
-    });
+    await cell._runWorkflow(genesis_task(cell, cellId, membrane_proof));
 
     return cell;
   }
@@ -88,7 +93,7 @@ export class Cell {
     return this.state;
   }
 
-  triggerWorkflow(workflow: Workflow) {
+  triggerWorkflow(workflow: Workflow<any, any>) {
     this.#pendingWorkflows[workflow.name] = workflow;
 
     setTimeout(() => this._runPendingWorkflows(), 300);
@@ -105,7 +110,7 @@ export class Cell {
     await Promise.all(promises);
   }
 
-  async _runWorkflow(workflow: Workflow): Promise<any> {
+  async _runWorkflow(workflow: Workflow<any, any>): Promise<any> {
     return this.workflowExecutor.execute(() => workflow.task(this), workflow);
   }
 
@@ -117,12 +122,9 @@ export class Cell {
     payload: any;
     cap: string;
   }): Promise<any> {
-    return this._runWorkflow({
-      name: 'Call Zome Function',
-      description: `Zome: ${args.zome}, Function name: ${args.fnName}`,
-      task: () =>
-        callZomeFn(args.zome, args.fnName, args.payload, args.cap)(this),
-    });
+    return this._runWorkflow(
+      call_zome_fn_workflow(this, args.zome, args.fnName, args.payload)
+    );
   }
 
   /** Network handlers */
@@ -136,10 +138,41 @@ export class Cell {
     dht_hash: Hash, // The basis for the DHTOps
     ops: Dictionary<DHTOp>
   ): Promise<void> {
-    return this._runWorkflow({
-      name: 'Incoming DHT Ops',
-      description: 'Persist the recieved DHT Ops to validate them later',
-      task: () => incoming_dht_ops(dht_hash, ops, from_agent)(this),
+    return this._runWorkflow(
+      incoming_dht_ops_task(this, from_agent, dht_hash, ops)
+    );
+  }
+
+  public async handle_get(
+    dht_hash: Hash,
+    options: GetOptions
+  ): Promise<GetResult | undefined> {
+    const authority = new Authority(this);
+
+    const hashType = getHashType(dht_hash);
+    if (hashType === HashType.ENTRY || hashType === HashType.AGENT) {
+      return authority.handle_get_entry(dht_hash, options);
+    } else if (hashType === HashType.HEADER) {
+      return authority.handle_get_element(dht_hash, options);
+    }
+    return undefined;
+  }
+
+  public async handle_call_remote(
+    from_agent: AgentPubKey,
+    zome_name: string,
+    fn_name: string,
+    cap: CapSecret | undefined,
+    payload: any
+  ): Promise<any> {
+    if (!valid_cap_grant(this.state, zome_name, fn_name, from_agent, cap))
+      throw new Error('Unauthorized call zome');
+
+    return this.callZomeFn({
+      zome: zome_name,
+      cap: cap as CapSecret,
+      fnName: fn_name,
+      payload,
     });
   }
 }

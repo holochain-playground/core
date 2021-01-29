@@ -49,6 +49,19 @@ function getEntryDetails(state, entryHash) {
         entry_dht_status: dhtStatus,
     };
 }
+function getHeaderModifiers(state, headerHash) {
+    const allModifiers = state.metadata.system_meta[headerHash];
+    const updates = allModifiers
+        .filter(m => m.Update)
+        .map(m => state.CAS[m.Update]);
+    const deletes = allModifiers
+        .filter(m => m.Delete)
+        .map(m => state.CAS[m.Delete]);
+    return {
+        updates,
+        deletes,
+    };
+}
 function getAllHeldEntries(state) {
     const newEntryHeaders = Object.values(state.integratedDHTOps)
         .filter(dhtOpValue => dhtOpValue.op.type === DHTOpType.StoreEntry)
@@ -636,6 +649,33 @@ var blakejs = {
   blake2sFinal: blake2s_1.blake2sFinal
 };
 
+var HashType;
+(function (HashType) {
+    HashType[HashType["AGENT"] = 0] = "AGENT";
+    HashType[HashType["ENTRY"] = 1] = "ENTRY";
+    HashType[HashType["DHTOP"] = 2] = "DHTOP";
+    HashType[HashType["HEADER"] = 3] = "HEADER";
+    HashType[HashType["DNA"] = 4] = "DNA";
+})(HashType || (HashType = {}));
+const AGENT_PREFIX = 'hCAk';
+const ENTRY_PREFIX = 'hCEk';
+const DHTOP_PREFIX = 'hCQk';
+const DNA_PREFIX = 'hC0k';
+const HEADER_PREFIX = 'hCkk';
+function getPrefix(type) {
+    switch (type) {
+        case HashType.AGENT:
+            return AGENT_PREFIX;
+        case HashType.ENTRY:
+            return ENTRY_PREFIX;
+        case HashType.DHTOP:
+            return DHTOP_PREFIX;
+        case HashType.HEADER:
+            return HEADER_PREFIX;
+        case HashType.DNA:
+            return DNA_PREFIX;
+    }
+}
 function str2ab(str) {
     var buf = new ArrayBuffer(str.length);
     var bufView = new Uint8Array(buf);
@@ -646,12 +686,14 @@ function str2ab(str) {
 }
 const hashCache = {};
 // From https://github.com/holochain/holochain/blob/dc0cb61d0603fa410ac5f024ed6ccfdfc29715b3/crates/holo_hash/src/encode.rs
-function hash(content) {
+function hash(content, type) {
     const contentString = typeof content === 'string' ? content : JSON.stringify(content);
     if (hashCache[contentString])
         return hashCache[contentString];
     const hashable = new Uint8Array(str2ab(contentString));
-    const hash = serializeHash(blakejs.blake2b(hashable, null, 32));
+    const bytesHash = blakejs.blake2b(hashable, null, 32);
+    const strHash = serializeHash(bytesHash);
+    const hash = `u${getPrefix(type)}${strHash.slice(1)}`;
     hashCache[contentString] = hash;
     return hash;
 }
@@ -688,11 +730,25 @@ function compareBigInts(a, b) {
     }
     return 0;
 }
+function getHashType(hash) {
+    const hashExt = hash.slice(1, 5);
+    if (hashExt === AGENT_PREFIX)
+        return HashType.AGENT;
+    if (hashExt === DNA_PREFIX)
+        return HashType.DNA;
+    if (hashExt === DHTOP_PREFIX)
+        return HashType.DHTOP;
+    if (hashExt === HEADER_PREFIX)
+        return HashType.HEADER;
+    if (hashExt === ENTRY_PREFIX)
+        return HashType.ENTRY;
+    throw new Error('Could not get hash type');
+}
 
 function hashEntry(entry) {
     if (entry.entry_type === 'Agent')
         return entry.content;
-    return hash(entry.content);
+    return hash(entry.content, HashType.ENTRY);
 }
 function getAppEntryType(entryType) {
     if (entryType.App)
@@ -710,7 +766,7 @@ function getEntryTypeString(cell, entryType) {
 function getDHTOpBasis(dhtOp) {
     switch (dhtOp.type) {
         case DHTOpType.StoreElement:
-            return hash(dhtOp.header);
+            return hash(dhtOp.header, HashType.DHTOP);
         case DHTOpType.StoreEntry:
             return dhtOp.header.header.content.entry_hash;
         case DHTOpType.RegisterUpdatedContent:
@@ -740,7 +796,7 @@ const putIntegrationLimboValue = (dhtOpHash, integrationLimboValue) => (state) =
     state.integrationLimbo[dhtOpHash] = integrationLimboValue;
 };
 const putDhtOpData = (dhtOp) => async (state) => {
-    const headerHash = hash(dhtOp.header);
+    const headerHash = dhtOp.header.header.hash;
     state.CAS[headerHash] = dhtOp.header;
     const entry = getEntry(dhtOp);
     if (entry) {
@@ -749,7 +805,7 @@ const putDhtOpData = (dhtOp) => async (state) => {
     }
 };
 const putDhtOpMetadata = (dhtOp) => (state) => {
-    const headerHash = hash(dhtOp.header);
+    const headerHash = dhtOp.header.header.hash;
     if (dhtOp.type === DHTOpType.StoreElement) {
         state.metadata.misc_meta[headerHash] = 'StoreElement';
     }
@@ -808,7 +864,8 @@ const putDhtOpMetadata = (dhtOp) => (state) => {
 const update_entry_dht_status = (entryHash) => (state) => {
     const headers = getHeadersForEntry(state, entryHash);
     const entryIsAlive = headers.some(header => {
-        const dhtHeaders = state.metadata.system_meta[hash(header)];
+        const headerHash = header.header.hash;
+        const dhtHeaders = state.metadata.system_meta[headerHash];
         return dhtHeaders
             ? dhtHeaders.find(metaVal => metaVal.Delete)
             : true;
@@ -818,7 +875,7 @@ const update_entry_dht_status = (entryHash) => (state) => {
     };
 };
 const register_header_on_basis = (basis, header) => (state) => {
-    const headerHash = hash(header);
+    const headerHash = hash(header, HashType.HEADER);
     let value;
     if (header.type === HeaderType.Create) {
         value = { NewEntry: headerHash };
@@ -850,6 +907,9 @@ function getNewHeaders(state) {
     const dhtOps = Object.values(state.authoredDHTOps);
     const headerHashesAlreadyPublished = dhtOps.map(dhtOp => dhtOp.op.header.header.hash);
     return state.sourceChain.filter(headerHash => !headerHashesAlreadyPublished.includes(headerHash));
+}
+function getAllAuthoredHeaders(state) {
+    return state.sourceChain.map(headerHash => state.CAS[headerHash]);
 }
 
 const putElement = (element) => (state) => {
@@ -906,12 +966,53 @@ function getNonPublishedDhtOps(state) {
     }
     return nonPublishedDhtOps;
 }
+function valid_cap_grant(state, zome, fnName, provenance, secret) {
+    if (provenance === getCellId(state)[1])
+        return true;
+    const aliveCapGrantsHeaders = {};
+    const allHeaders = getAllAuthoredHeaders(state);
+    for (const header of allHeaders) {
+        if (isCapGrant(header)) {
+            aliveCapGrantsHeaders[header.header.hash] = header;
+        }
+    }
+    for (const header of allHeaders) {
+        const headerContent = header.header.content;
+        if (headerContent.original_header_address &&
+            aliveCapGrantsHeaders[headerContent.original_header_address]) {
+            delete aliveCapGrantsHeaders[headerContent.original_header_address];
+        }
+        if (headerContent.deletes_address &&
+            aliveCapGrantsHeaders[headerContent.deletes_address]) {
+            delete aliveCapGrantsHeaders[headerContent.deletes_address];
+        }
+    }
+    const aliveCapGrants = Object.values(aliveCapGrantsHeaders).map(headerHash => state.CAS[headerHash.header.content.entry_hash].content);
+    return !!aliveCapGrants.find(capGrant => isCapGrantValid(capGrant, zome, fnName, provenance, secret));
+}
+function isCapGrantValid(capGrant, zome, fnName, check_agent, check_secret) {
+    if (!capGrant.functions.find(fn => fn.fn_name === fnName && fn.zome === zome))
+        return false;
+    if (capGrant.access === 'Unrestricted')
+        return true;
+    else if (capGrant.access.Assigned) {
+        return capGrant.access.Assigned.assignees.includes(check_agent);
+    }
+    else {
+        return (capGrant.access.Transferable.secret === check_secret);
+    }
+}
+function isCapGrant(header) {
+    const content = header.header.content;
+    return !!(content.entry_hash &&
+        content.entry_type === 'CapGrant');
+}
 
 function buildShh(header) {
     return {
         header: {
             content: header,
-            hash: hash(header),
+            hash: hash(header, HashType.HEADER),
         },
         signature: Uint8Array.from([]),
     };
@@ -966,6 +1067,15 @@ function buildUpdate(state, entry, entry_type, original_entry_address, original_
     };
     return update;
 }
+function buildDelete(state, deletes_address, deletes_entry_address) {
+    const deleteHeader = {
+        ...buildCommon(state),
+        type: HeaderType.Delete,
+        deletes_address,
+        deletes_entry_address,
+    };
+    return deleteHeader;
+}
 /** Helpers */
 function buildCommon(state) {
     const author = getAuthor(state);
@@ -1014,6 +1124,7 @@ function integrate_dht_ops_task(cell) {
     return {
         name: 'Integrate DHT Ops',
         description: 'Integration of the validated DHTOp in our DHT shard',
+        payload: undefined,
         task: () => integrate_dht_ops(cell),
     };
 }
@@ -1036,10 +1147,23 @@ const app_validation = async (cell) => {
 function app_validation_task(cell) {
     return {
         name: 'App Validation',
-        description: 'Running of the zome appropriate zome hook',
+        description: 'Running of the zome appropriate validation hook',
+        payload: undefined,
         task: () => app_validation(cell),
     };
 }
+
+// Creates a new Create header and its entry in the source chain
+const create_cap_grant = (zome_index, cell) => async (cap_grant) => {
+    const entry = { entry_type: 'CapGrant', content: cap_grant };
+    const create = buildCreate(cell.state, entry, 'CapGrant');
+    const element = {
+        signed_header: buildShh(create),
+        entry,
+    };
+    putElement(element)(cell.state);
+    return element.signed_header.header.hash;
+};
 
 // Creates a new Create header and its entry in the source chain
 const create_entry = (zome_index, cell) => async (args) => {
@@ -1076,6 +1200,138 @@ const create_link = (zome_id, cell) => async (args) => {
     return element.signed_header.header.hash;
 };
 
+var GetStrategy;
+(function (GetStrategy) {
+    GetStrategy[GetStrategy["Latest"] = 0] = "Latest";
+    GetStrategy[GetStrategy["Contents"] = 1] = "Contents";
+})(GetStrategy || (GetStrategy = {}));
+
+// From https://github.com/holochain/holochain/blob/develop/crates/holochain_cascade/src/authority.rs
+class Authority {
+    constructor(cell) {
+        this.cell = cell;
+    }
+    async handle_get_entry(entry_hash, options) {
+        const entry = this.cell.state.CAS[entry_hash];
+        if (!entry)
+            return undefined;
+        const allHeaders = getHeadersForEntry(this.cell.state, entry_hash);
+        let entry_type = undefined;
+        const live_headers = [];
+        const updates = [];
+        const deletes = [];
+        for (const header of allHeaders) {
+            const headerContent = header.header.content;
+            if (headerContent.original_entry_address &&
+                headerContent.original_entry_address === entry_hash) {
+                updates.push(header);
+            }
+            else if (headerContent.entry_hash &&
+                headerContent.entry_hash === entry_hash) {
+                live_headers.push(header);
+                if (!entry_type) {
+                    entry_type = headerContent.entry_type;
+                }
+            }
+            else if (headerContent.deletes_entry_address === entry_hash) {
+                deletes.push(header);
+            }
+        }
+        return {
+            entry,
+            entry_type: entry_type,
+            live_headers,
+            updates,
+            deletes,
+        };
+    }
+    async handle_get_element(header_hash, options) {
+        if (this.cell.state.metadata.misc_meta[header_hash] !== 'StoreElement') {
+            return undefined;
+        }
+        const header = this.cell.state.CAS[header_hash];
+        let maybe_entry = undefined;
+        let validation_status = ValidationStatus.Valid;
+        if (header) {
+            if (header.header.content.entry_hash) {
+                const entryHash = header.header
+                    .content.entry_hash;
+                maybe_entry = this.cell.state.CAS[entryHash];
+            }
+        }
+        else {
+            validation_status = ValidationStatus.Rejected;
+        }
+        const modifiers = getHeaderModifiers(this.cell.state, header_hash);
+        return {
+            deletes: modifiers.deletes,
+            updates: modifiers.updates,
+            signed_header: header,
+            validation_status,
+            maybe_entry,
+        };
+    }
+}
+
+class Cascade {
+    constructor(cell) {
+        this.cell = cell;
+    }
+    async dht_get(hash, options) {
+        // TODO rrDHT arcs
+        const authority = new Authority(this.cell);
+        const isPresent = this.cell.state.CAS[hash];
+        // TODO only return local if GetOptions::content() is given
+        if (isPresent && options.strategy === GetStrategy.Contents) {
+            const hashType = getHashType(hash);
+            if (hashType === HashType.ENTRY) {
+                const entry = this.cell.state.CAS[hash];
+                const signed_header = Object.values(this.cell.state.CAS).find(header => header.header &&
+                    header.header.content
+                        .entry_hash === hash);
+                return {
+                    entry,
+                    signed_header,
+                };
+            }
+            if (hashType === HashType.HEADER) {
+                const signed_header = this.cell.state.CAS[hash];
+                const entry = this.cell.state.CAS[signed_header.header.content
+                    .entry_hash];
+                return {
+                    entry,
+                    signed_header,
+                };
+            }
+        }
+        return this.cell.p2p.get(hash, options);
+    }
+}
+
+// Creates a new Create header and its entry in the source chain
+const delete_cap_grant = (zome_index, cell) => async ({ header_hash }) => {
+    const cascade = new Cascade(cell);
+    const elementToDelete = await cascade.dht_get(header_hash, {
+        strategy: GetStrategy.Contents,
+    });
+    if (!elementToDelete)
+        throw new Error('Could not find element to be deleted');
+    const deletesEntryAddress = elementToDelete.signed_header.header
+        .content.entry_hash;
+    const deleteHeader = buildDelete(cell.state, header_hash, deletesEntryAddress);
+    const element = {
+        signed_header: buildShh(deleteHeader),
+        entry: undefined,
+    };
+    putElement(element)(cell.state);
+    return element.signed_header.header.hash;
+};
+
+// Creates a new Create header and its entry in the source chain
+const call_remote = (zome_index, cell) => async (args) => {
+    return cell.p2p.call_remote(args.agent, args.zome, args.fn_name, args.cap_secret, args.payload);
+};
+
 // Creates a new Create header and its entry in the source chain
 const hash_entry = (zome_index, cell) => async (args) => {
     const entry = { entry_type: 'App', content: args.content };
@@ -1106,6 +1362,9 @@ function buildZomeFunctionContext(zome_index, cell) {
         create_entry: create_entry(zome_index, cell),
         hash_entry: hash_entry(),
         create_link: create_link(zome_index, cell),
+        create_cap_grant: create_cap_grant(zome_index, cell),
+        delete_cap_grant: delete_cap_grant(zome_index, cell),
+        call_remote: call_remote(zome_index, cell),
         path,
     };
 }
@@ -1114,6 +1373,7 @@ function publish_dht_ops_task(cell) {
     return {
         name: 'Publish DHT Ops',
         description: 'Read the elements in the authored DHT Ops that have not been published and publish them',
+        payload: undefined,
         task: () => publish_dht_ops(cell),
     };
 }
@@ -1142,6 +1402,7 @@ function produce_dht_ops_task(cell) {
     return {
         name: 'Produce DHT Ops',
         description: 'Read the new elements in the source chain and produce their appropriate DHT Ops',
+        payload: undefined,
         task: () => produce_dht_ops(cell),
     };
 }
@@ -1152,7 +1413,7 @@ const produce_dht_ops = async (cell) => {
         const element = getElement(cell.state, newHeaderHash);
         const dhtOps = elementToDHTOps(element);
         for (const dhtOp of dhtOps) {
-            const dhtOpHash = hash(dhtOp);
+            const dhtOpHash = hash(dhtOp, HashType.DHTOP);
             const dhtOpValue = {
                 op: dhtOp,
                 last_publish_time: undefined,
@@ -1187,6 +1448,18 @@ const callZomeFn = (zomeName, fnName, payload, cap) => async (cell) => {
     }
     return result;
 };
+function call_zome_fn_workflow(cell, zome, fnName, payload) {
+    return {
+        name: 'Call Zome Function',
+        description: `Zome: ${zome}, Function name: ${fnName}`,
+        payload: {
+            fnName,
+            payload,
+            zome,
+        },
+        task: () => callZomeFn(zome, fnName, payload)(cell),
+    };
+}
 
 const genesis = (agentId, dnaHash, membrane_proof) => async (cell) => {
     const dna = buildDna(dnaHash, agentId);
@@ -1204,6 +1477,17 @@ const genesis = (agentId, dnaHash, membrane_proof) => async (cell) => {
     })(cell.state);
     cell.triggerWorkflow(produce_dht_ops_task(cell));
 };
+function genesis_task(cell, cellId, membrane_proof) {
+    return {
+        name: 'Genesis',
+        description: 'Initialize the cell with all the needed databases',
+        payload: {
+            cellId,
+            membrane_proof,
+        },
+        task: () => genesis(cellId[1], cellId[0], membrane_proof)(cell),
+    };
+}
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/sys_validation_workflow.rs
 const sys_validation = async (cell) => {
@@ -1220,6 +1504,7 @@ function sys_validation_task(cell) {
     return {
         name: 'System Validation',
         description: 'Subconscious checks of data integrity',
+        payload: undefined,
         task: () => sys_validation(cell),
     };
 }
@@ -1241,6 +1526,19 @@ const incoming_dht_ops = (basis, dhtOps, from_agent) => async (cell) => {
     }
     cell.triggerWorkflow(sys_validation_task(cell));
 };
+function incoming_dht_ops_task(cell, from_agent, dht_hash, // The basis for the DHTOps
+ops) {
+    return {
+        name: 'Incoming DHT Ops',
+        description: 'Persist the recieved DHT Ops to validate them later',
+        payload: {
+            from_agent,
+            dht_hash,
+            ops,
+        },
+        task: () => incoming_dht_ops(dht_hash, ops, from_agent)(cell),
+    };
+}
 
 class MiddlewareExecutor {
     constructor() {
@@ -1320,11 +1618,7 @@ class Cell {
         };
         const p2p = conductor.network.createP2pCell(cellId);
         const cell = new Cell(newCellState, conductor, p2p);
-        await cell._runWorkflow({
-            name: 'Genesis',
-            description: 'Initialize the cell with all the needed databases',
-            task: () => genesis(cellId[1], cellId[0], membrane_proof)(cell),
-        });
+        await cell._runWorkflow(genesis_task(cell, cellId, membrane_proof));
         return cell;
     }
     getState() {
@@ -1345,11 +1639,7 @@ class Cell {
     }
     /** Workflows */
     callZomeFn(args) {
-        return this._runWorkflow({
-            name: 'Call Zome Function',
-            description: `Zome: ${args.zome}, Function name: ${args.fnName}`,
-            task: () => callZomeFn(args.zome, args.fnName, args.payload, args.cap)(this),
-        });
+        return this._runWorkflow(call_zome_fn_workflow(this, args.zome, args.fnName, args.payload));
     }
     /** Network handlers */
     // https://github.com/holochain/holochain/blob/develop/crates/holochain/src/conductor/cell.rs#L429
@@ -1358,24 +1648,32 @@ class Cell {
     }
     handle_publish(from_agent, dht_hash, // The basis for the DHTOps
     ops) {
-        return this._runWorkflow({
-            name: 'Incoming DHT Ops',
-            description: 'Persist the recieved DHT Ops to validate them later',
-            task: () => incoming_dht_ops(dht_hash, ops, from_agent)(this),
+        return this._runWorkflow(incoming_dht_ops_task(this, from_agent, dht_hash, ops));
+    }
+    async handle_get(dht_hash, options) {
+        const authority = new Authority(this);
+        const hashType = getHashType(dht_hash);
+        if (hashType === HashType.ENTRY || hashType === HashType.AGENT) {
+            return authority.handle_get_entry(dht_hash, options);
+        }
+        else if (hashType === HashType.HEADER) {
+            return authority.handle_get_element(dht_hash, options);
+        }
+        return undefined;
+    }
+    async handle_call_remote(from_agent, zome_name, fn_name, cap, payload) {
+        if (!valid_cap_grant(this.state, zome_name, fn_name, from_agent, cap))
+            throw new Error('Unauthorized call zome');
+        return this.callZomeFn({
+            zome: zome_name,
+            cap: cap,
+            fnName: fn_name,
+            payload,
         });
     }
 }
 
-function getClosestNeighbors(peers, targetHash, numNeighbors) {
-    const sortedPeers = peers.sort((agentA, agentB) => {
-        const distanceA = distance(targetHash, agentA);
-        const distanceB = distance(targetHash, agentB);
-        return compareBigInts(distanceA, distanceB);
-    });
-    return sortedPeers.slice(0, numNeighbors);
-}
-
-// From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/types/actor.rs
+// From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/lib.rs
 class P2pCell {
     constructor(state, cellId, network) {
         this.cellId = cellId;
@@ -1390,49 +1688,100 @@ class P2pCell {
             redundancyFactor: this.redundancyFactor,
         };
     }
+    /** P2p actions */
     async join(containerCell) {
         const dnaHash = this.cellId[0];
         const agentPubKey = this.cellId[1];
-        this.network.conductor.bootstrapService.announceCell(this.cellId, containerCell);
-        const neighbors = this.network.conductor.bootstrapService.getNeighbors(dnaHash, agentPubKey, this.redundancyFactor);
-        this.neighbors = neighbors.map(cell => cell.agentPubKey);
-        const promises = this.neighbors.map(neighbor => this._sendRequest(neighbor, 'Add Neighbor', cell => cell.handle_new_neighbor(agentPubKey)));
+        this.network.bootstrapService.announceCell(this.cellId, containerCell);
+        const neighbors = this.network.bootstrapService.getNeighborhood(dnaHash, agentPubKey, this.redundancyFactor);
+        this.neighbors = neighbors
+            .filter(cell => cell.agentPubKey !== agentPubKey)
+            .map(cell => cell.agentPubKey);
+        const promises = neighbors.map(neighbor => this._executeNetworkRequest(neighbor, 'Add Neighbor', cell => cell.handle_new_neighbor(agentPubKey)));
         await Promise.all(promises);
     }
     async leave() { }
     async publish(dht_hash, ops) {
-        const neighbors = this._getClosestNeighbors(dht_hash, this.redundancyFactor);
-        const promises = neighbors.map(neighbor => this._sendRequest(neighbor, 'Publish Request', cell => cell.handle_publish(this.cellId[1], dht_hash, ops)));
-        await Promise.all(promises);
+        await this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], dht_hash, this.redundancyFactor, cell => this._executeNetworkRequest(cell, 'Publish Request', cell => cell.handle_publish(this.cellId[1], dht_hash, ops)));
+    }
+    async get(dht_hash, options) {
+        const gets = await this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], dht_hash, 0, cell => this._executeNetworkRequest(cell, 'Get Request', cell => cell.handle_get(dht_hash, options)));
+        const result = gets.find(get => !!get);
+        if (!result)
+            return undefined;
+        if (result.signed_header) {
+            return {
+                entry: result.maybe_entry,
+                signed_header: result.signed_header,
+            };
+        }
+        else {
+            return {
+                signed_header: result.live_headers[0],
+                entry: result.entry,
+            };
+        }
+    }
+    async call_remote(agent, zome, fnName, cap, payload) {
+        return this.network.kitsune.rpc_single(this.cellId[0], this.cellId[1], agent, cell => this._executeNetworkRequest(cell, 'Call Remote', cell => cell.handle_call_remote(this.cellId[1], zome, fnName, cap, payload)));
+    }
+    /** Neighbor handling */
+    getNeighbors() {
+        return this.neighbors;
     }
     async addNeighbor(neighborPubKey) {
         if (!this.neighbors.includes(neighborPubKey))
             this.neighbors.push(neighborPubKey);
     }
-    async get(dna_hash, from_agent, dht_hash, _options // TODO: complete?
-    ) {
-        return undefined;
-    }
-    getNeighbors() {
-        return this.neighbors;
-    }
-    _getClosestNeighbors(basisHash, neighborCount) {
-        return getClosestNeighbors([...this.neighbors, this.cellId[1]], basisHash, neighborCount);
-    }
-    _sendRequest(toAgent, name, message) {
+    _executeNetworkRequest(toCell, name, request) {
         const networkRequest = {
             fromAgent: this.cellId[1],
-            toAgent: toAgent,
+            toAgent: toCell.agentPubKey,
             dnaHash: this.cellId[0],
             name,
         };
-        return this.networkRequestsExecutor.execute(() => this.network.sendRequest(this.cellId[0], this.cellId[1], toAgent, message), networkRequest);
+        return this.networkRequestsExecutor.execute(() => request(toCell), networkRequest);
+    }
+}
+
+class KitsuneP2p {
+    constructor(network) {
+        this.network = network;
+        this.discover = new Discover(network);
+    }
+    async rpc_single(dna_hash, from_agent, to_agent, networkRequest) {
+        const peer = await this.discover.peer_discover(dna_hash, from_agent, to_agent);
+        return networkRequest(peer);
+    }
+    async rpc_multi(dna_hash, from_agent, basis, remote_agent_count, networkRequest) {
+        // TODO Get all local agents and call them
+        // Discover neighbors
+        return this.discover.message_neighborhood(dna_hash, from_agent, basis, remote_agent_count, networkRequest);
+    }
+}
+// From https://github.com/holochain/holochain/blob/develop/crates/kitsune_p2p/kitsune_p2p/src/spawn/actor/discover.rs
+class Discover {
+    constructor(network) {
+        this.network = network;
+    }
+    // TODO fix this
+    async peer_discover(dna_hash, from_agent, to_agent) {
+        return this.network.bootstrapService.cells[dna_hash][to_agent];
+    }
+    async message_neighborhood(dna_hash, from_agent, basis, remote_agent_count, networkRequest) {
+        const agents = await this.search_for_agents(dna_hash, basis, remote_agent_count);
+        const promises = agents.map(cell => networkRequest(cell));
+        return Promise.all(promises);
+    }
+    async search_for_agents(dna_hash, basis, remote_agent_count) {
+        return this.network.bootstrapService.getNeighborhood(dna_hash, basis, remote_agent_count);
     }
 }
 
 class Network {
-    constructor(state, conductor) {
+    constructor(state, conductor, bootstrapService) {
         this.conductor = conductor;
+        this.bootstrapService = bootstrapService;
         this.p2pCells = {};
         for (const [dnaHash, p2pState] of Object.entries(state.p2pCellsState)) {
             if (!this.p2pCells[dnaHash])
@@ -1441,6 +1790,7 @@ class Network {
                 this.p2pCells[dnaHash][agentPubKey] = new P2pCell(p2pCellState, [dnaHash, agentPubKey], this);
             }
         }
+        this.kitsune = new KitsuneP2p(this);
     }
     getState() {
         const p2pCellsState = {};
@@ -1475,14 +1825,13 @@ class Network {
         const localCell = this.conductor.cells[dna] && this.conductor.cells[dna][toAgent];
         if (localCell)
             return request(localCell);
-        return request(this.conductor.bootstrapService.cells[dna][toAgent]);
+        return request(this.bootstrapService.cells[dna][toAgent]);
     }
 }
 
 class Conductor {
     constructor(state, bootstrapService) {
-        this.bootstrapService = bootstrapService;
-        this.network = new Network(state.networkState, this);
+        this.network = new Network(state.networkState, this, bootstrapService);
         this.registeredDnas = state.registeredDnas;
         this.registeredTemplates = state.registeredTemplates;
         this.cells = {};
@@ -1530,13 +1879,13 @@ class Conductor {
         return this.cells[dnaHash][agentPubKey];
     }
     async registerDna(dna_template) {
-        const templateHash = hash(dna_template);
+        const templateHash = hash(dna_template, HashType.DNA);
         this.registeredTemplates[templateHash] = dna_template;
         return templateHash;
     }
     async installApp(dna_hash, membrane_proof, properties, uuid) {
         const rand = `${Math.random().toString()}/${Date.now()}`;
-        const agentId = hash(rand);
+        const agentId = hash(rand, HashType.AGENT);
         const template = this.registeredTemplates[dna_hash];
         if (!template) {
             throw new Error(`The given dna is not registered on this conductor`);
@@ -1546,7 +1895,7 @@ class Conductor {
             properties,
             uuid,
         };
-        const dnaHash = hash(dna);
+        const dnaHash = hash(dna, HashType.DNA);
         this.registeredDnas[dnaHash] = dna;
         const cellId = [dnaHash, agentId];
         const cell = await Cell.create(this, cellId, membrane_proof);
@@ -1617,6 +1966,15 @@ function sampleDnaTemplate() {
 const sleep = (ms) => new Promise(resolve => setTimeout(() => resolve(), ms));
 const DelayMiddleware = (ms) => () => sleep(ms);
 
+function getClosestNeighbors(peers, targetHash, numNeighbors) {
+    const sortedPeers = peers.sort((agentA, agentB) => {
+        const distanceA = distance(targetHash, agentA);
+        const distanceB = distance(targetHash, agentB);
+        return compareBigInts(distanceA, distanceB);
+    });
+    return sortedPeers.slice(0, numNeighbors);
+}
+
 class BootstrapService {
     constructor() {
         this.cells = {};
@@ -1628,9 +1986,9 @@ class BootstrapService {
             this.cells[dnaHash] = {};
         this.cells[dnaHash][agentPubKey] = cell;
     }
-    getNeighbors(dnaHash, agentPubKey, numNeighbors) {
-        const cells = Object.keys(this.cells[dnaHash]).filter(cellPubKey => cellPubKey !== agentPubKey);
-        const neighborsKeys = getClosestNeighbors(cells, agentPubKey, numNeighbors);
+    getNeighborhood(dnaHash, basis_dht_hash, numNeighbors) {
+        const cells = Object.keys(this.cells[dnaHash]);
+        const neighborsKeys = getClosestNeighbors(cells, basis_dht_hash, numNeighbors);
         return neighborsKeys.map(pubKey => this.cells[dnaHash][pubKey]);
     }
 }
@@ -1638,7 +1996,7 @@ class BootstrapService {
 async function createConductors(conductorsToCreate, currentConductors, dnaTemplate) {
     const bootstrapService = currentConductors.length === 0
         ? new BootstrapService()
-        : currentConductors[0].bootstrapService;
+        : currentConductors[0].network.bootstrapService;
     const newConductorsPromises = [];
     for (let i = 0; i < conductorsToCreate; i++) {
         const conductor = Conductor.create(bootstrapService);
@@ -1653,5 +2011,5 @@ async function createConductors(conductorsToCreate, currentConductors, dnaTempla
     return allConductors;
 }
 
-export { Cell, Conductor, DelayMiddleware, index as Hdk, MiddlewareExecutor, Network, P2pCell, ValidationLimboStatus, ValidationStatus, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDna, buildShh, buildUpdate, callZomeFn, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, getAllAuthoredEntries, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHeaderAt, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sleep, sys_validation, sys_validation_task };
+export { AGENT_PREFIX, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, ENTRY_PREFIX, HEADER_PREFIX, HashType, index as Hdk, MiddlewareExecutor, Network, P2pCell, ValidationLimboStatus, ValidationStatus, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sleep, sys_validation, sys_validation_task, valid_cap_grant };
 //# sourceMappingURL=index.js.map

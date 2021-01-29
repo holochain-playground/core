@@ -9,12 +9,12 @@ import {
   Hash,
   NewEntryHeader,
 } from '@holochain-open-dev/core-types';
-import { hash } from '../../processors/hash';
+import { hash, HashType } from '../../processors/hash';
 import { Cell } from './cell';
 
 export function hashEntry(entry: Entry): Hash {
   if (entry.entry_type === 'Agent') return entry.content;
-  return hash(entry.content);
+  return hash(entry.content, HashType.ENTRY);
 }
 
 export function getAppEntryType(
@@ -39,7 +39,7 @@ export function getEntryTypeString(cell: Cell, entryType: EntryType): string {
 export function getDHTOpBasis(dhtOp: DHTOp): Hash {
   switch (dhtOp.type) {
     case DHTOpType.StoreElement:
-      return hash(dhtOp.header);
+      return hash(dhtOp.header, HashType.DHTOP);
     case DHTOpType.StoreEntry:
       return dhtOp.header.header.content.entry_hash;
     case DHTOpType.RegisterUpdatedContent:

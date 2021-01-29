@@ -11,7 +11,6 @@ export interface ConductorState {
     registeredDnas: Dictionary<SimulatedDna>;
 }
 export declare class Conductor {
-    bootstrapService: BootstrapService;
     readonly cells: Dictionary<Dictionary<Cell>>;
     registeredTemplates: Dictionary<SimulatedDnaTemplate>;
     registeredDnas: Dictionary<SimulatedDna>;

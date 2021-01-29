@@ -5,7 +5,7 @@ import {
   Hash,
 } from '@holochain-open-dev/core-types';
 import { Cell, getCellId } from '../core/cell';
-import { hash } from '../processors/hash';
+import { hash, HashType } from '../processors/hash';
 import { Network, NetworkState } from './network/network';
 
 import { SimulatedDna, SimulatedDnaTemplate } from '../dnas/simulated-dna';
@@ -27,11 +27,8 @@ export class Conductor {
 
   network: Network;
 
-  constructor(
-    state: ConductorState,
-    public bootstrapService: BootstrapService
-  ) {
-    this.network = new Network(state.networkState, this);
+  constructor(state: ConductorState, bootstrapService: BootstrapService) {
+    this.network = new Network(state.networkState, this, bootstrapService);
     this.registeredDnas = state.registeredDnas;
     this.registeredTemplates = state.registeredTemplates;
 
@@ -98,7 +95,7 @@ export class Conductor {
   }
 
   async registerDna(dna_template: SimulatedDnaTemplate): Promise<Hash> {
-    const templateHash = hash(dna_template);
+    const templateHash = hash(dna_template, HashType.DNA);
 
     this.registeredTemplates[templateHash] = dna_template;
     return templateHash;
@@ -111,7 +108,7 @@ export class Conductor {
     uuid: string
   ): Promise<Cell> {
     const rand = `${Math.random().toString()}/${Date.now()}`;
-    const agentId = hash(rand);
+    const agentId = hash(rand, HashType.AGENT);
 
     const template = this.registeredTemplates[dna_hash];
     if (!template) {
@@ -123,7 +120,7 @@ export class Conductor {
       properties,
       uuid,
     };
-    const dnaHash = hash(dna);
+    const dnaHash = hash(dna, HashType.DNA);
     this.registeredDnas[dnaHash] = dna;
 
     const cellId: CellId = [dnaHash, agentId];

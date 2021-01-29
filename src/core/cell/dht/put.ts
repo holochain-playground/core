@@ -12,7 +12,7 @@ import {
   EntryDhtStatus,
   Header,
 } from '@holochain-open-dev/core-types';
-import { hash } from '../../../processors/hash';
+import { hash, HashType } from '../../../processors/hash';
 import {
   ValidationLimboValue,
   CellState,
@@ -44,7 +44,7 @@ export const putIntegrationLimboValue = (
 };
 
 export const putDhtOpData = (dhtOp: DHTOp) => async (state: CellState) => {
-  const headerHash = hash(dhtOp.header);
+  const headerHash = dhtOp.header.header.hash;
   state.CAS[headerHash] = dhtOp.header;
 
   const entry = getEntry(dhtOp);
@@ -56,7 +56,7 @@ export const putDhtOpData = (dhtOp: DHTOp) => async (state: CellState) => {
 };
 
 export const putDhtOpMetadata = (dhtOp: DHTOp) => (state: CellState) => {
-  const headerHash = hash(dhtOp.header);
+  const headerHash = dhtOp.header.header.hash;
 
   if (dhtOp.type === DHTOpType.StoreElement) {
     state.metadata.misc_meta[headerHash] = 'StoreElement';
@@ -137,7 +137,9 @@ const update_entry_dht_status = (entryHash: Hash) => (state: CellState) => {
   const headers = getHeadersForEntry(state, entryHash);
 
   const entryIsAlive = headers.some(header => {
-    const dhtHeaders = state.metadata.system_meta[hash(header)];
+    const headerHash = header.header.hash;
+
+    const dhtHeaders = state.metadata.system_meta[headerHash];
     return dhtHeaders
       ? dhtHeaders.find(
           metaVal =>
@@ -156,7 +158,7 @@ const update_entry_dht_status = (entryHash: Hash) => (state: CellState) => {
 export const register_header_on_basis = (basis: Hash, header: Header) => (
   state: CellState
 ) => {
-  const headerHash = hash(header);
+  const headerHash = hash(header, HashType.HEADER);
   let value: SysMetaVal | undefined;
   if (header.type === HeaderType.Create) {
     value = { NewEntry: headerHash };

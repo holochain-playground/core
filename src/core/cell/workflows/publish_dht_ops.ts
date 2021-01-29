@@ -3,11 +3,14 @@ import { Cell, Workflow } from '../../cell';
 import { getNonPublishedDhtOps } from '../source-chain/utils';
 import { getDHTOpBasis } from '../utils';
 
-export function publish_dht_ops_task(cell: Cell): Workflow {
+export type PublishDhtOpsWorkflow = Workflow<void, void>;
+
+export function publish_dht_ops_task(cell: Cell): PublishDhtOpsWorkflow {
   return {
     name: 'Publish DHT Ops',
     description:
       'Read the elements in the authored DHT Ops that have not been published and publish them',
+    payload: undefined,
     task: () => publish_dht_ops(cell),
   };
 }
