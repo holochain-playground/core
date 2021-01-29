@@ -4,7 +4,7 @@ export interface Workflow<D, R> {
     details: D;
     task: (cell: Cell) => Promise<R>;
 }
-export declare enum WorkflowTypes {
+export declare enum WorkflowType {
     CALL_ZOME = "Call Zome Function",
     SYS_VALIDATION = "System Validation",
     PUBLISH_DHT_OPS = "Publish DHT Ops",

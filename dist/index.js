@@ -1104,17 +1104,17 @@ var ValidationLimboStatus;
     ValidationLimboStatus[ValidationLimboStatus["AwaitingAppDeps"] = 3] = "AwaitingAppDeps";
 })(ValidationLimboStatus || (ValidationLimboStatus = {}));
 
-var WorkflowTypes;
-(function (WorkflowTypes) {
-    WorkflowTypes["CALL_ZOME"] = "Call Zome Function";
-    WorkflowTypes["SYS_VALIDATION"] = "System Validation";
-    WorkflowTypes["PUBLISH_DHT_OPS"] = "Publish DHT Ops";
-    WorkflowTypes["PRODUCE_DHT_OPS"] = "Produce DHT Ops";
-    WorkflowTypes["APP_VALIDATION"] = "App Validation";
-    WorkflowTypes["INTEGRATE_DHT_OPS"] = "Integrate DHT Ops";
-    WorkflowTypes["GENESIS"] = "Genesis";
-    WorkflowTypes["INCOMING_DHT_OPS"] = "Incoming DHT Ops";
-})(WorkflowTypes || (WorkflowTypes = {}));
+var WorkflowType;
+(function (WorkflowType) {
+    WorkflowType["CALL_ZOME"] = "Call Zome Function";
+    WorkflowType["SYS_VALIDATION"] = "System Validation";
+    WorkflowType["PUBLISH_DHT_OPS"] = "Publish DHT Ops";
+    WorkflowType["PRODUCE_DHT_OPS"] = "Produce DHT Ops";
+    WorkflowType["APP_VALIDATION"] = "App Validation";
+    WorkflowType["INTEGRATE_DHT_OPS"] = "Integrate DHT Ops";
+    WorkflowType["GENESIS"] = "Genesis";
+    WorkflowType["INCOMING_DHT_OPS"] = "Incoming DHT Ops";
+})(WorkflowType || (WorkflowType = {}));
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/integrate_dht_ops_workflow.rs
 const integrate_dht_ops = async (cell) => {
@@ -1134,7 +1134,7 @@ const integrate_dht_ops = async (cell) => {
 };
 function integrate_dht_ops_task(cell) {
     return {
-        name: WorkflowTypes.INTEGRATE_DHT_OPS,
+        name: WorkflowType.INTEGRATE_DHT_OPS,
         details: undefined,
         task: () => integrate_dht_ops(cell),
     };
@@ -1157,7 +1157,7 @@ const app_validation = async (cell) => {
 };
 function app_validation_task(cell) {
     return {
-        name: WorkflowTypes.APP_VALIDATION,
+        name: WorkflowType.APP_VALIDATION,
         details: undefined,
         task: () => app_validation(cell),
     };
@@ -1401,7 +1401,7 @@ const publish_dht_ops = async (cell) => {
 };
 function publish_dht_ops_task(cell) {
     return {
-        name: WorkflowTypes.PUBLISH_DHT_OPS,
+        name: WorkflowType.PUBLISH_DHT_OPS,
         details: undefined,
         task: () => publish_dht_ops(cell),
     };
@@ -1427,7 +1427,7 @@ const produce_dht_ops = async (cell) => {
 };
 function produce_dht_ops_task(cell) {
     return {
-        name: WorkflowTypes.PRODUCE_DHT_OPS,
+        name: WorkflowType.PRODUCE_DHT_OPS,
         details: undefined,
         task: () => produce_dht_ops(cell),
     };
@@ -1458,7 +1458,7 @@ const callZomeFn = (zomeName, fnName, payload, cap) => async (cell) => {
 };
 function call_zome_fn_workflow(cell, zome, fnName, payload) {
     return {
-        name: WorkflowTypes.CALL_ZOME,
+        name: WorkflowType.CALL_ZOME,
         details: {
             fnName,
             payload,
@@ -1486,7 +1486,7 @@ const genesis = (agentId, dnaHash, membrane_proof) => async (cell) => {
 };
 function genesis_task(cell, cellId, membrane_proof) {
     return {
-        name: WorkflowTypes.GENESIS,
+        name: WorkflowType.GENESIS,
         details: {
             cellId,
             membrane_proof,
@@ -1508,7 +1508,7 @@ const sys_validation = async (cell) => {
 };
 function sys_validation_task(cell) {
     return {
-        name: WorkflowTypes.SYS_VALIDATION,
+        name: WorkflowType.SYS_VALIDATION,
         details: undefined,
         task: () => sys_validation(cell),
     };
@@ -1534,7 +1534,7 @@ const incoming_dht_ops = (basis, dhtOps, from_agent) => async (cell) => {
 function incoming_dht_ops_task(cell, from_agent, dht_hash, // The basis for the DHTOps
 ops) {
     return {
-        name: WorkflowTypes.INCOMING_DHT_OPS,
+        name: WorkflowType.INCOMING_DHT_OPS,
         details: {
             from_agent,
             dht_hash,
@@ -2024,5 +2024,5 @@ async function createConductors(conductorsToCreate, currentConductors, dnaTempla
     return allConductors;
 }
 
-export { AGENT_PREFIX, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, ENTRY_PREFIX, HEADER_PREFIX, HashType, index as Hdk, MiddlewareExecutor, Network, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowTypes, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sleep, sys_validation, sys_validation_task, valid_cap_grant };
+export { AGENT_PREFIX, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, ENTRY_PREFIX, HEADER_PREFIX, HashType, index as Hdk, MiddlewareExecutor, Network, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sleep, sys_validation, sys_validation_task, valid_cap_grant };
 //# sourceMappingURL=index.js.map
