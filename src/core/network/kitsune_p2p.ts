@@ -1,6 +1,7 @@
 import { AgentPubKey, Hash } from '@holochain-open-dev/core-types';
 import { Cell } from '../cell/cell';
-import { Network, NetworkRequest } from './network';
+import { Network } from './network';
+import { NetworkRequest } from './network-request';
 
 export class KitsuneP2p {
   discover: Discover;
