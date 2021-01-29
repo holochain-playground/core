@@ -145,7 +145,10 @@ export class P2pCell {
   }
 
   async addNeighbor(neighborPubKey: AgentPubKey) {
-    if (!this.neighbors.includes(neighborPubKey))
+    if (
+      neighborPubKey !== this.cellId[1] &&
+      !this.neighbors.includes(neighborPubKey)
+    )
       this.neighbors.push(neighborPubKey);
   }
 

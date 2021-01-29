@@ -29,8 +29,7 @@ export type SysValidationWorkflow = Workflow<void, void>;
 export function sys_validation_task(cell: Cell): SysValidationWorkflow {
   return {
     name: 'System Validation',
-    description: 'Subconscious checks of data integrity',
-    payload: undefined,
+    details: undefined,
     task: () => sys_validation(cell),
   };
 }

@@ -40,8 +40,7 @@ export type AppValidationWorkflow = Workflow<any, any>;
 export function app_validation_task(cell: Cell): AppValidationWorkflow {
   return {
     name: 'App Validation',
-    description: 'Running of the zome appropriate validation hook',
-    payload: undefined,
+    details: undefined,
     task: () => app_validation(cell),
   };
 }
