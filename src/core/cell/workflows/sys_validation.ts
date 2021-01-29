@@ -28,7 +28,7 @@ export type SysValidationWorkflow = Workflow<void, void>;
 
 export function sys_validation_task(cell: Cell): SysValidationWorkflow {
   return {
-    name: WorkflowType.SYS_VALIDATION,
+    type: WorkflowType.SYS_VALIDATION,
     details: undefined,
     task: () => sys_validation(cell),
   };

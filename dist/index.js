@@ -1134,7 +1134,7 @@ const integrate_dht_ops = async (cell) => {
 };
 function integrate_dht_ops_task(cell) {
     return {
-        name: WorkflowType.INTEGRATE_DHT_OPS,
+        type: WorkflowType.INTEGRATE_DHT_OPS,
         details: undefined,
         task: () => integrate_dht_ops(cell),
     };
@@ -1157,7 +1157,7 @@ const app_validation = async (cell) => {
 };
 function app_validation_task(cell) {
     return {
-        name: WorkflowType.APP_VALIDATION,
+        type: WorkflowType.APP_VALIDATION,
         details: undefined,
         task: () => app_validation(cell),
     };
@@ -1401,7 +1401,7 @@ const publish_dht_ops = async (cell) => {
 };
 function publish_dht_ops_task(cell) {
     return {
-        name: WorkflowType.PUBLISH_DHT_OPS,
+        type: WorkflowType.PUBLISH_DHT_OPS,
         details: undefined,
         task: () => publish_dht_ops(cell),
     };
@@ -1427,7 +1427,7 @@ const produce_dht_ops = async (cell) => {
 };
 function produce_dht_ops_task(cell) {
     return {
-        name: WorkflowType.PRODUCE_DHT_OPS,
+        type: WorkflowType.PRODUCE_DHT_OPS,
         details: undefined,
         task: () => produce_dht_ops(cell),
     };
@@ -1458,7 +1458,7 @@ const callZomeFn = (zomeName, fnName, payload, cap) => async (cell) => {
 };
 function call_zome_fn_workflow(cell, zome, fnName, payload) {
     return {
-        name: WorkflowType.CALL_ZOME,
+        type: WorkflowType.CALL_ZOME,
         details: {
             fnName,
             payload,
@@ -1486,7 +1486,7 @@ const genesis = (agentId, dnaHash, membrane_proof) => async (cell) => {
 };
 function genesis_task(cell, cellId, membrane_proof) {
     return {
-        name: WorkflowType.GENESIS,
+        type: WorkflowType.GENESIS,
         details: {
             cellId,
             membrane_proof,
@@ -1508,7 +1508,7 @@ const sys_validation = async (cell) => {
 };
 function sys_validation_task(cell) {
     return {
-        name: WorkflowType.SYS_VALIDATION,
+        type: WorkflowType.SYS_VALIDATION,
         details: undefined,
         task: () => sys_validation(cell),
     };
@@ -1534,7 +1534,7 @@ const incoming_dht_ops = (basis, dhtOps, from_agent) => async (cell) => {
 function incoming_dht_ops_task(cell, from_agent, dht_hash, // The basis for the DHTOps
 ops) {
     return {
-        name: WorkflowType.INCOMING_DHT_OPS,
+        type: WorkflowType.INCOMING_DHT_OPS,
         details: {
             from_agent,
             dht_hash,
@@ -1629,7 +1629,7 @@ class Cell {
         return this.state;
     }
     triggerWorkflow(workflow) {
-        this.#pendingWorkflows[workflow.name] = workflow;
+        this.#pendingWorkflows[workflow.type] = workflow;
         setTimeout(() => this._runPendingWorkflows(), 300);
     }
     async _runPendingWorkflows() {

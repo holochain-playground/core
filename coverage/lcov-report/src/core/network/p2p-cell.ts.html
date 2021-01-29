@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">79.88% </span>
+                <span class="strong">79.78% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>135/169</span>
+                <span class='fraction'>142/178</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>15/15</span>
+                <span class='fraction'>17/17</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">79.88% </span>
+                <span class="strong">79.78% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>135/169</span>
+                <span class='fraction'>142/178</span>
             </div>
         
             
@@ -226,10 +226,16 @@
 <a name='L167'></a><a href='#L167'>167</a>
 <a name='L168'></a><a href='#L168'>168</a>
 <a name='L169'></a><a href='#L169'>169</a>
-<a name='L170'></a><a href='#L170'>170</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
@@ -299,6 +305,8 @@
 <span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-yes">43x</span>
 <span class="cline-any cline-yes">43x</span>
+<span class="cline-any cline-yes">43x</span>
+<span class="cline-any cline-yes">43x</span>
 <span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-yes">12x</span>
@@ -313,6 +321,8 @@
 <span class="cline-any cline-yes">42x</span>
 <span class="cline-any cline-yes">42x</span>
 <span class="cline-any cline-yes">42x</span>
+<span class="cline-any cline-yes">210x</span>
+<span class="cline-any cline-yes">210x</span>
 <span class="cline-any cline-yes">210x</span>
 <span class="cline-any cline-yes">210x</span>
 <span class="cline-any cline-yes">42x</span>
@@ -347,8 +357,13 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
@@ -373,6 +388,9 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">43x</span>
+<span class="cline-any cline-yes">43x</span>
+<span class="cline-any cline-yes">36x</span>
 <span class="cline-any cline-yes">43x</span>
 <span class="cline-any cline-yes">43x</span>
 <span class="cline-any cline-yes">43x</span>
@@ -408,20 +426,17 @@ import { MiddlewareExecutor } from '../../executor/middleware-executor';
 import { GetOptions } from '../../types';
 import { Cell } from '../cell';
 import { GetElementFull, GetEntryFull } from '../cell/cascade/types';
-import { Network, NetworkRequest } from './network';
-import { getClosestNeighbors } from './utils';
+import { Network } from './network';
+import {
+  NetworkRequestInfo,
+  NetworkRequest,
+  NetworkRequestType,
+} from './network-request';
 &nbsp;
 export type P2pCellState = {
   neighbors: Hash[];
   redundancyFactor: number;
 };
-&nbsp;
-export interface NetworkRequestInfo {
-  dnaHash: Hash;
-  fromAgent: AgentPubKey;
-  toAgent: AgentPubKey;
-  name: string;
-}
 &nbsp;
 // From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/lib.rs
 export class P2pCell {
@@ -466,8 +481,10 @@ export class P2pCell {
       .map(cell =&gt; cell.agentPubKey);
 &nbsp;
     const promises = neighbors.map(neighbor =&gt;
-      this._executeNetworkRequest(neighbor, 'Add Neighbor', cell =&gt;
-        cell.handle_new_neighbor(agentPubKey)
+      this._executeNetworkRequest(
+        neighbor,
+        NetworkRequestType.ADD_NEIGHBOR,
+        (cell: Cell) =&gt; cell.handle_new_neighbor(agentPubKey)
       )
     );
     await Promise.all(promises);
@@ -481,9 +498,11 @@ export class P2pCell {
       this.cellId[1],
       dht_hash,
       this.redundancyFactor,
-      cell =&gt;
-        this._executeNetworkRequest(cell, 'Publish Request', cell =&gt;
-          cell.handle_publish(this.cellId[1], dht_hash, ops)
+      (cell: Cell) =&gt;
+        this._executeNetworkRequest(
+          cell,
+          NetworkRequestType.PUBLISH_REQUEST,
+          (cell: Cell) =&gt; cell.handle_publish(this.cellId[1], dht_hash, ops)
         )
     );
   }
@@ -494,9 +513,11 @@ export class P2pCell {
 <span class="cstat-no" title="statement not covered" >      this.cellId[1],</span>
 <span class="cstat-no" title="statement not covered" >      dht_hash,</span>
 <span class="cstat-no" title="statement not covered" >      0,</span>
-<span class="cstat-no" title="statement not covered" >      cell =&gt;</span>
-<span class="cstat-no" title="statement not covered" >        this._executeNetworkRequest(cell, 'Get Request', cell =&gt;</span>
-<span class="cstat-no" title="statement not covered" >          cell.handle_get(dht_hash, options)</span>
+<span class="cstat-no" title="statement not covered" >      (cell: Cell) =&gt;</span>
+<span class="cstat-no" title="statement not covered" >        this._executeNetworkRequest(</span>
+<span class="cstat-no" title="statement not covered" >          cell,</span>
+<span class="cstat-no" title="statement not covered" >          NetworkRequestType.GET_REQUEST,</span>
+<span class="cstat-no" title="statement not covered" >          (cell: Cell) =&gt; cell.handle_get(dht_hash, options)</span>
 <span class="cstat-no" title="statement not covered" >        )</span>
 <span class="cstat-no" title="statement not covered" >    );</span>
 <span class="cstat-no" title="statement not covered" ></span>
@@ -528,9 +549,12 @@ export class P2pCell {
       this.cellId[0],
       this.cellId[1],
       agent,
-      cell =&gt;
-        this._executeNetworkRequest(cell, 'Call Remote', cell =&gt;
-          cell.handle_call_remote(this.cellId[1], zome, fnName, cap, payload)
+      (cell: Cell) =&gt;
+        this._executeNetworkRequest(
+          cell,
+          NetworkRequestType.CALL_REMOTE,
+          (cell: Cell) =&gt;
+            cell.handle_call_remote(this.cellId[1], zome, fnName, cap, payload)
         )
     );
   }
@@ -542,20 +566,23 @@ export class P2pCell {
 <span class="cstat-no" title="statement not covered" >  }</span>
 &nbsp;
   async addNeighbor(neighborPubKey: AgentPubKey) {
-    if (!this.neighbors.includes(neighborPubKey))
+    if (
+      neighborPubKey !== this.cellId[1] &amp;&amp;
+      !this.neighbors.includes(neighborPubKey)
+    )
       this.neighbors.push(neighborPubKey);
   }
 &nbsp;
   private _executeNetworkRequest&lt;T&gt;(
     toCell: Cell,
-    name: string,
+    type: NetworkRequestType,
     request: NetworkRequest&lt;T&gt;
   ): Promise&lt;T&gt; {
-    const networkRequest = {
+    const networkRequest: NetworkRequestInfo = {
       fromAgent: this.cellId[1],
       toAgent: toCell.agentPubKey,
       dnaHash: this.cellId[0],
-      name,
+      type,
     };
 &nbsp;
     return this.networkRequestsExecutor.execute(
@@ -571,7 +598,7 @@ export class P2pCell {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank">istanbul</a>
-                at Fri Jan 29 2021 16:30:30 GMT+0100 (Hora estàndard del Centre d’Europa)
+                at Fri Jan 29 2021 17:19:54 GMT+0100 (Hora estàndard del Centre d’Europa)
             </div>
         </div>
         <script src="../../../prettify.js"></script>

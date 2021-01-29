@@ -37,7 +37,7 @@ export type PublishDhtOpsWorkflow = Workflow<void, void>;
 
 export function publish_dht_ops_task(cell: Cell): PublishDhtOpsWorkflow {
   return {
-    name: WorkflowType.PUBLISH_DHT_OPS,
+    type: WorkflowType.PUBLISH_DHT_OPS,
     details: undefined,
     task: () => publish_dht_ops(cell),
   };
