@@ -4,7 +4,7 @@ import { Cell, Workflow } from '../../cell';
 import { getNewHeaders } from '../source-chain/get';
 import { getElement } from '../source-chain/utils';
 import { publish_dht_ops_task } from './publish_dht_ops';
-import { WorkflowTypes } from './workflows';
+import { WorkflowType } from './workflows';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/produce_dht_ops_workflow.rs
 export const produce_dht_ops = async (cell: Cell): Promise<void> => {
@@ -33,7 +33,7 @@ export type ProduceDhtOpsWorkflow = Workflow<void, void>;
 
 export function produce_dht_ops_task(cell: Cell): ProduceDhtOpsWorkflow {
   return {
-    name: WorkflowTypes.PRODUCE_DHT_OPS,
+    name: WorkflowType.PRODUCE_DHT_OPS,
     details: undefined,
     task: () => produce_dht_ops(cell),
   };

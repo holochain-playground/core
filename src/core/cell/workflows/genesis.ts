@@ -13,7 +13,7 @@ import {
 } from '../source-chain/builder-headers';
 import { putElement } from '../source-chain/put';
 import { produce_dht_ops_task } from './produce_dht_ops';
-import { WorkflowTypes } from './workflows';
+import { WorkflowType } from './workflows';
 
 export const genesis = (
   agentId: AgentPubKey,
@@ -50,7 +50,7 @@ export function genesis_task(
   membrane_proof: any
 ): GenesisWorkflow {
   return {
-    name: WorkflowTypes.GENESIS,
+    name: WorkflowType.GENESIS,
     details: {
       cellId,
       membrane_proof,

@@ -2,7 +2,7 @@ import { Cell } from '../../cell';
 import { buildZomeFunctionContext } from '../../hdk/context';
 import { getTipOfChain } from '../source-chain/utils';
 import { produce_dht_ops_task } from './produce_dht_ops';
-import { Workflow, WorkflowTypes } from './workflows';
+import { Workflow, WorkflowType } from './workflows';
 
 /**
  * Calls the zome function of the cell DNA
@@ -59,7 +59,7 @@ export function call_zome_fn_workflow(
   payload: any
 ): CallZomeFnWorkflow {
   return {
-    name: WorkflowTypes.CALL_ZOME,
+    name: WorkflowType.CALL_ZOME,
     details: {
       fnName,
       payload,

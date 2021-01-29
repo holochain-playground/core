@@ -8,7 +8,7 @@ import { Cell, Workflow } from '../../cell';
 import { ValidationLimboValue, ValidationLimboStatus } from '../state';
 import { putValidationLimboValue } from '../dht/put';
 import { sys_validation_task } from './sys_validation';
-import { WorkflowTypes } from './workflows';
+import { WorkflowType } from './workflows';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/incoming_dht_ops_workflow.rs
 export const incoming_dht_ops = (
@@ -47,7 +47,7 @@ export function incoming_dht_ops_task(
   ops: Dictionary<DHTOp>
 ): IncomingDhtOpsWorkflow {
   return {
-    name: WorkflowTypes.INCOMING_DHT_OPS,
+    name: WorkflowType.INCOMING_DHT_OPS,
     details: {
       from_agent,
       dht_hash,

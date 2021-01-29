@@ -10,7 +10,7 @@ import {
   putIntegrationLimboValue,
 } from '../dht/put';
 import { integrate_dht_ops_task } from './integrate_dht_ops';
-import { WorkflowTypes } from './workflows';
+import { WorkflowType } from './workflows';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/app_validation_workflow.rs
 export const app_validation = async (cell: Cell): Promise<void> => {
@@ -40,7 +40,7 @@ export type AppValidationWorkflow = Workflow<any, any>;
 
 export function app_validation_task(cell: Cell): AppValidationWorkflow {
   return {
-    name: WorkflowTypes.APP_VALIDATION,
+    name: WorkflowType.APP_VALIDATION,
     details: undefined,
     task: () => app_validation(cell),
   };
