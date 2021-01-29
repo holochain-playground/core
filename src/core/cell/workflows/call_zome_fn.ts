@@ -60,8 +60,7 @@ export function call_zome_fn_workflow(
 ): CallZomeFnWorkflow {
   return {
     name: 'Call Zome Function',
-    description: `Zome: ${zome}, Function name: ${fnName}`,
-    payload: {
+    details: {
       fnName,
       payload,
       zome,

@@ -50,8 +50,7 @@ export function genesis_task(
 ): GenesisWorkflow {
   return {
     name: 'Genesis',
-    description: 'Initialize the cell with all the needed databases',
-    payload: {
+    details: {
       cellId,
       membrane_proof,
     },

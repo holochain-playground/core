@@ -1123,8 +1123,7 @@ const integrate_dht_ops = async (cell) => {
 function integrate_dht_ops_task(cell) {
     return {
         name: 'Integrate DHT Ops',
-        description: 'Integration of the validated DHTOp in our DHT shard',
-        payload: undefined,
+        details: undefined,
         task: () => integrate_dht_ops(cell),
     };
 }
@@ -1147,8 +1146,7 @@ const app_validation = async (cell) => {
 function app_validation_task(cell) {
     return {
         name: 'App Validation',
-        description: 'Running of the zome appropriate validation hook',
-        payload: undefined,
+        details: undefined,
         task: () => app_validation(cell),
     };
 }
@@ -1369,14 +1367,6 @@ function buildZomeFunctionContext(zome_index, cell) {
     };
 }
 
-function publish_dht_ops_task(cell) {
-    return {
-        name: 'Publish DHT Ops',
-        description: 'Read the elements in the authored DHT Ops that have not been published and publish them',
-        payload: undefined,
-        task: () => publish_dht_ops(cell),
-    };
-}
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/publish_dht_ops_workflow.rs
 const publish_dht_ops = async (cell) => {
     const dhtOps = getNonPublishedDhtOps(cell.state);
@@ -1397,15 +1387,14 @@ const publish_dht_ops = async (cell) => {
     });
     await Promise.all(promises);
 };
-
-function produce_dht_ops_task(cell) {
+function publish_dht_ops_task(cell) {
     return {
-        name: 'Produce DHT Ops',
-        description: 'Read the new elements in the source chain and produce their appropriate DHT Ops',
-        payload: undefined,
-        task: () => produce_dht_ops(cell),
+        name: 'Publish DHT Ops',
+        details: undefined,
+        task: () => publish_dht_ops(cell),
     };
 }
+
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/produce_dht_ops_workflow.rs
 const produce_dht_ops = async (cell) => {
     const newHeaderHashes = getNewHeaders(cell.state);
@@ -1424,6 +1413,13 @@ const produce_dht_ops = async (cell) => {
     }
     cell.triggerWorkflow(publish_dht_ops_task(cell));
 };
+function produce_dht_ops_task(cell) {
+    return {
+        name: 'Produce DHT Ops',
+        details: undefined,
+        task: () => produce_dht_ops(cell),
+    };
+}
 
 /**
  * Calls the zome function of the cell DNA
@@ -1451,8 +1447,7 @@ const callZomeFn = (zomeName, fnName, payload, cap) => async (cell) => {
 function call_zome_fn_workflow(cell, zome, fnName, payload) {
     return {
         name: 'Call Zome Function',
-        description: `Zome: ${zome}, Function name: ${fnName}`,
-        payload: {
+        details: {
             fnName,
             payload,
             zome,
@@ -1480,8 +1475,7 @@ const genesis = (agentId, dnaHash, membrane_proof) => async (cell) => {
 function genesis_task(cell, cellId, membrane_proof) {
     return {
         name: 'Genesis',
-        description: 'Initialize the cell with all the needed databases',
-        payload: {
+        details: {
             cellId,
             membrane_proof,
         },
@@ -1503,8 +1497,7 @@ const sys_validation = async (cell) => {
 function sys_validation_task(cell) {
     return {
         name: 'System Validation',
-        description: 'Subconscious checks of data integrity',
-        payload: undefined,
+        details: undefined,
         task: () => sys_validation(cell),
     };
 }
@@ -1530,8 +1523,7 @@ function incoming_dht_ops_task(cell, from_agent, dht_hash, // The basis for the 
 ops) {
     return {
         name: 'Incoming DHT Ops',
-        description: 'Persist the recieved DHT Ops to validate them later',
-        payload: {
+        details: {
             from_agent,
             dht_hash,
             ops,
@@ -1730,7 +1722,8 @@ class P2pCell {
         return this.neighbors;
     }
     async addNeighbor(neighborPubKey) {
-        if (!this.neighbors.includes(neighborPubKey))
+        if (neighborPubKey !== this.cellId[1] &&
+            !this.neighbors.includes(neighborPubKey))
             this.neighbors.push(neighborPubKey);
     }
     _executeNetworkRequest(toCell, name, request) {

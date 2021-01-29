@@ -34,8 +34,7 @@ export type IntegrateDhtOpsWorkflow = Workflow<void, void>;
 export function integrate_dht_ops_task(cell: Cell): IntegrateDhtOpsWorkflow {
   return {
     name: 'Integrate DHT Ops',
-    description: 'Integration of the validated DHTOp in our DHT shard',
-    payload: undefined,
+    details: undefined,
     task: () => integrate_dht_ops(cell),
   };
 }

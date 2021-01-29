@@ -1,8 +1,7 @@
 import { Cell } from '../../cell';
 
-export interface Workflow<P, R> {
+export interface Workflow<D, R> {
   name: string;
-  description: string;
-  payload: P;
+  details: D;
   task: (cell: Cell) => Promise<R>;
 }

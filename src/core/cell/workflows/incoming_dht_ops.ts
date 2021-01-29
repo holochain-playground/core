@@ -47,8 +47,7 @@ export function incoming_dht_ops_task(
 ): IncomingDhtOpsWorkflow {
   return {
     name: 'Incoming DHT Ops',
-    description: 'Persist the recieved DHT Ops to validate them later',
-    payload: {
+    details: {
       from_agent,
       dht_hash,
       ops,
