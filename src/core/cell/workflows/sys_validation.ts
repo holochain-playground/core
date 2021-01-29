@@ -25,10 +25,11 @@ export const sys_validation = async (cell: Cell): Promise<void> => {
 };
 
 export type SysValidationWorkflow = Workflow<void, void>;
+export const SYS_VALIDATION_WORKFLOW = 'System Validation';
 
 export function sys_validation_task(cell: Cell): SysValidationWorkflow {
   return {
-    name: 'System Validation',
+    name: SYS_VALIDATION_WORKFLOW,
     details: undefined,
     task: () => sys_validation(cell),
   };

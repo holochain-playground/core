@@ -42,6 +42,7 @@ export type GenesisWorkflow = Workflow<
   { cellId: CellId; membrane_proof: any },
   void
 >;
+export const GENESIS_WORKFLOW = 'Genesis';
 
 export function genesis_task(
   cell: Cell,
@@ -49,7 +50,7 @@ export function genesis_task(
   membrane_proof: any
 ): GenesisWorkflow {
   return {
-    name: 'Genesis',
+    name: GENESIS_WORKFLOW,
     details: {
       cellId,
       membrane_proof,

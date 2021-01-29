@@ -38,6 +38,7 @@ export type IncomingDhtOpsWorkflow = Workflow<
   { from_agent: AgentPubKey; dht_hash: Hash; ops: Dictionary<DHTOp> },
   void
 >;
+export const INCOMING_DHT_OPS_WORKFLOW = 'Incoming DHT Ops';
 
 export function incoming_dht_ops_task(
   cell: Cell,
@@ -46,7 +47,7 @@ export function incoming_dht_ops_task(
   ops: Dictionary<DHTOp>
 ): IncomingDhtOpsWorkflow {
   return {
-    name: 'Incoming DHT Ops',
+    name: INCOMING_DHT_OPS_WORKFLOW,
     details: {
       from_agent,
       dht_hash,

@@ -29,10 +29,11 @@ export const produce_dht_ops = async (cell: Cell): Promise<void> => {
 };
 
 export type ProduceDhtOpsWorkflow = Workflow<void, void>;
+export const PRODUCE_DHT_OPS_WORKFLOW = 'Produce DHT Ops';
 
 export function produce_dht_ops_task(cell: Cell): ProduceDhtOpsWorkflow {
   return {
-    name: 'Produce DHT Ops',
+    name: PRODUCE_DHT_OPS_WORKFLOW,
     details: undefined,
     task: () => produce_dht_ops(cell),
   };
