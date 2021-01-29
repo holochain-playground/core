@@ -3,17 +3,11 @@ import { MiddlewareExecutor } from '../../executor/middleware-executor';
 import { GetOptions } from '../../types';
 import { Cell } from '../cell';
 import { Network } from './network';
-import { NetworkRequestType } from './network-request';
+import { NetworkRequestInfo } from './network-request';
 export declare type P2pCellState = {
     neighbors: Hash[];
     redundancyFactor: number;
 };
-export interface NetworkRequestInfo {
-    dnaHash: Hash;
-    fromAgent: AgentPubKey;
-    toAgent: AgentPubKey;
-    name: NetworkRequestType;
-}
 export declare class P2pCell {
     protected cellId: CellId;
     protected network: Network;

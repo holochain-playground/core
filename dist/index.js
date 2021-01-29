@@ -1709,15 +1709,15 @@ class P2pCell {
         this.neighbors = neighbors
             .filter(cell => cell.agentPubKey !== agentPubKey)
             .map(cell => cell.agentPubKey);
-        const promises = neighbors.map(neighbor => this._executeNetworkRequest(neighbor, NetworkRequestType.ADD_NEIGHBOR, cell => cell.handle_new_neighbor(agentPubKey)));
+        const promises = neighbors.map(neighbor => this._executeNetworkRequest(neighbor, NetworkRequestType.ADD_NEIGHBOR, (cell) => cell.handle_new_neighbor(agentPubKey)));
         await Promise.all(promises);
     }
     async leave() { }
     async publish(dht_hash, ops) {
-        await this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], dht_hash, this.redundancyFactor, cell => this._executeNetworkRequest(cell, NetworkRequestType.PUBLISH_REQUEST, cell => cell.handle_publish(this.cellId[1], dht_hash, ops)));
+        await this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], dht_hash, this.redundancyFactor, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.PUBLISH_REQUEST, (cell) => cell.handle_publish(this.cellId[1], dht_hash, ops)));
     }
     async get(dht_hash, options) {
-        const gets = await this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], dht_hash, 0, cell => this._executeNetworkRequest(cell, NetworkRequestType.GET_REQUEST, cell => cell.handle_get(dht_hash, options)));
+        const gets = await this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], dht_hash, 0, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.GET_REQUEST, (cell) => cell.handle_get(dht_hash, options)));
         const result = gets.find(get => !!get);
         if (!result)
             return undefined;
@@ -1735,7 +1735,7 @@ class P2pCell {
         }
     }
     async call_remote(agent, zome, fnName, cap, payload) {
-        return this.network.kitsune.rpc_single(this.cellId[0], this.cellId[1], agent, cell => this._executeNetworkRequest(cell, NetworkRequestType.CALL_REMOTE, cell => cell.handle_call_remote(this.cellId[1], zome, fnName, cap, payload)));
+        return this.network.kitsune.rpc_single(this.cellId[0], this.cellId[1], agent, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.CALL_REMOTE, (cell) => cell.handle_call_remote(this.cellId[1], zome, fnName, cap, payload)));
     }
     /** Neighbor handling */
     getNeighbors() {
@@ -1746,12 +1746,12 @@ class P2pCell {
             !this.neighbors.includes(neighborPubKey))
             this.neighbors.push(neighborPubKey);
     }
-    _executeNetworkRequest(toCell, name, request) {
+    _executeNetworkRequest(toCell, type, request) {
         const networkRequest = {
             fromAgent: this.cellId[1],
             toAgent: toCell.agentPubKey,
             dnaHash: this.cellId[0],
-            name,
+            type,
         };
         return this.networkRequestsExecutor.execute(() => request(toCell), networkRequest);
     }
@@ -1840,6 +1840,15 @@ class Network {
             return request(localCell);
         return request(this.bootstrapService.cells[dna][toAgent]);
     }
+}
+
+function getClosestNeighbors(peers, targetHash, numNeighbors) {
+    const sortedPeers = peers.sort((agentA, agentB) => {
+        const distanceA = distance(targetHash, agentA);
+        const distanceB = distance(targetHash, agentB);
+        return compareBigInts(distanceA, distanceB);
+    });
+    return sortedPeers.slice(0, numNeighbors);
 }
 
 class Conductor {
@@ -1979,15 +1988,6 @@ function sampleDnaTemplate() {
 const sleep = (ms) => new Promise(resolve => setTimeout(() => resolve(), ms));
 const DelayMiddleware = (ms) => () => sleep(ms);
 
-function getClosestNeighbors(peers, targetHash, numNeighbors) {
-    const sortedPeers = peers.sort((agentA, agentB) => {
-        const distanceA = distance(targetHash, agentA);
-        const distanceB = distance(targetHash, agentB);
-        return compareBigInts(distanceA, distanceB);
-    });
-    return sortedPeers.slice(0, numNeighbors);
-}
-
 class BootstrapService {
     constructor() {
         this.cells = {};
@@ -2024,5 +2024,5 @@ async function createConductors(conductorsToCreate, currentConductors, dnaTempla
     return allConductors;
 }
 
-export { AGENT_PREFIX, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, ENTRY_PREFIX, HEADER_PREFIX, HashType, index as Hdk, MiddlewareExecutor, Network, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sleep, sys_validation, sys_validation_task, valid_cap_grant };
+export { AGENT_PREFIX, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sleep, sys_validation, sys_validation_task, valid_cap_grant };
 //# sourceMappingURL=index.js.map

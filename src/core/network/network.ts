@@ -1,14 +1,9 @@
-import {
-  AgentPubKey,
-  CellId,
-  Dictionary,
-  Hash,
-} from '@holochain-open-dev/core-types';
+import { CellId, Dictionary, Hash } from '@holochain-open-dev/core-types';
 import { BootstrapService } from '../../bootstrap/bootstrap-service';
-import { Cell } from '../cell';
 import { Conductor } from '../conductor';
 import { P2pCell, P2pCellState } from '../network/p2p-cell';
 import { KitsuneP2p } from './kitsune_p2p';
+import { NetworkRequest } from './network-request';
 
 export interface NetworkState {
   // P2pCellState by dna hash / agentPubKey
@@ -93,5 +88,3 @@ export class Network {
     return request(this.bootstrapService.cells[dna][toAgent]);
   }
 }
-
-export type NetworkRequest<T> = (cell: Cell) => Promise<T>;

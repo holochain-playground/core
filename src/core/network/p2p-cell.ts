@@ -11,20 +11,17 @@ import { MiddlewareExecutor } from '../../executor/middleware-executor';
 import { GetOptions } from '../../types';
 import { Cell } from '../cell';
 import { GetElementFull, GetEntryFull } from '../cell/cascade/types';
-import { Network, NetworkRequest } from './network';
-import { NetworkRequestType } from './network-request';
+import { Network } from './network';
+import {
+  NetworkRequestInfo,
+  NetworkRequest,
+  NetworkRequestType,
+} from './network-request';
 
 export type P2pCellState = {
   neighbors: Hash[];
   redundancyFactor: number;
 };
-
-export interface NetworkRequestInfo {
-  dnaHash: Hash;
-  fromAgent: AgentPubKey;
-  toAgent: AgentPubKey;
-  name: NetworkRequestType;
-}
 
 // From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/lib.rs
 export class P2pCell {
@@ -72,7 +69,7 @@ export class P2pCell {
       this._executeNetworkRequest(
         neighbor,
         NetworkRequestType.ADD_NEIGHBOR,
-        cell => cell.handle_new_neighbor(agentPubKey)
+        (cell: Cell) => cell.handle_new_neighbor(agentPubKey)
       )
     );
     await Promise.all(promises);
@@ -86,11 +83,11 @@ export class P2pCell {
       this.cellId[1],
       dht_hash,
       this.redundancyFactor,
-      cell =>
+      (cell: Cell) =>
         this._executeNetworkRequest(
           cell,
           NetworkRequestType.PUBLISH_REQUEST,
-          cell => cell.handle_publish(this.cellId[1], dht_hash, ops)
+          (cell: Cell) => cell.handle_publish(this.cellId[1], dht_hash, ops)
         )
     );
   }
@@ -101,11 +98,11 @@ export class P2pCell {
       this.cellId[1],
       dht_hash,
       0,
-      cell =>
+      (cell: Cell) =>
         this._executeNetworkRequest(
           cell,
           NetworkRequestType.GET_REQUEST,
-          cell => cell.handle_get(dht_hash, options)
+          (cell: Cell) => cell.handle_get(dht_hash, options)
         )
     );
 
@@ -137,11 +134,11 @@ export class P2pCell {
       this.cellId[0],
       this.cellId[1],
       agent,
-      cell =>
+      (cell: Cell) =>
         this._executeNetworkRequest(
           cell,
           NetworkRequestType.CALL_REMOTE,
-          cell =>
+          (cell: Cell) =>
             cell.handle_call_remote(this.cellId[1], zome, fnName, cap, payload)
         )
     );
@@ -163,14 +160,14 @@ export class P2pCell {
 
   private _executeNetworkRequest<T>(
     toCell: Cell,
-    name: NetworkRequestType,
+    type: NetworkRequestType,
     request: NetworkRequest<T>
   ): Promise<T> {
     const networkRequest: NetworkRequestInfo = {
       fromAgent: this.cellId[1],
       toAgent: toCell.agentPubKey,
       dnaHash: this.cellId[0],
-      name,
+      type,
     };
 
     return this.networkRequestsExecutor.execute(
