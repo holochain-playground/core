@@ -10,5 +10,4 @@ export declare type CallZomeFnWorkflow = Workflow<{
     fnName: string;
     payload: any;
 }, any>;
-export declare const CALL_ZOME_WORKFLOW = "Call Zome Function";
 export declare function call_zome_fn_workflow(cell: Cell, zome: string, fnName: string, payload: any): CallZomeFnWorkflow;

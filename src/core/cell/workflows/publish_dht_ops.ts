@@ -2,6 +2,7 @@ import { DHTOp, Dictionary } from '@holochain-open-dev/core-types';
 import { Cell, Workflow } from '../../cell';
 import { getNonPublishedDhtOps } from '../source-chain/utils';
 import { getDHTOpBasis } from '../utils';
+import { WorkflowTypes } from './workflows';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/publish_dht_ops_workflow.rs
 export const publish_dht_ops = async (cell: Cell): Promise<void> => {
@@ -33,11 +34,10 @@ export const publish_dht_ops = async (cell: Cell): Promise<void> => {
 };
 
 export type PublishDhtOpsWorkflow = Workflow<void, void>;
-export const PUBLISH_DHT_OPS_WORKFLOW = 'Publish DHT Ops';
 
 export function publish_dht_ops_task(cell: Cell): PublishDhtOpsWorkflow {
   return {
-    name: PUBLISH_DHT_OPS_WORKFLOW,
+    name: WorkflowTypes.PUBLISH_DHT_OPS,
     details: undefined,
     task: () => publish_dht_ops(cell),
   };

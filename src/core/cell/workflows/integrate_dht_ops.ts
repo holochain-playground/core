@@ -6,6 +6,7 @@ import {
   putDhtOpMetadata,
   putDhtOpToIntegrated,
 } from '../dht/put';
+import { WorkflowTypes } from './workflows';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/integrate_dht_ops_workflow.rs
 export const integrate_dht_ops = async (cell: Cell): Promise<void> => {
@@ -30,11 +31,10 @@ export const integrate_dht_ops = async (cell: Cell): Promise<void> => {
 };
 
 export type IntegrateDhtOpsWorkflow = Workflow<void, void>;
-export const INTEGRATE_DHT_OPS_WORKFLOW = 'Integrate DHT Ops';
 
 export function integrate_dht_ops_task(cell: Cell): IntegrateDhtOpsWorkflow {
   return {
-    name: INTEGRATE_DHT_OPS_WORKFLOW,
+    name: WorkflowTypes.INTEGRATE_DHT_OPS,
     details: undefined,
     task: () => integrate_dht_ops(cell),
   };
