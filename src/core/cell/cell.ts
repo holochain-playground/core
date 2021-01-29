@@ -94,7 +94,7 @@ export class Cell {
   }
 
   triggerWorkflow(workflow: Workflow<any, any>) {
-    this.#pendingWorkflows[workflow.name] = workflow;
+    this.#pendingWorkflows[workflow.type] = workflow;
 
     setTimeout(() => this._runPendingWorkflows(), 300);
   }

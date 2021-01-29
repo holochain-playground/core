@@ -33,7 +33,7 @@ export type ProduceDhtOpsWorkflow = Workflow<void, void>;
 
 export function produce_dht_ops_task(cell: Cell): ProduceDhtOpsWorkflow {
   return {
-    name: WorkflowType.PRODUCE_DHT_OPS,
+    type: WorkflowType.PRODUCE_DHT_OPS,
     details: undefined,
     task: () => produce_dht_ops(cell),
   };

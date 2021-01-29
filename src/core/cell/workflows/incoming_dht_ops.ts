@@ -47,7 +47,7 @@ export function incoming_dht_ops_task(
   ops: Dictionary<DHTOp>
 ): IncomingDhtOpsWorkflow {
   return {
-    name: WorkflowType.INCOMING_DHT_OPS,
+    type: WorkflowType.INCOMING_DHT_OPS,
     details: {
       from_agent,
       dht_hash,

@@ -50,7 +50,7 @@ export function genesis_task(
   membrane_proof: any
 ): GenesisWorkflow {
   return {
-    name: WorkflowType.GENESIS,
+    type: WorkflowType.GENESIS,
     details: {
       cellId,
       membrane_proof,

@@ -59,7 +59,7 @@ export function call_zome_fn_workflow(
   payload: any
 ): CallZomeFnWorkflow {
   return {
-    name: WorkflowType.CALL_ZOME,
+    type: WorkflowType.CALL_ZOME,
     details: {
       fnName,
       payload,
