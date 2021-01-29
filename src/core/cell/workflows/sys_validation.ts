@@ -3,7 +3,7 @@ import { ValidationLimboStatus } from '../state';
 import { getValidationLimboDhtOps } from '../dht/get';
 import { putValidationLimboValue } from '../dht/put';
 import { app_validation_task } from './app_validation';
-import { Workflow } from './workflows';
+import { Workflow, WorkflowTypes } from './workflows';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/sys_validation_workflow.rs
 export const sys_validation = async (cell: Cell): Promise<void> => {
@@ -25,11 +25,10 @@ export const sys_validation = async (cell: Cell): Promise<void> => {
 };
 
 export type SysValidationWorkflow = Workflow<void, void>;
-export const SYS_VALIDATION_WORKFLOW = 'System Validation';
 
 export function sys_validation_task(cell: Cell): SysValidationWorkflow {
   return {
-    name: SYS_VALIDATION_WORKFLOW,
+    name: WorkflowTypes.SYS_VALIDATION,
     details: undefined,
     task: () => sys_validation(cell),
   };
