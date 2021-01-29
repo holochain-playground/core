@@ -1,16 +1,8 @@
-import {
-  Entry,
-  EntryType,
-  Element,
-  Hash,
-  CapGrant,
-  ZomeCallCapGrant,
-  NewEntryHeader,
-} from '@holochain-open-dev/core-types';
+import { Element, Hash, NewEntryHeader } from '@holochain-open-dev/core-types';
+import { GetStrategy } from '../../../../types';
 import { Cell } from '../../../cell';
 import { Cascade } from '../../../cell/cascade';
 import {
-  buildCreate,
   buildDelete,
   buildShh,
 } from '../../../cell/source-chain/builder-headers';
@@ -25,7 +17,9 @@ export const delete_cap_grant: HostFn<DeleteCapGrant> = (
   cell: Cell
 ): DeleteCapGrant => async ({ header_hash }): Promise<Hash> => {
   const cascade = new Cascade(cell);
-  const elementToDelete = await cascade.dht_get(header_hash, null);
+  const elementToDelete = await cascade.dht_get(header_hash, {
+    strategy: GetStrategy.Contents,
+  });
 
   if (!elementToDelete) throw new Error('Could not find element to be deleted');
 

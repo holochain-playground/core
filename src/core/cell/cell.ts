@@ -22,6 +22,7 @@ import { GetResult } from './cascade/types';
 import { Authority } from './cascade/authority';
 import { getHashType, HashType } from '../../processors/hash';
 import { valid_cap_grant } from './source-chain/utils';
+import { GetOptions } from '../../types';
 
 export type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export type CellSignalListener = (payload: any) => void;
@@ -144,15 +145,15 @@ export class Cell {
 
   public async handle_get(
     dht_hash: Hash,
-    _options: any // TODO fix me
+    options: GetOptions
   ): Promise<GetResult | undefined> {
     const authority = new Authority(this);
 
     const hashType = getHashType(dht_hash);
     if (hashType === HashType.ENTRY || hashType === HashType.AGENT) {
-      return authority.handle_get_entry(dht_hash, _options);
+      return authority.handle_get_entry(dht_hash, options);
     } else if (hashType === HashType.HEADER) {
-      return authority.handle_get_element(dht_hash, _options);
+      return authority.handle_get_element(dht_hash, options);
     }
     return undefined;
   }

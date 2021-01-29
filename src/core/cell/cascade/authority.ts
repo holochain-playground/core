@@ -9,6 +9,7 @@ import {
   SignedHeaderHashed,
   Update,
 } from '@holochain-open-dev/core-types';
+import { GetOptions } from '../../../types';
 import { Cell } from '../cell';
 import { getHeaderModifiers, getHeadersForEntry } from '../dht/get';
 import { ValidationStatus } from '../state';
@@ -21,7 +22,7 @@ export class Authority {
 
   public async handle_get_entry(
     entry_hash: Hash,
-    _options: any
+    options: GetOptions
   ): Promise<GetEntryFull | undefined> {
     const entry = this.cell.state.CAS[entry_hash];
     if (!entry) return undefined;
@@ -67,7 +68,7 @@ export class Authority {
 
   public async handle_get_element(
     header_hash: Hash,
-    _options: any
+    options: GetOptions
   ): Promise<GetElementFull | undefined> {
     if (this.cell.state.metadata.misc_meta[header_hash] !== 'StoreElement') {
       return undefined;

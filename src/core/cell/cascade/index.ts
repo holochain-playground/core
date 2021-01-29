@@ -5,20 +5,21 @@ import {
   SignedHeaderHashed,
 } from '@holochain-open-dev/core-types';
 import { getHashType, HashType } from '../../../processors/hash';
+import { GetOptions, GetStrategy } from '../../../types';
 import { Cell } from '../cell';
 import { Authority } from './authority';
 
 export class Cascade {
   constructor(protected cell: Cell) {}
 
-  async dht_get(hash: Hash, _options: any): Promise<Element | undefined> {
+  async dht_get(hash: Hash, options: GetOptions): Promise<Element | undefined> {
     // TODO rrDHT arcs
     const authority = new Authority(this.cell);
 
     const isPresent = this.cell.state.CAS[hash];
 
     // TODO only return local if GetOptions::content() is given
-    if (isPresent) {
+    if (isPresent && options.strategy === GetStrategy.Contents) {
       const hashType = getHashType(hash);
 
       if (hashType === HashType.ENTRY) {
@@ -49,6 +50,6 @@ export class Cascade {
       }
     }
 
-    return this.cell.p2p.get(hash, _options);
+    return this.cell.p2p.get(hash, options);
   }
 }

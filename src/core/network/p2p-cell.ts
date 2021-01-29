@@ -8,6 +8,7 @@ import {
   Hash,
 } from '@holochain-open-dev/core-types';
 import { MiddlewareExecutor } from '../../executor/middleware-executor';
+import { GetOptions } from '../../types';
 import { Cell } from '../cell';
 import { GetElementFull, GetEntryFull } from '../cell/cascade/types';
 import { Network, NetworkRequest } from './network';
@@ -67,8 +68,8 @@ export class P2pCell {
       .filter(cell => cell.agentPubKey !== agentPubKey)
       .map(cell => cell.agentPubKey);
 
-    const promises = this.neighbors.map(neighbor =>
-      this._sendRequest(neighbor, 'Add Neighbor', cell =>
+    const promises = neighbors.map(neighbor =>
+      this._executeNetworkRequest(neighbor, 'Add Neighbor', cell =>
         cell.handle_new_neighbor(agentPubKey)
       )
     );
@@ -78,30 +79,28 @@ export class P2pCell {
   async leave(): Promise<void> {}
 
   async publish(dht_hash: Hash, ops: Dictionary<DHTOp>): Promise<void> {
-    const neighbors = this._getClosestNeighbors(
+    await this.network.kitsune.rpc_multi(
+      this.cellId[0],
+      this.cellId[1],
       dht_hash,
       this.redundancyFactor,
-      true
+      cell =>
+        this._executeNetworkRequest(cell, 'Publish Request', cell =>
+          cell.handle_publish(this.cellId[1], dht_hash, ops)
+        )
     );
-
-    const promises = neighbors.map(neighbor =>
-      this._sendRequest(neighbor, 'Publish Request', cell =>
-        cell.handle_publish(this.cellId[1], dht_hash, ops)
-      )
-    );
-
-    await Promise.all(promises);
   }
-  async get(
-    dht_hash: Hash,
-    _options: any // TODO: complete?
-  ): Promise<Element | undefined> {
+
+  async get(dht_hash: Hash, options: GetOptions): Promise<Element | undefined> {
     const gets = await this.network.kitsune.rpc_multi(
       this.cellId[0],
       this.cellId[1],
       dht_hash,
       0,
-      cell => cell.handle_get(dht_hash, _options)
+      cell =>
+        this._executeNetworkRequest(cell, 'Get Request', cell =>
+          cell.handle_get(dht_hash, options)
+        )
     );
 
     const result = gets.find(get => !!get);
@@ -133,7 +132,9 @@ export class P2pCell {
       this.cellId[1],
       agent,
       cell =>
-        cell.handle_call_remote(this.cellId[1], zome, fnName, cap, payload)
+        this._executeNetworkRequest(cell, 'Call Remote', cell =>
+          cell.handle_call_remote(this.cellId[1], zome, fnName, cap, payload)
+        )
     );
   }
 
@@ -148,37 +149,20 @@ export class P2pCell {
       this.neighbors.push(neighborPubKey);
   }
 
-  private _getClosestNeighbors(
-    basisHash: Hash,
-    neighborCount: number,
-    includeMe: boolean
-  ): Array<AgentPubKey> {
-    const neighors = [...this.neighbors];
-    if (includeMe) {
-      neighors.push(this.cellId[1]);
-    }
-    return getClosestNeighbors(neighors, basisHash, neighborCount);
-  }
-
-  private _sendRequest<T>(
-    toAgent: AgentPubKey,
+  private _executeNetworkRequest<T>(
+    toCell: Cell,
     name: string,
-    message: NetworkRequest<T>
+    request: NetworkRequest<T>
   ): Promise<T> {
     const networkRequest = {
       fromAgent: this.cellId[1],
-      toAgent: toAgent,
+      toAgent: toCell.agentPubKey,
       dnaHash: this.cellId[0],
       name,
     };
+
     return this.networkRequestsExecutor.execute(
-      () =>
-        this.network.sendRequest(
-          this.cellId[0],
-          this.cellId[1],
-          toAgent,
-          message
-        ),
+      () => request(toCell),
       networkRequest
     );
   }

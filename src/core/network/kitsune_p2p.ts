@@ -26,16 +26,17 @@ export class KitsuneP2p {
     dna_hash: Hash,
     from_agent: AgentPubKey,
     basis: Hash,
-    _remote_agent_count: number, // TODO implement this,
+    remote_agent_count: number,
     networkRequest: NetworkRequest<T>
   ): Promise<Array<T>> {
     // TODO Get all local agents and call them
-    // Discover neighbors
 
+    // Discover neighbors
     return this.discover.message_neighborhood(
       dna_hash,
       from_agent,
       basis,
+      remote_agent_count,
       networkRequest
     );
   }
@@ -60,9 +61,14 @@ export class Discover {
     dna_hash: Hash,
     from_agent: AgentPubKey,
     basis: Hash,
+    remote_agent_count: number,
     networkRequest: NetworkRequest<T>
   ): Promise<Array<T>> {
-    const agents = await this.search_for_agents(dna_hash, basis);
+    const agents = await this.search_for_agents(
+      dna_hash,
+      basis,
+      remote_agent_count
+    );
 
     const promises = agents.map(cell => networkRequest(cell));
     return Promise.all(promises);
@@ -70,8 +76,13 @@ export class Discover {
 
   private async search_for_agents(
     dna_hash: Hash,
-    basis: Hash
+    basis: Hash,
+    remote_agent_count: number
   ): Promise<Cell[]> {
-    return this.network.bootstrapService.getNeighborhood(dna_hash, basis, 5);
+    return this.network.bootstrapService.getNeighborhood(
+      dna_hash,
+      basis,
+      remote_agent_count
+    );
   }
 }
