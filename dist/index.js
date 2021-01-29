@@ -1120,9 +1120,10 @@ const integrate_dht_ops = async (cell) => {
         putDhtOpToIntegrated(dhtOpHash, value)(cell.state);
     }
 };
+const INTEGRATE_DHT_OPS_WORKFLOW = 'Integrate DHT Ops';
 function integrate_dht_ops_task(cell) {
     return {
-        name: 'Integrate DHT Ops',
+        name: INTEGRATE_DHT_OPS_WORKFLOW,
         details: undefined,
         task: () => integrate_dht_ops(cell),
     };
@@ -1143,9 +1144,10 @@ const app_validation = async (cell) => {
     }
     cell.triggerWorkflow(integrate_dht_ops_task(cell));
 };
+const APP_VALIDATION_WORKFLOW = 'App Validation';
 function app_validation_task(cell) {
     return {
-        name: 'App Validation',
+        name: APP_VALIDATION_WORKFLOW,
         details: undefined,
         task: () => app_validation(cell),
     };
@@ -1387,9 +1389,10 @@ const publish_dht_ops = async (cell) => {
     });
     await Promise.all(promises);
 };
+const PUBLISH_DHT_OPS_WORKFLOW = 'Publish DHT Ops';
 function publish_dht_ops_task(cell) {
     return {
-        name: 'Publish DHT Ops',
+        name: PUBLISH_DHT_OPS_WORKFLOW,
         details: undefined,
         task: () => publish_dht_ops(cell),
     };
@@ -1413,9 +1416,10 @@ const produce_dht_ops = async (cell) => {
     }
     cell.triggerWorkflow(publish_dht_ops_task(cell));
 };
+const PRODUCE_DHT_OPS_WORKFLOW = 'Produce DHT Ops';
 function produce_dht_ops_task(cell) {
     return {
-        name: 'Produce DHT Ops',
+        name: PRODUCE_DHT_OPS_WORKFLOW,
         details: undefined,
         task: () => produce_dht_ops(cell),
     };
@@ -1444,9 +1448,10 @@ const callZomeFn = (zomeName, fnName, payload, cap) => async (cell) => {
     }
     return result;
 };
+const CALL_ZOME_WORKFLOW = 'Call Zome Function';
 function call_zome_fn_workflow(cell, zome, fnName, payload) {
     return {
-        name: 'Call Zome Function',
+        name: CALL_ZOME_WORKFLOW,
         details: {
             fnName,
             payload,
@@ -1472,9 +1477,10 @@ const genesis = (agentId, dnaHash, membrane_proof) => async (cell) => {
     })(cell.state);
     cell.triggerWorkflow(produce_dht_ops_task(cell));
 };
+const GENESIS_WORKFLOW = 'Genesis';
 function genesis_task(cell, cellId, membrane_proof) {
     return {
-        name: 'Genesis',
+        name: GENESIS_WORKFLOW,
         details: {
             cellId,
             membrane_proof,
@@ -1494,9 +1500,10 @@ const sys_validation = async (cell) => {
     }
     cell.triggerWorkflow(app_validation_task(cell));
 };
+const SYS_VALIDATION_WORKFLOW = 'System Validation';
 function sys_validation_task(cell) {
     return {
-        name: 'System Validation',
+        name: SYS_VALIDATION_WORKFLOW,
         details: undefined,
         task: () => sys_validation(cell),
     };
@@ -1519,10 +1526,11 @@ const incoming_dht_ops = (basis, dhtOps, from_agent) => async (cell) => {
     }
     cell.triggerWorkflow(sys_validation_task(cell));
 };
+const INCOMING_DHT_OPS_WORKFLOW = 'Incoming DHT Ops';
 function incoming_dht_ops_task(cell, from_agent, dht_hash, // The basis for the DHTOps
 ops) {
     return {
-        name: 'Incoming DHT Ops',
+        name: INCOMING_DHT_OPS_WORKFLOW,
         details: {
             from_agent,
             dht_hash,
@@ -2004,5 +2012,5 @@ async function createConductors(conductorsToCreate, currentConductors, dnaTempla
     return allConductors;
 }
 
-export { AGENT_PREFIX, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, ENTRY_PREFIX, HEADER_PREFIX, HashType, index as Hdk, MiddlewareExecutor, Network, P2pCell, ValidationLimboStatus, ValidationStatus, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sleep, sys_validation, sys_validation_task, valid_cap_grant };
+export { AGENT_PREFIX, APP_VALIDATION_WORKFLOW, CALL_ZOME_WORKFLOW, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, ENTRY_PREFIX, GENESIS_WORKFLOW, HEADER_PREFIX, HashType, index as Hdk, INCOMING_DHT_OPS_WORKFLOW, INTEGRATE_DHT_OPS_WORKFLOW, MiddlewareExecutor, Network, P2pCell, PRODUCE_DHT_OPS_WORKFLOW, PUBLISH_DHT_OPS_WORKFLOW, SYS_VALIDATION_WORKFLOW, ValidationLimboStatus, ValidationStatus, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sleep, sys_validation, sys_validation_task, valid_cap_grant };
 //# sourceMappingURL=index.js.map

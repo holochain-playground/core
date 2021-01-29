@@ -6,5 +6,6 @@ export declare type IncomingDhtOpsWorkflow = Workflow<{
     dht_hash: Hash;
     ops: Dictionary<DHTOp>;
 }, void>;
+export declare const INCOMING_DHT_OPS_WORKFLOW = "Incoming DHT Ops";
 export declare function incoming_dht_ops_task(cell: Cell, from_agent: AgentPubKey, dht_hash: Hash, // The basis for the DHTOps
 ops: Dictionary<DHTOp>): IncomingDhtOpsWorkflow;

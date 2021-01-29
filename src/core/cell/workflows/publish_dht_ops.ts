@@ -33,10 +33,11 @@ export const publish_dht_ops = async (cell: Cell): Promise<void> => {
 };
 
 export type PublishDhtOpsWorkflow = Workflow<void, void>;
+export const PUBLISH_DHT_OPS_WORKFLOW = 'Publish DHT Ops';
 
 export function publish_dht_ops_task(cell: Cell): PublishDhtOpsWorkflow {
   return {
-    name: 'Publish DHT Ops',
+    name: PUBLISH_DHT_OPS_WORKFLOW,
     details: undefined,
     task: () => publish_dht_ops(cell),
   };

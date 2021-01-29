@@ -36,10 +36,11 @@ export const app_validation = async (cell: Cell): Promise<void> => {
 };
 
 export type AppValidationWorkflow = Workflow<any, any>;
+export const APP_VALIDATION_WORKFLOW = 'App Validation';
 
 export function app_validation_task(cell: Cell): AppValidationWorkflow {
   return {
-    name: 'App Validation',
+    name: APP_VALIDATION_WORKFLOW,
     details: undefined,
     task: () => app_validation(cell),
   };

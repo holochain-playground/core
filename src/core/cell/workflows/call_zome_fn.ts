@@ -51,6 +51,7 @@ export type CallZomeFnWorkflow = Workflow<
   { zome: string; fnName: string; payload: any },
   any
 >;
+export const CALL_ZOME_WORKFLOW = 'Call Zome Function';
 
 export function call_zome_fn_workflow(
   cell: Cell,
@@ -59,7 +60,7 @@ export function call_zome_fn_workflow(
   payload: any
 ): CallZomeFnWorkflow {
   return {
-    name: 'Call Zome Function',
+    name: CALL_ZOME_WORKFLOW,
     details: {
       fnName,
       payload,

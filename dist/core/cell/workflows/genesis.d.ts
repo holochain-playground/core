@@ -5,4 +5,5 @@ export declare type GenesisWorkflow = Workflow<{
     cellId: CellId;
     membrane_proof: any;
 }, void>;
+export declare const GENESIS_WORKFLOW = "Genesis";
 export declare function genesis_task(cell: Cell, cellId: CellId, membrane_proof: any): GenesisWorkflow;

@@ -30,10 +30,11 @@ export const integrate_dht_ops = async (cell: Cell): Promise<void> => {
 };
 
 export type IntegrateDhtOpsWorkflow = Workflow<void, void>;
+export const INTEGRATE_DHT_OPS_WORKFLOW = 'Integrate DHT Ops';
 
 export function integrate_dht_ops_task(cell: Cell): IntegrateDhtOpsWorkflow {
   return {
-    name: 'Integrate DHT Ops',
+    name: INTEGRATE_DHT_OPS_WORKFLOW,
     details: undefined,
     task: () => integrate_dht_ops(cell),
   };
