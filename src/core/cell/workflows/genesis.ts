@@ -1,5 +1,10 @@
-import { AgentPubKey, Hash, Entry } from '@holochain-open-dev/core-types';
-import { Cell } from '../../cell';
+import {
+  AgentPubKey,
+  Hash,
+  Entry,
+  CellId,
+} from '@holochain-open-dev/core-types';
+import { Cell, Workflow } from '../../cell';
 import {
   buildAgentValidationPkg,
   buildCreate,
@@ -32,3 +37,24 @@ export const genesis = (
 
   cell.triggerWorkflow(produce_dht_ops_task(cell));
 };
+
+export type GenesisWorkflow = Workflow<
+  { cellId: CellId; membrane_proof: any },
+  void
+>;
+
+export function genesis_task(
+  cell: Cell,
+  cellId: CellId,
+  membrane_proof: any
+): GenesisWorkflow {
+  return {
+    name: 'Genesis',
+    description: 'Initialize the cell with all the needed databases',
+    payload: {
+      cellId,
+      membrane_proof,
+    },
+    task: () => genesis(cellId[1], cellId[0], membrane_proof)(cell),
+  };
+}

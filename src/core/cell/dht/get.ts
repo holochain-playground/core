@@ -1,4 +1,3 @@
-import { deserializeHash, serializeHash } from '@holochain-open-dev/common';
 import {
   Dictionary,
   Hash,
@@ -10,6 +9,8 @@ import {
   NewEntryHeader,
   SignedHeaderHashed,
   DHTOpType,
+  Update,
+  Delete,
 } from '@holochain-open-dev/core-types';
 import { isEqual, uniq } from 'lodash-es';
 import {
@@ -95,6 +96,27 @@ export function getEntryDetails(
     entry,
     headers: headers,
     entry_dht_status: dhtStatus as EntryDhtStatus,
+  };
+}
+
+export function getHeaderModifiers(
+  state: CellState,
+  headerHash: Hash
+): {
+  updates: SignedHeaderHashed<Update>[];
+  deletes: SignedHeaderHashed<Delete>[];
+} {
+  const allModifiers = state.metadata.system_meta[headerHash];
+  const updates = allModifiers
+    .filter(m => (m as { Update: Hash }).Update)
+    .map(m => state.CAS[(m as { Update: Hash }).Update]);
+  const deletes = allModifiers
+    .filter(m => (m as { Delete: Hash }).Delete)
+    .map(m => state.CAS[(m as { Delete: Hash }).Delete]);
+
+  return {
+    updates,
+    deletes,
   };
 }
 

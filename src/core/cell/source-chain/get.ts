@@ -1,4 +1,4 @@
-import { Hash } from '@holochain-open-dev/core-types';
+import { Hash, SignedHeaderHashed } from '@holochain-open-dev/core-types';
 import { CellState } from '../state';
 
 /**
@@ -12,4 +12,10 @@ export function getNewHeaders(state: CellState): Array<Hash> {
   return state.sourceChain.filter(
     headerHash => !headerHashesAlreadyPublished.includes(headerHash)
   );
+}
+
+export function getAllAuthoredHeaders(
+  state: CellState
+): Array<SignedHeaderHashed> {
+  return state.sourceChain.map(headerHash => state.CAS[headerHash]);
 }

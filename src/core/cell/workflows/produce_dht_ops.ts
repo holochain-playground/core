@@ -1,15 +1,18 @@
 import { elementToDHTOps } from '@holochain-open-dev/core-types';
-import { hash } from '../../../processors/hash';
+import { hash, HashType } from '../../../processors/hash';
 import { Cell, Workflow } from '../../cell';
 import { getNewHeaders } from '../source-chain/get';
 import { getElement } from '../source-chain/utils';
 import { publish_dht_ops_task } from './publish_dht_ops';
 
-export function produce_dht_ops_task(cell: Cell): Workflow {
+export type ProduceDhtOpsWorkflow = Workflow<void, void>;
+
+export function produce_dht_ops_task(cell: Cell): ProduceDhtOpsWorkflow {
   return {
     name: 'Produce DHT Ops',
     description:
       'Read the new elements in the source chain and produce their appropriate DHT Ops',
+    payload: undefined,
     task: () => produce_dht_ops(cell),
   };
 }
@@ -23,7 +26,7 @@ export const produce_dht_ops = async (cell: Cell): Promise<void> => {
     const dhtOps = elementToDHTOps(element);
 
     for (const dhtOp of dhtOps) {
-      const dhtOpHash = hash(dhtOp);
+      const dhtOpHash = hash(dhtOp, HashType.DHTOP);
       const dhtOpValue = {
         op: dhtOp,
         last_publish_time: undefined,

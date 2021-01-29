@@ -4,7 +4,7 @@ import {
   DHTOp,
   AgentPubKey,
 } from '@holochain-open-dev/core-types';
-import { Cell } from '../../cell';
+import { Cell, Workflow } from '../../cell';
 import { ValidationLimboValue, ValidationLimboStatus } from '../state';
 import { putValidationLimboValue } from '../dht/put';
 import { sys_validation_task } from './sys_validation';
@@ -33,3 +33,26 @@ export const incoming_dht_ops = (
 
   cell.triggerWorkflow(sys_validation_task(cell));
 };
+
+export type IncomingDhtOpsWorkflow = Workflow<
+  { from_agent: AgentPubKey; dht_hash: Hash; ops: Dictionary<DHTOp> },
+  void
+>;
+
+export function incoming_dht_ops_task(
+  cell: Cell,
+  from_agent: AgentPubKey,
+  dht_hash: Hash, // The basis for the DHTOps
+  ops: Dictionary<DHTOp>
+): IncomingDhtOpsWorkflow {
+  return {
+    name: 'Incoming DHT Ops',
+    description: 'Persist the recieved DHT Ops to validate them later',
+    payload: {
+      from_agent,
+      dht_hash,
+      ops,
+    },
+    task: () => incoming_dht_ops(dht_hash, ops, from_agent)(cell),
+  };
+}

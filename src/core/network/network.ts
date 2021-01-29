@@ -4,9 +4,11 @@ import {
   Dictionary,
   Hash,
 } from '@holochain-open-dev/core-types';
+import { BootstrapService } from '../../bootstrap/bootstrap-service';
 import { Cell } from '../cell';
 import { Conductor } from '../conductor';
 import { P2pCell, P2pCellState } from '../network/p2p-cell';
+import { KitsuneP2p } from './kitsune_p2p';
 
 export interface NetworkState {
   // P2pCellState by dna hash / agentPubKey
@@ -16,8 +18,13 @@ export interface NetworkState {
 export class Network {
   // P2pCells contained in this conductor
   p2pCells: Dictionary<Dictionary<P2pCell>>;
+  kitsune: KitsuneP2p;
 
-  constructor(state: NetworkState, public conductor: Conductor) {
+  constructor(
+    state: NetworkState,
+    public conductor: Conductor,
+    public bootstrapService: BootstrapService
+  ) {
     this.p2pCells = {};
     for (const [dnaHash, p2pState] of Object.entries(state.p2pCellsState)) {
       if (!this.p2pCells[dnaHash]) this.p2pCells[dnaHash];
@@ -29,6 +36,8 @@ export class Network {
         );
       }
     }
+
+    this.kitsune = new KitsuneP2p(this);
   }
 
   getState(): NetworkState {
@@ -81,7 +90,7 @@ export class Network {
 
     if (localCell) return request(localCell);
 
-    return request(this.conductor.bootstrapService.cells[dna][toAgent]);
+    return request(this.bootstrapService.cells[dna][toAgent]);
   }
 }
 

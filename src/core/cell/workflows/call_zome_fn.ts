@@ -2,6 +2,7 @@ import { Cell } from '../../cell';
 import { buildZomeFunctionContext } from '../../hdk/context';
 import { getTipOfChain } from '../source-chain/utils';
 import { produce_dht_ops_task } from './produce_dht_ops';
+import { Workflow } from './workflows';
 
 /**
  * Calls the zome function of the cell DNA
@@ -32,7 +33,9 @@ export const callZomeFn = (
 
   const context = buildZomeFunctionContext(zomeIndex, cell);
 
-  const result = dna.zomes[zomeIndex].zome_functions[fnName].call(context)(payload);
+  const result = dna.zomes[zomeIndex].zome_functions[fnName].call(context)(
+    payload
+  );
 
   if (getTipOfChain(cell.state) != currentHeader) {
     // Do validation
@@ -43,3 +46,26 @@ export const callZomeFn = (
 
   return result;
 };
+
+export type CallZomeFnWorkflow = Workflow<
+  { zome: string; fnName: string; payload: any },
+  any
+>;
+
+export function call_zome_fn_workflow(
+  cell: Cell,
+  zome: string,
+  fnName: string,
+  payload: any
+): CallZomeFnWorkflow {
+  return {
+    name: 'Call Zome Function',
+    description: `Zome: ${zome}, Function name: ${fnName}`,
+    payload: {
+      fnName,
+      payload,
+      zome,
+    },
+    task: () => callZomeFn(zome, fnName, payload, '')(cell),
+  };
+}

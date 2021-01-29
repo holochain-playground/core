@@ -35,10 +35,13 @@ export const app_validation = async (cell: Cell): Promise<void> => {
   cell.triggerWorkflow(integrate_dht_ops_task(cell));
 };
 
-export function app_validation_task(cell: Cell): Workflow {
+export type AppValidationWorkflow = Workflow<any, any>;
+
+export function app_validation_task(cell: Cell): AppValidationWorkflow {
   return {
     name: 'App Validation',
-    description: 'Running of the zome appropriate zome hook',
+    description: 'Running of the zome appropriate validation hook',
+    payload: undefined,
     task: () => app_validation(cell),
   };
 }

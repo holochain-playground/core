@@ -3,6 +3,35 @@ import { Dictionary, Hash } from '@holochain-open-dev/core-types';
 // @ts-ignore
 import blake from 'blakejs';
 
+export enum HashType {
+  AGENT,
+  ENTRY,
+  DHTOP,
+  HEADER,
+  DNA,
+}
+
+export const AGENT_PREFIX = 'hCAk';
+export const ENTRY_PREFIX = 'hCEk';
+export const DHTOP_PREFIX = 'hCQk';
+export const DNA_PREFIX = 'hC0k';
+export const HEADER_PREFIX = 'hCkk';
+
+function getPrefix(type: HashType) {
+  switch (type) {
+    case HashType.AGENT:
+      return AGENT_PREFIX;
+    case HashType.ENTRY:
+      return ENTRY_PREFIX;
+    case HashType.DHTOP:
+      return DHTOP_PREFIX;
+    case HashType.HEADER:
+      return HEADER_PREFIX;
+    case HashType.DNA:
+      return DNA_PREFIX;
+  }
+}
+
 function str2ab(str: string) {
   var buf = new ArrayBuffer(str.length);
   var bufView = new Uint8Array(buf);
@@ -15,7 +44,7 @@ function str2ab(str: string) {
 const hashCache: Dictionary<Hash> = {};
 
 // From https://github.com/holochain/holochain/blob/dc0cb61d0603fa410ac5f024ed6ccfdfc29715b3/crates/holo_hash/src/encode.rs
-export function hash(content: any): Hash {
+export function hash(content: any, type: HashType): Hash {
   const contentString =
     typeof content === 'string' ? content : JSON.stringify(content);
 
@@ -23,7 +52,10 @@ export function hash(content: any): Hash {
 
   const hashable = new Uint8Array(str2ab(contentString));
 
-  const hash = serializeHash(blake.blake2b(hashable, null, 32));
+  const bytesHash = blake.blake2b(hashable, null, 32);
+
+  const strHash = serializeHash(bytesHash);
+  const hash = `u${getPrefix(type)}${strHash.slice(1)}`;
 
   hashCache[contentString] = hash;
 
@@ -71,4 +103,15 @@ export function compareBigInts(a: number, b: number): number {
     return -1;
   }
   return 0;
+}
+
+export function getHashType(hash: Hash): HashType {
+  const hashExt = hash.slice(1, 5);
+
+  if (hashExt === AGENT_PREFIX) return HashType.AGENT;
+  if (hashExt === DNA_PREFIX) return HashType.DNA;
+  if (hashExt === DHTOP_PREFIX) return HashType.DHTOP;
+  if (hashExt === HEADER_PREFIX) return HashType.HEADER;
+  if (hashExt === ENTRY_PREFIX) return HashType.ENTRY;
+  throw new Error('Could not get hash type');
 }

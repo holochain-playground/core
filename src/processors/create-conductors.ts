@@ -10,7 +10,7 @@ export async function createConductors(
   const bootstrapService =
     currentConductors.length === 0
       ? new BootstrapService()
-      : currentConductors[0].bootstrapService;
+      : currentConductors[0].network.bootstrapService;
 
   const newConductorsPromises: Promise<Conductor>[] = [];
   for (let i = 0; i < conductorsToCreate; i++) {
