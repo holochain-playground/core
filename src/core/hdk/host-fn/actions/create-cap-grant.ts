@@ -29,9 +29,10 @@ export const create_cap_grant: HostFn<CreateCapGrant> = (
         secret: CapSecret;
         assignees: AgentPubKey[];
       };
-    }).Assigned.assignees.find(a => !a)
-  )
-    throw new Error('Cannot create a capability grant to an undefined agent');
+    }).Assigned.assignees.find(a => typeof a !== 'string')
+  ) {
+    throw new Error('Tried to assign a capability to an invalid agent');
+  }
 
   const entry: Entry = { entry_type: 'CapGrant', content: cap_grant };
 
