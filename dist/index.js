@@ -1165,6 +1165,8 @@ function app_validation_task(cell) {
 
 // Creates a new Create header and its entry in the source chain
 const create_cap_grant = (zome_index, cell) => async (cap_grant) => {
+    if (cap_grant.access.Assigned.assignees.find(a => !a))
+        throw new Error('Cannot create a capability grant to an undefined agent');
     const entry = { entry_type: 'CapGrant', content: cap_grant };
     const create = buildCreate(cell.state, entry, 'CapGrant');
     const element = {
