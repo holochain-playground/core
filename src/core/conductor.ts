@@ -152,6 +152,7 @@ export class Conductor {
       cap: args.cap,
       fnName: args.fnName,
       payload: args.payload,
+      provenance: agentPubKey,
     });
   }
 }

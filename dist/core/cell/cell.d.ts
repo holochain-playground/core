@@ -30,6 +30,7 @@ export declare class Cell {
         fnName: string;
         payload: any;
         cap: string;
+        provenance: AgentPubKey;
     }): Promise<any>;
     /** Network handlers */
     handle_new_neighbor(neighborPubKey: AgentPubKey): Promise<void>;

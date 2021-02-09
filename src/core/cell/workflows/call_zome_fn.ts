@@ -1,6 +1,7 @@
+import { AgentPubKey } from '@holochain-open-dev/core-types';
 import { Cell } from '../../cell';
 import { buildZomeFunctionContext } from '../../hdk/context';
-import { getTipOfChain } from '../source-chain/utils';
+import { getTipOfChain, valid_cap_grant } from '../source-chain/utils';
 import { produce_dht_ops_task } from './produce_dht_ops';
 import { Workflow, WorkflowType } from './workflows';
 
@@ -12,8 +13,12 @@ export const callZomeFn = (
   zomeName: string,
   fnName: string,
   payload: any,
+  provenance: AgentPubKey,
   cap: string
 ) => async (cell: Cell): Promise<any> => {
+  if (!valid_cap_grant(cell.state, zomeName, fnName, provenance, cap))
+    throw new Error('Unauthorized Zome Call');
+
   const currentHeader = getTipOfChain(cell.state);
 
   const dna = cell.getSimulatedDna();
@@ -56,7 +61,8 @@ export function call_zome_fn_workflow(
   cell: Cell,
   zome: string,
   fnName: string,
-  payload: any
+  payload: any,
+  provenance: AgentPubKey
 ): CallZomeFnWorkflow {
   return {
     type: WorkflowType.CALL_ZOME,
@@ -65,6 +71,6 @@ export function call_zome_fn_workflow(
       payload,
       zome,
     },
-    task: () => callZomeFn(zome, fnName, payload, '')(cell),
+    task: () => callZomeFn(zome, fnName, payload, provenance, '')(cell),
   };
 }

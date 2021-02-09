@@ -1440,7 +1440,9 @@ function produce_dht_ops_task(cell) {
  * Calls the zome function of the cell DNA
  * This can only be called in the simulated mode: we can assume that cell.simulatedDna exists
  */
-const callZomeFn = (zomeName, fnName, payload, cap) => async (cell) => {
+const callZomeFn = (zomeName, fnName, payload, provenance, cap) => async (cell) => {
+    if (!valid_cap_grant(cell.state, zomeName, fnName, provenance, cap))
+        throw new Error('Unauthorized Zome Call');
     const currentHeader = getTipOfChain(cell.state);
     const dna = cell.getSimulatedDna();
     if (!dna)
@@ -1459,7 +1461,7 @@ const callZomeFn = (zomeName, fnName, payload, cap) => async (cell) => {
     }
     return result;
 };
-function call_zome_fn_workflow(cell, zome, fnName, payload) {
+function call_zome_fn_workflow(cell, zome, fnName, payload, provenance) {
     return {
         type: WorkflowType.CALL_ZOME,
         details: {
@@ -1467,7 +1469,7 @@ function call_zome_fn_workflow(cell, zome, fnName, payload) {
             payload,
             zome,
         },
-        task: () => callZomeFn(zome, fnName, payload)(cell),
+        task: () => callZomeFn(zome, fnName, payload, provenance, '')(cell),
     };
 }
 
@@ -1655,7 +1657,7 @@ class Cell {
     }
     /** Workflows */
     callZomeFn(args) {
-        return this._runWorkflow(call_zome_fn_workflow(this, args.zome, args.fnName, args.payload));
+        return this._runWorkflow(call_zome_fn_workflow(this, args.zome, args.fnName, args.payload, args.provenance));
     }
     /** Network handlers */
     // https://github.com/holochain/holochain/blob/develop/crates/holochain/src/conductor/cell.rs#L429
@@ -1678,13 +1680,12 @@ class Cell {
         return undefined;
     }
     async handle_call_remote(from_agent, zome_name, fn_name, cap, payload) {
-        if (!valid_cap_grant(this.state, zome_name, fn_name, from_agent, cap))
-            throw new Error('Unauthorized call zome');
         return this.callZomeFn({
             zome: zome_name,
             cap: cap,
             fnName: fn_name,
             payload,
+            provenance: from_agent,
         });
     }
 }
@@ -1949,6 +1950,7 @@ class Conductor {
             cap: args.cap,
             fnName: args.fnName,
             payload: args.payload,
+            provenance: agentPubKey,
         });
     }
 }
