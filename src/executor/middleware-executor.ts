@@ -1,12 +1,13 @@
 import { Task } from './task';
 
 export type Middleware<P> = (payload: P) => Promise<void>;
+export type SuccessMiddleware<P> = (payload: P, result: any) => Promise<void>;
 export type ErrorMiddleware<P> = (payload: P, error: any) => Promise<void>;
 export type MiddlewareSubscription = { unsubscribe: () => void };
 
 export class MiddlewareExecutor<P> {
   _beforeMiddlewares: Array<Middleware<P>> = [];
-  _successMiddlewares: Array<Middleware<P>> = [];
+  _successMiddlewares: Array<SuccessMiddleware<P>> = [];
   _errorMiddlewares: Array<ErrorMiddleware<P>> = [];
 
   async execute<T>(task: Task<T>, payload: P): Promise<T> {
@@ -18,7 +19,7 @@ export class MiddlewareExecutor<P> {
       const result = await task();
 
       for (const middleware of this._successMiddlewares) {
-        await middleware(payload);
+        await middleware(payload, result);
       }
 
       return result;

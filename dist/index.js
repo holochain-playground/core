@@ -1560,7 +1560,7 @@ class MiddlewareExecutor {
         try {
             const result = await task();
             for (const middleware of this._successMiddlewares) {
-                await middleware(payload);
+                await middleware(payload, result);
             }
             return result;
         }
