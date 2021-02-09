@@ -29,7 +29,7 @@ export const create_cap_grant: HostFn<CreateCapGrant> = (
         secret: CapSecret;
         assignees: AgentPubKey[];
       };
-    }).Assigned.assignees.find(a => typeof a !== 'string')
+    }).Assigned.assignees.find(a => !!a && typeof a !== 'string')
   ) {
     throw new Error('Tried to assign a capability to an invalid agent');
   }

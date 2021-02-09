@@ -1,42 +1,54 @@
 import { Task } from './task';
 
 export type Middleware<P> = (payload: P) => Promise<void>;
+export type ErrorMiddleware<P> = (payload: P, error: any) => Promise<void>;
 export type MiddlewareSubscription = { unsubscribe: () => void };
 
 export class MiddlewareExecutor<P> {
   _beforeMiddlewares: Array<Middleware<P>> = [];
-  _afterMiddlewares: Array<Middleware<P>> = [];
+  _successMiddlewares: Array<Middleware<P>> = [];
+  _errorMiddlewares: Array<ErrorMiddleware<P>> = [];
 
   async execute<T>(task: Task<T>, payload: P): Promise<T> {
     for (const middleware of this._beforeMiddlewares) {
       await middleware(payload);
     }
 
-    const result = await task();
-    for (const middleware of this._afterMiddlewares) {
-      await middleware(payload);
-    }
+    try {
+      const result = await task();
 
-    return result;
+      for (const middleware of this._successMiddlewares) {
+        await middleware(payload);
+      }
+
+      return result;
+    } catch (e) {
+      for (const middleware of this._errorMiddlewares) {
+        await middleware(payload, e);
+      }
+
+      throw e;
+    }
   }
 
   before(callback: Middleware<P>): MiddlewareSubscription {
-    this._beforeMiddlewares.push(callback);
-
-    return {
-      unsubscribe: () => {
-        const index = this._beforeMiddlewares.findIndex(c => c === callback);
-        this._beforeMiddlewares.splice(index, 1);
-      },
-    };
+    return this._addListener(callback, this._beforeMiddlewares);
   }
-  after(callback: Middleware<P>): MiddlewareSubscription {
-    this._afterMiddlewares.push(callback);
+  success(callback: Middleware<P>): MiddlewareSubscription {
+    return this._addListener(callback, this._successMiddlewares);
+  }
+
+  error(callback: ErrorMiddleware<P>): MiddlewareSubscription {
+    return this._addListener(callback, this._errorMiddlewares);
+  }
+
+  private _addListener(callback: Function, middlewareList: Array<Function>) {
+    middlewareList.push(callback);
 
     return {
       unsubscribe: () => {
-        const index = this._afterMiddlewares.findIndex(c => c === callback);
-        this._afterMiddlewares.splice(index, 1);
+        const index = middlewareList.findIndex(c => c === callback);
+        middlewareList.splice(index, 1);
       },
     };
   }

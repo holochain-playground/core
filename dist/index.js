@@ -1165,7 +1165,7 @@ function app_validation_task(cell) {
 
 // Creates a new Create header and its entry in the source chain
 const create_cap_grant = (zome_index, cell) => async (cap_grant) => {
-    if (cap_grant.access.Assigned.assignees.find(a => typeof a !== 'string')) {
+    if (cap_grant.access.Assigned.assignees.find(a => !!a && typeof a !== 'string')) {
         throw new Error('Tried to assign a capability to an invalid agent');
     }
     const entry = { entry_type: 'CapGrant', content: cap_grant };
@@ -1550,33 +1550,42 @@ ops) {
 class MiddlewareExecutor {
     constructor() {
         this._beforeMiddlewares = [];
-        this._afterMiddlewares = [];
+        this._successMiddlewares = [];
+        this._errorMiddlewares = [];
     }
     async execute(task, payload) {
         for (const middleware of this._beforeMiddlewares) {
             await middleware(payload);
         }
-        const result = await task();
-        for (const middleware of this._afterMiddlewares) {
-            await middleware(payload);
+        try {
+            const result = await task();
+            for (const middleware of this._successMiddlewares) {
+                await middleware(payload);
+            }
+            return result;
         }
-        return result;
+        catch (e) {
+            for (const middleware of this._errorMiddlewares) {
+                await middleware(payload, e);
+            }
+            throw e;
+        }
     }
     before(callback) {
-        this._beforeMiddlewares.push(callback);
-        return {
-            unsubscribe: () => {
-                const index = this._beforeMiddlewares.findIndex(c => c === callback);
-                this._beforeMiddlewares.splice(index, 1);
-            },
-        };
+        return this._addListener(callback, this._beforeMiddlewares);
     }
-    after(callback) {
-        this._afterMiddlewares.push(callback);
+    success(callback) {
+        return this._addListener(callback, this._successMiddlewares);
+    }
+    error(callback) {
+        return this._addListener(callback, this._errorMiddlewares);
+    }
+    _addListener(callback, middlewareList) {
+        middlewareList.push(callback);
         return {
             unsubscribe: () => {
-                const index = this._afterMiddlewares.findIndex(c => c === callback);
-                this._afterMiddlewares.splice(index, 1);
+                const index = middlewareList.findIndex(c => c === callback);
+                middlewareList.splice(index, 1);
             },
         };
     }
