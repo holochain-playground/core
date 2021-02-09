@@ -14,3 +14,4 @@ export declare enum WorkflowType {
     GENESIS = "Genesis",
     INCOMING_DHT_OPS = "Incoming DHT Ops"
 }
+export declare function workflowPriority(workflowType: WorkflowType): number;
