@@ -1460,7 +1460,7 @@ const callZomeFn = (zomeName, fnName, payload, provenance, cap) => async (cell) 
     if (zomeIndex < 0)
         throw new Error(`There is no zome with the name ${zomeName} in this DNA`);
     if (!dna.zomes[zomeIndex].zome_functions[fnName])
-        throw new Error(`There is function with the name ${fnName} in this zome with the name ${zomeName}`);
+        throw new Error(`There isn't a function with the name ${fnName} in this zome with the name ${zomeName}`);
     const context = buildZomeFunctionContext(zomeIndex, cell);
     const result = dna.zomes[zomeIndex].zome_functions[fnName].call(context)(payload);
     if (getTipOfChain(cell.state) != currentHeader) {
