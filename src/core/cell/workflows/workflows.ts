@@ -16,3 +16,14 @@ export enum WorkflowType {
   GENESIS = 'Genesis',
   INCOMING_DHT_OPS = 'Incoming DHT Ops',
 }
+
+export function workflowPriority(workflowType: WorkflowType): number {
+  switch (workflowType) {
+    case WorkflowType.GENESIS:
+      return 0;
+    case WorkflowType.CALL_ZOME:
+      return 1;
+    default:
+      return 10;
+  }
+}
