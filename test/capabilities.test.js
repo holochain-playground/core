@@ -65,6 +65,7 @@ describe('Capabilities', () => {
     const bobAddress = bobCell.cellId[1];
 
     let result;
+    let failed = false;
 
     try {
       result = await conductors[1].callZomeFn({
@@ -75,7 +76,10 @@ describe('Capabilities', () => {
         zome: 'sample',
       });
       expect(false).to.be.ok;
-    } catch (e) {}
+    } catch (e) {
+      failed = true;
+    }
+    expect(failed).to.be.ok;
 
     const capGrantAddress = await conductors[0].callZomeFn({
       cellId: aliceCell.cellId,
@@ -106,6 +110,7 @@ describe('Capabilities', () => {
 
     expect(result).to.be.ok;
 
+    failed = false;
     try {
       result = await conductors[1].callZomeFn({
         cellId: bobCell.cellId,
@@ -115,6 +120,9 @@ describe('Capabilities', () => {
         zome: 'sample',
       });
       expect(false).to.be.ok;
-    } catch (e) {}
+    } catch (e) {
+      failed = true;
+    }
+    expect(failed).to.be.ok;
   });
 });

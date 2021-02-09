@@ -5,6 +5,8 @@ import {
   Hash,
   CapGrant,
   ZomeCallCapGrant,
+  AgentPubKey,
+  CapSecret,
 } from '@holochain-open-dev/core-types';
 import { Cell } from '../../../cell';
 import {
@@ -21,6 +23,17 @@ export const create_cap_grant: HostFn<CreateCapGrant> = (
   zome_index: number,
   cell: Cell
 ): CreateCapGrant => async (cap_grant: ZomeCallCapGrant): Promise<Hash> => {
+  if (
+    (cap_grant.access as {
+      Assigned: {
+        secret: CapSecret;
+        assignees: AgentPubKey[];
+      };
+    }).Assigned.assignees.find(a => !!a && typeof a !== 'string')
+  ) {
+    throw new Error('Tried to assign a capability to an invalid agent');
+  }
+
   const entry: Entry = { entry_type: 'CapGrant', content: cap_grant };
 
   const create = buildCreate(cell.state, entry, 'CapGrant');

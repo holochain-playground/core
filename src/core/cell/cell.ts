@@ -121,9 +121,16 @@ export class Cell {
     fnName: string;
     payload: any;
     cap: string;
+    provenance: AgentPubKey;
   }): Promise<any> {
     return this._runWorkflow(
-      call_zome_fn_workflow(this, args.zome, args.fnName, args.payload)
+      call_zome_fn_workflow(
+        this,
+        args.zome,
+        args.fnName,
+        args.payload,
+        args.provenance
+      )
     );
   }
 
@@ -165,14 +172,12 @@ export class Cell {
     cap: CapSecret | undefined,
     payload: any
   ): Promise<any> {
-    if (!valid_cap_grant(this.state, zome_name, fn_name, from_agent, cap))
-      throw new Error('Unauthorized call zome');
-
     return this.callZomeFn({
       zome: zome_name,
       cap: cap as CapSecret,
       fnName: fn_name,
       payload,
+      provenance: from_agent,
     });
   }
 }
