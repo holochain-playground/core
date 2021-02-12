@@ -1607,14 +1607,13 @@ class Cell {
         this.state = state;
         this.conductor = conductor;
         this.p2p = p2p;
-        this.#pendingWorkflows = {};
+        this._pendingWorkflows = {};
         this.workflowExecutor = new MiddlewareExecutor();
         // Let genesis be run before actually joining
         setTimeout(() => {
             this.p2p.join(this);
         });
     }
-    #pendingWorkflows;
     get cellId() {
         return [this.state.dnaHash, this.state.agentPubKey];
     }
@@ -1652,12 +1651,12 @@ class Cell {
         return this.state;
     }
     triggerWorkflow(workflow) {
-        this.#pendingWorkflows[workflow.type] = workflow;
+        this._pendingWorkflows[workflow.type] = workflow;
         setTimeout(() => this._runPendingWorkflows(), 300);
     }
     async _runPendingWorkflows() {
-        const workflowsToRun = this.#pendingWorkflows;
-        this.#pendingWorkflows = {};
+        const workflowsToRun = this._pendingWorkflows;
+        this._pendingWorkflows = {};
         const promises = Object.values(workflowsToRun).map(w => this._runWorkflow(w));
         await Promise.all(promises);
     }
