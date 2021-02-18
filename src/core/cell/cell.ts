@@ -41,11 +41,6 @@ export class Cell {
     setTimeout(() => {
       this.p2p.join(this);
     });
-    this.workflowExecutor.success(async task => {
-      task.triggers.forEach(workflowToTrigger =>
-        this.triggerWorkflow(workflowToTrigger)
-      );
-    });
   }
 
   get cellId(): CellId {
@@ -116,7 +111,15 @@ export class Cell {
   }
 
   async _runWorkflow(workflow: Workflow<any, any>): Promise<any> {
-    return this.workflowExecutor.execute(() => workflow.task(this), workflow);
+    const result = await this.workflowExecutor.execute(
+      () => workflow.task(this),
+      workflow
+    );
+
+    result.triggers.forEach(triggeredWorkflow =>
+      this.triggerWorkflow(triggeredWorkflow)
+    );
+    return result.result;
   }
 
   /** Workflows */
