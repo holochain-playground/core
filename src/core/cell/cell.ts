@@ -23,6 +23,7 @@ import { Authority } from './cascade/authority';
 import { getHashType, HashType } from '../../processors/hash';
 import { valid_cap_grant } from './source-chain/utils';
 import { GetOptions } from '../../types';
+import { Cascade } from './cascade';
 
 export type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export type CellSignalListener = (payload: any) => void;
@@ -57,6 +58,10 @@ export class Cell {
 
   getSimulatedDna() {
     return this.conductor.registeredDnas[this.dnaHash];
+  }
+
+  public getCascade(): Cascade {
+    return new Cascade(this);
   }
 
   static async create(
