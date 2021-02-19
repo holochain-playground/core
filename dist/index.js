@@ -1362,6 +1362,15 @@ const call_remote = (zome_index, cell) => async (args) => {
 };
 
 // Creates a new Create header and its entry in the source chain
+const get = (zome_index, cell) => async (hash, options) => {
+    if (!hash)
+        throw new Error(`Cannot get with undefined hash`);
+    options = options || { strategy: GetStrategy.Contents };
+    const cascade = cell.getCascade();
+    return cascade.dht_get(hash, options);
+};
+
+// Creates a new Create header and its entry in the source chain
 const hash_entry = (zome_index, cell) => async (args) => {
     const entry = { entry_type: 'App', content: args.content };
     return hashEntry(entry);
@@ -1390,6 +1399,7 @@ function buildZomeFunctionContext(zome_index, cell) {
     return {
         create_entry: create_entry(zome_index, cell),
         hash_entry: hash_entry(),
+        get: get(zome_index, cell),
         create_link: create_link(zome_index, cell),
         create_cap_grant: create_cap_grant(zome_index, cell),
         delete_cap_grant: delete_cap_grant(zome_index, cell),
@@ -1651,6 +1661,9 @@ class Cell {
     }
     getSimulatedDna() {
         return this.conductor.registeredDnas[this.dnaHash];
+    }
+    getCascade() {
+        return new Cascade(this);
     }
     static async create(conductor, cellId, membrane_proof) {
         const newCellState = {
@@ -2015,6 +2028,12 @@ const sampleZome = {
                 return create_entry({ content, entry_def_id: 'sample_entry' });
             },
             arguments: [{ name: 'content', type: 'any' }],
+        },
+        get: {
+            call: ({ get }) => ({ hash }) => {
+                return get(hash);
+            },
+            arguments: [{ name: 'hash', type: 'AnyDhtHash' }],
         },
         create_link: {
             call: ({ create_link }) => ({ base, target, tag }) => {
