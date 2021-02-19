@@ -1,4 +1,5 @@
 import { AgentPubKey } from '@holochain-open-dev/core-types';
+import { cloneDeep } from 'lodash-es';
 import { Cell } from '../../cell';
 import { buildZomeFunctionContext } from '../../hdk/context';
 import { getTipOfChain, valid_cap_grant } from '../source-chain/utils';
@@ -49,7 +50,7 @@ export const callZomeFn = (
   }
 
   return {
-    result,
+    result: cloneDeep(result),
     triggers,
   };
 };

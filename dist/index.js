@@ -1262,7 +1262,7 @@ const callZomeFn = (zomeName, fnName, payload, provenance, cap) => async (worskp
         triggers.push(produce_dht_ops_task());
     }
     return {
-        result,
+        result: cloneDeep(result),
         triggers,
     };
 };
