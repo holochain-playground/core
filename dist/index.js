@@ -710,7 +710,7 @@ function location(hash) {
         out[3] ^= hash128[i + 3];
     }
     const view = new DataView(new Uint8Array(out).buffer, 0);
-    const location = view.getUint32(0, false);
+    const location = wrap(view.getUint32(0, false));
     hashLocationCache[hash] = location;
     return location;
 }
@@ -718,7 +718,19 @@ function location(hash) {
 function distance(hash1, hash2) {
     const location1 = location(hash1);
     const location2 = location(hash2);
-    return Math.min(location1 - location2, location2 - location1);
+    return locationDistance(location1, location2) + 1;
+}
+function locationDistance(location1, location2) {
+    const distance1 = wrap(location1 - location2);
+    const distance2 = wrap(location2 - location1);
+    return Math.min(distance1, distance2);
+}
+function wrap(uint) {
+    if (uint < 0)
+        return 4294967295 - uint;
+    if (uint > 4294967295)
+        return uint - 4294967295;
+    return uint;
 }
 function compareBigInts(a, b) {
     if (a > b) {
@@ -1948,16 +1960,16 @@ class Network {
 
 function getClosestNeighbors(peers, targetHash, numNeighbors) {
     const sortedPeers = peers.sort((agentA, agentB) => {
-        const distanceA = Math.min(distance(targetHash, agentA), distance(agentA, targetHash));
-        const distanceB = Math.min(distance(targetHash, agentB), distance(agentB, targetHash));
+        const distanceA = distance(agentA, targetHash);
+        const distanceB = distance(agentB, targetHash);
         return compareBigInts(distanceB, distanceA);
     });
     return sortedPeers.slice(0, numNeighbors);
 }
 function getFarthestNeighbors(peers, targetHash, numNeighbors) {
     const sortedPeers = peers.sort((agentA, agentB) => {
-        const distanceA = Math.min(distance(targetHash, agentA), distance(agentA, targetHash));
-        const distanceB = Math.min(distance(targetHash, agentB), distance(agentB, targetHash));
+        const distanceA = distance(agentA, targetHash);
+        const distanceB = distance(agentB, targetHash);
         return compareBigInts(distanceA, distanceB);
     });
     return sortedPeers.slice(0, numNeighbors);
@@ -2142,5 +2154,5 @@ async function createConductors(conductorsToCreate, currentConductors, dnaTempla
     return allConductors;
 }
 
-export { AGENT_PREFIX, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sleep, sys_validation, sys_validation_task, valid_cap_grant, workflowPriority };
+export { AGENT_PREFIX, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, locationDistance, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sleep, sys_validation, sys_validation_task, valid_cap_grant, workflowPriority, wrap };
 //# sourceMappingURL=index.js.map

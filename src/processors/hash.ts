@@ -1,4 +1,8 @@
-import { serializeHash, Dictionary, Hash } from '@holochain-open-dev/core-types';
+import {
+  serializeHash,
+  Dictionary,
+  Hash,
+} from '@holochain-open-dev/core-types';
 // @ts-ignore
 import blake from 'blakejs';
 
@@ -79,7 +83,7 @@ export function location(hash: string): number {
   }
 
   const view = new DataView(new Uint8Array(out).buffer, 0);
-  const location = view.getUint32(0, false);
+  const location = wrap(view.getUint32(0, false));
 
   hashLocationCache[hash] = location;
 
@@ -91,7 +95,19 @@ export function distance(hash1: Hash, hash2: Hash): number {
   const location1 = location(hash1);
   const location2 = location(hash2);
 
-  return Math.min(location1 - location2, location2 - location1);
+  return locationDistance(location1, location2) + 1;
+}
+
+export function locationDistance(location1: number, location2: number): number {
+  const distance1 = wrap(location1 - location2)
+  const distance2 = wrap(location2 - location1)
+  return Math.min(distance1, distance2);
+}
+
+export function wrap(uint: number): number {
+  if (uint < 0) return 4294967295 - uint;
+  if (uint > 4294967295) return uint - 4294967295;
+  return uint;
 }
 
 export function compareBigInts(a: number, b: number): number {
