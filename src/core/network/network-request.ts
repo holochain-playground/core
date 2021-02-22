@@ -1,4 +1,4 @@
-import { AgentPubKey, DHTOp, Hash } from '@holochain-open-dev/core-types';
+import { AgentPubKey, DHTOp, Dictionary, Hash } from '@holochain-open-dev/core-types';
 import { GetOptions } from '../../types';
 import { Cell } from '../cell/cell';
 
@@ -22,7 +22,7 @@ export interface NetworkRequestInfo<T extends NetworkRequestType, D> {
 export type PublishRequestInfo = NetworkRequestInfo<
   NetworkRequestType.PUBLISH_REQUEST,
   {
-    dhtOps: DHTOp[];
+    dhtOps: Dictionary<DHTOp>;
   }
 >;
 
