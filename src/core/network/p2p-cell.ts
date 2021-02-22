@@ -21,6 +21,7 @@ import {
 export type P2pCellState = {
   neighbors: Hash[];
   redundancyFactor: number;
+  neighborNumber: number;
 };
 
 // From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/lib.rs
@@ -28,6 +29,7 @@ export class P2pCell {
   neighbors: AgentPubKey[];
 
   redundancyFactor: number;
+  neighborNumber: number;
 
   networkRequestsExecutor = new MiddlewareExecutor<NetworkRequestInfo>();
 
@@ -38,12 +40,14 @@ export class P2pCell {
   ) {
     this.neighbors = state.neighbors;
     this.redundancyFactor = state.redundancyFactor;
+    this.neighborNumber = state.neighborNumber;
   }
 
   getState(): P2pCellState {
     return {
       neighbors: this.neighbors,
       redundancyFactor: this.redundancyFactor,
+      neighborNumber: this.neighborNumber,
     };
   }
 
@@ -52,7 +56,11 @@ export class P2pCell {
   async join(containerCell: Cell): Promise<void> {
     this.network.bootstrapService.announceCell(this.cellId, containerCell);
 
-    await this.addNeighborsFromNeighborhood();
+    await this.syncNeighborsFromNeighborhood();
+
+    setInterval(() => {
+      this.syncNeighborsFromNeighborhood();
+    }, 1000);
   }
 
   async leave(): Promise<void> {}
@@ -138,14 +146,14 @@ export class P2pCell {
       this.neighbors.push(neighborPubKey);
   }
 
-  async addNeighborsFromNeighborhood() {
+  async syncNeighborsFromNeighborhood() {
     const dnaHash = this.cellId[0];
     const agentPubKey = this.cellId[1];
 
     const neighbors = this.network.bootstrapService.getNeighborhood(
       dnaHash,
       agentPubKey,
-      this.redundancyFactor
+      this.neighborNumber
     );
 
     const newNeighbors = neighbors.filter(
@@ -161,13 +169,10 @@ export class P2pCell {
     );
     await Promise.all(promises);
 
-    this.neighbors = [
-      ...newNeighbors.map(n => n.agentPubKey),
-      ...this.neighbors,
-    ];
+    this.neighbors = newNeighbors.map(n => n.agentPubKey);
 
     if (this.neighbors.length < this.redundancyFactor) {
-      setTimeout(() => this.addNeighborsFromNeighborhood(), 1000);
+      setTimeout(() => this.syncNeighborsFromNeighborhood(), 1000);
     }
   }
 

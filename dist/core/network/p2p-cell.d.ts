@@ -7,12 +7,14 @@ import { NetworkRequestInfo } from './network-request';
 export declare type P2pCellState = {
     neighbors: Hash[];
     redundancyFactor: number;
+    neighborNumber: number;
 };
 export declare class P2pCell {
     protected cellId: CellId;
     protected network: Network;
     neighbors: AgentPubKey[];
     redundancyFactor: number;
+    neighborNumber: number;
     networkRequestsExecutor: MiddlewareExecutor<NetworkRequestInfo>;
     constructor(state: P2pCellState, cellId: CellId, network: Network);
     getState(): P2pCellState;
@@ -25,6 +27,6 @@ export declare class P2pCell {
     /** Neighbor handling */
     getNeighbors(): Array<AgentPubKey>;
     addNeighbor(neighborPubKey: AgentPubKey): void;
-    addNeighborsFromNeighborhood(): Promise<void>;
+    syncNeighborsFromNeighborhood(): Promise<void>;
     private _executeNetworkRequest;
 }

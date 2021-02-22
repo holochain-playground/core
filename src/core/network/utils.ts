@@ -9,7 +9,7 @@ export function getClosestNeighbors(
   const sortedPeers = peers.sort((agentA: Hash, agentB: Hash) => {
     const distanceA = distance(targetHash, agentA);
     const distanceB = distance(targetHash, agentB);
-    return compareBigInts(distanceA, distanceB);
+    return compareBigInts(distanceB, distanceA);
   });
 
   return sortedPeers.slice(0, numNeighbors);
