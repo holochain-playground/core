@@ -27,6 +27,6 @@ export declare class P2pCell {
     /** Neighbor handling */
     getNeighbors(): Array<AgentPubKey>;
     addNeighbor(neighborPubKey: AgentPubKey): void;
-    syncNeighborsFromNeighborhood(): Promise<void>;
+    syncNeighbors(): Promise<void>;
     private _executeNetworkRequest;
 }

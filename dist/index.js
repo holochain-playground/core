@@ -1797,9 +1797,9 @@ class P2pCell {
     /** P2p actions */
     async join(containerCell) {
         this.network.bootstrapService.announceCell(this.cellId, containerCell);
-        await this.syncNeighborsFromNeighborhood();
+        await this.syncNeighbors();
         setInterval(() => {
-            this.syncNeighborsFromNeighborhood();
+            this.syncNeighbors();
         }, 1000);
     }
     async leave() { }
@@ -1836,17 +1836,14 @@ class P2pCell {
             !this.neighbors.includes(neighborPubKey))
             this.neighbors.push(neighborPubKey);
     }
-    async syncNeighborsFromNeighborhood() {
+    async syncNeighbors() {
         const dnaHash = this.cellId[0];
         const agentPubKey = this.cellId[1];
-        const neighbors = this.network.bootstrapService.getNeighborhood(dnaHash, agentPubKey, this.neighborNumber);
+        const neighbors = this.network.bootstrapService.getDhtPeers(dnaHash, agentPubKey, this.neighborNumber - 2, 2);
         const newNeighbors = neighbors.filter(cell => ![this.cellId[1], ...this.neighbors].includes(cell.agentPubKey));
+        this.neighbors = newNeighbors.map(n => n.agentPubKey);
         const promises = newNeighbors.map(neighbor => this._executeNetworkRequest(neighbor, NetworkRequestType.ADD_NEIGHBOR, (cell) => cell.handle_new_neighbor(agentPubKey)));
         await Promise.all(promises);
-        this.neighbors = newNeighbors.map(n => n.agentPubKey);
-        if (this.neighbors.length < this.redundancyFactor) {
-            setTimeout(() => this.syncNeighborsFromNeighborhood(), 1000);
-        }
     }
     _executeNetworkRequest(toCell, type, request) {
         const networkRequest = {
@@ -1950,6 +1947,14 @@ function getClosestNeighbors(peers, targetHash, numNeighbors) {
         const distanceA = distance(targetHash, agentA);
         const distanceB = distance(targetHash, agentB);
         return compareBigInts(distanceB, distanceA);
+    });
+    return sortedPeers.slice(0, numNeighbors);
+}
+function getFarthestNeighbors(peers, targetHash, numNeighbors) {
+    const sortedPeers = peers.sort((agentA, agentB) => {
+        const distanceA = distance(targetHash, agentA);
+        const distanceB = distance(targetHash, agentB);
+        return compareBigInts(distanceA, distanceB);
     });
     return sortedPeers.slice(0, numNeighbors);
 }
@@ -2108,6 +2113,12 @@ class BootstrapService {
         const neighborsKeys = getClosestNeighbors(cells, basis_dht_hash, numNeighbors);
         return neighborsKeys.map(pubKey => this.cells[dnaHash][pubKey]);
     }
+    getDhtPeers(dnaHash, agentPubKey, numNeighbors, numFarthest) {
+        const cells = Object.keys(this.cells[dnaHash]);
+        const neighborsKeys = getClosestNeighbors(cells, agentPubKey, numNeighbors);
+        const farthestKeys = getFarthestNeighbors(cells, agentPubKey, numFarthest);
+        return [...neighborsKeys, ...farthestKeys].map(pubKey => this.cells[dnaHash][pubKey]);
+    }
 }
 
 async function createConductors(conductorsToCreate, currentConductors, dnaTemplate) {
@@ -2128,5 +2139,5 @@ async function createConductors(conductorsToCreate, currentConductors, dnaTempla
     return allConductors;
 }
 
-export { AGENT_PREFIX, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sleep, sys_validation, sys_validation_task, valid_cap_grant, workflowPriority };
+export { AGENT_PREFIX, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, compareBigInts, createConductors, deleteValidationLimboValue, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sleep, sys_validation, sys_validation_task, valid_cap_grant, workflowPriority };
 //# sourceMappingURL=index.js.map

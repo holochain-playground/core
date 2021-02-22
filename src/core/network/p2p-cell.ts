@@ -56,10 +56,10 @@ export class P2pCell {
   async join(containerCell: Cell): Promise<void> {
     this.network.bootstrapService.announceCell(this.cellId, containerCell);
 
-    await this.syncNeighborsFromNeighborhood();
+    await this.syncNeighbors();
 
     setInterval(() => {
-      this.syncNeighborsFromNeighborhood();
+      this.syncNeighbors();
     }, 1000);
   }
 
@@ -146,19 +146,21 @@ export class P2pCell {
       this.neighbors.push(neighborPubKey);
   }
 
-  async syncNeighborsFromNeighborhood() {
+  async syncNeighbors() {
     const dnaHash = this.cellId[0];
     const agentPubKey = this.cellId[1];
 
-    const neighbors = this.network.bootstrapService.getNeighborhood(
+    const neighbors = this.network.bootstrapService.getDhtPeers(
       dnaHash,
       agentPubKey,
-      this.neighborNumber
+      this.neighborNumber - 2,
+      2
     );
 
     const newNeighbors = neighbors.filter(
       cell => ![this.cellId[1], ...this.neighbors].includes(cell.agentPubKey)
     );
+    this.neighbors = newNeighbors.map(n => n.agentPubKey);
 
     const promises = newNeighbors.map(neighbor =>
       this._executeNetworkRequest(
@@ -168,12 +170,6 @@ export class P2pCell {
       )
     );
     await Promise.all(promises);
-
-    this.neighbors = newNeighbors.map(n => n.agentPubKey);
-
-    if (this.neighbors.length < this.redundancyFactor) {
-      setTimeout(() => this.syncNeighborsFromNeighborhood(), 1000);
-    }
   }
 
   private _executeNetworkRequest<T>(
