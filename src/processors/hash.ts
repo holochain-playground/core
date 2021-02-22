@@ -99,14 +99,16 @@ export function distance(hash1: Hash, hash2: Hash): number {
 }
 
 export function locationDistance(location1: number, location2: number): number {
-  const distance1 = wrap(location1 - location2)
-  const distance2 = wrap(location2 - location1)
+  const distance1 = wrap(location1 - location2);
+  const distance2 = wrap(location2 - location1);
   return Math.min(distance1, distance2);
 }
 
+const MAX_UINT = 4294967295;
+
 export function wrap(uint: number): number {
-  if (uint < 0) return 4294967295 - uint;
-  if (uint > 4294967295) return uint - 4294967295;
+  if (uint < 0) return 1 + MAX_UINT + uint;
+  if (uint > MAX_UINT) return uint - MAX_UINT;
   return uint;
 }
 
