@@ -163,7 +163,7 @@ export class P2pCell {
     );
 
     const newNeighbors = neighbors.filter(
-      cell => !this.neighbors.includes(cell.agentPubKey)
+      cell => ![this.cellId[1], ...this.neighbors].includes(cell.agentPubKey)
     );
     this.neighbors = neighbors.map(n => n.agentPubKey);
 
