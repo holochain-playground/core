@@ -725,11 +725,12 @@ function locationDistance(location1, location2) {
     const distance2 = wrap(location2 - location1);
     return Math.min(distance1, distance2);
 }
+const MAX_UINT = 4294967295;
 function wrap(uint) {
     if (uint < 0)
-        return 4294967295 - uint;
-    if (uint > 4294967295)
-        return uint - 4294967295;
+        return 1 + MAX_UINT + uint;
+    if (uint > MAX_UINT)
+        return uint - MAX_UINT;
     return uint;
 }
 function compareBigInts(a, b) {
