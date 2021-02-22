@@ -181,6 +181,10 @@ export class P2pCell {
       )
     );
     await Promise.all(promises);
+
+    if (this.neighbors.length < this.neighborNumber) {
+      setTimeout(() => this.syncNeighbors(), 4000);
+    }
   }
 
   private _executeNetworkRequest<R, T extends NetworkRequestType, D>(

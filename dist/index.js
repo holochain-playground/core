@@ -1851,6 +1851,9 @@ class P2pCell {
         this.neighbors = neighbors.map(n => n.agentPubKey);
         const promises = newNeighbors.map(neighbor => this._executeNetworkRequest(neighbor, NetworkRequestType.ADD_NEIGHBOR, {}, (cell) => cell.handle_new_neighbor(agentPubKey)));
         await Promise.all(promises);
+        if (this.neighbors.length < this.neighborNumber) {
+            setTimeout(() => this.syncNeighbors(), 4000);
+        }
     }
     _executeNetworkRequest(toCell, type, details, request) {
         const networkRequest = {
