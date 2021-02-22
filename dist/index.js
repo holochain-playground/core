@@ -780,7 +780,7 @@ function getEntryTypeString(cell, entryType) {
 function getDHTOpBasis(dhtOp) {
     switch (dhtOp.type) {
         case DHTOpType.StoreElement:
-            return hash(dhtOp.header, HashType.DHTOP);
+            return dhtOp.header.header.hash;
         case DHTOpType.StoreEntry:
             return dhtOp.header.header.content.entry_hash;
         case DHTOpType.RegisterUpdatedContent:
