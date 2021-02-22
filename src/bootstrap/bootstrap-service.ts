@@ -42,7 +42,7 @@ export class BootstrapService {
     numNeighbors: number,
     numFarthest: number
   ): Cell[] {
-    const cells = Object.keys(this.cells[dnaHash]);
+    const cells = Object.keys(this.cells[dnaHash]).filter(peerPubKey => peerPubKey !== agentPubKey);
 
     const neighborsKeys = getClosestNeighbors(cells, agentPubKey, numNeighbors);
     const farthestKeys = getFarthestNeighbors(cells, agentPubKey, numFarthest);
