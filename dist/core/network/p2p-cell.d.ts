@@ -24,6 +24,7 @@ export declare class P2pCell {
     call_remote(agent: AgentPubKey, zome: string, fnName: string, cap: CapSecret | undefined, payload: any): Promise<any>;
     /** Neighbor handling */
     getNeighbors(): Array<AgentPubKey>;
-    addNeighbor(neighborPubKey: AgentPubKey): Promise<void>;
+    addNeighbor(neighborPubKey: AgentPubKey): void;
+    addNeighborsFromNeighborhood(): Promise<void>;
     private _executeNetworkRequest;
 }

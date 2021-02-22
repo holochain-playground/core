@@ -50,29 +50,9 @@ export class P2pCell {
   /** P2p actions */
 
   async join(containerCell: Cell): Promise<void> {
-    const dnaHash = this.cellId[0];
-    const agentPubKey = this.cellId[1];
-
     this.network.bootstrapService.announceCell(this.cellId, containerCell);
 
-    const neighbors = this.network.bootstrapService.getNeighborhood(
-      dnaHash,
-      agentPubKey,
-      this.redundancyFactor
-    );
-
-    this.neighbors = neighbors
-      .filter(cell => cell.agentPubKey !== agentPubKey)
-      .map(cell => cell.agentPubKey);
-
-    const promises = neighbors.map(neighbor =>
-      this._executeNetworkRequest(
-        neighbor,
-        NetworkRequestType.ADD_NEIGHBOR,
-        (cell: Cell) => cell.handle_new_neighbor(agentPubKey)
-      )
-    );
-    await Promise.all(promises);
+    await this.addNeighborsFromNeighborhood();
   }
 
   async leave(): Promise<void> {}
@@ -150,12 +130,45 @@ export class P2pCell {
     return this.neighbors;
   }
 
-  async addNeighbor(neighborPubKey: AgentPubKey) {
+  addNeighbor(neighborPubKey: AgentPubKey) {
     if (
       neighborPubKey !== this.cellId[1] &&
       !this.neighbors.includes(neighborPubKey)
     )
       this.neighbors.push(neighborPubKey);
+  }
+
+  async addNeighborsFromNeighborhood() {
+    const dnaHash = this.cellId[0];
+    const agentPubKey = this.cellId[1];
+
+    const neighbors = this.network.bootstrapService.getNeighborhood(
+      dnaHash,
+      agentPubKey,
+      this.redundancyFactor
+    );
+
+    const newNeighbors = neighbors.filter(
+      cell => ![this.cellId[1], ...this.neighbors].includes(cell.agentPubKey)
+    );
+
+    const promises = newNeighbors.map(neighbor =>
+      this._executeNetworkRequest(
+        neighbor,
+        NetworkRequestType.ADD_NEIGHBOR,
+        (cell: Cell) => cell.handle_new_neighbor(agentPubKey)
+      )
+    );
+    await Promise.all(promises);
+
+    this.neighbors = [
+      ...newNeighbors.map(n => n.agentPubKey),
+      ...this.neighbors,
+    ];
+
+    if (this.neighbors.length < this.redundancyFactor) {
+      setTimeout(() => this.addNeighborsFromNeighborhood(), 1000);
+    }
   }
 
   private _executeNetworkRequest<T>(
