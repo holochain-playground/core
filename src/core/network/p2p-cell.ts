@@ -101,7 +101,7 @@ export class P2pCell {
 
     const result = gets.find(get => !!get);
 
-    if (!result) return undefined;
+    if (result === undefined) return undefined;
 
     if ((result as GetElementFull).signed_header) {
       return {
@@ -181,7 +181,7 @@ export class P2pCell {
     await Promise.all(promises);
 
     if (this.neighbors.length < this.neighborNumber) {
-      setTimeout(() => this.syncNeighbors(), 4000);
+      setTimeout(() => this.syncNeighbors(), 400);
     }
   }
 

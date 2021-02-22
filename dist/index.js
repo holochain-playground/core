@@ -17,7 +17,10 @@ function pullAllIntegrationLimboDhtOps(state) {
     return dhtOps;
 }
 function getHeadersForEntry(state, entryHash) {
-    return state.metadata.system_meta[entryHash]
+    const entryMetadata = state.metadata.system_meta[entryHash];
+    if (!entryMetadata)
+        return [];
+    return entryMetadata
         .map(h => {
         const hash = getSysMetaValHeaderHash(h);
         if (hash) {
@@ -50,6 +53,11 @@ function getEntryDetails(state, entryHash) {
 }
 function getHeaderModifiers(state, headerHash) {
     const allModifiers = state.metadata.system_meta[headerHash];
+    if (!allModifiers)
+        return {
+            updates: [],
+            deletes: [],
+        };
     const updates = allModifiers
         .filter(m => m.Update)
         .map(m => state.CAS[m.Update]);
@@ -818,10 +826,10 @@ const putDhtOpMetadata = (dhtOp) => (state) => {
     else if (dhtOp.type === DHTOpType.StoreEntry) {
         const entryHash = dhtOp.header.header.content.entry_hash;
         if (dhtOp.header.header.content.type === HeaderType.Update) {
-            register_header_on_basis(headerHash, dhtOp.header.header.content, headerHash)(state);
-            register_header_on_basis(entryHash, dhtOp.header.header.content, headerHash)(state);
+            register_header_on_basis(headerHash, dhtOp.header)(state);
+            register_header_on_basis(entryHash, dhtOp.header)(state);
         }
-        register_header_on_basis(entryHash, dhtOp.header.header.content, headerHash)(state);
+        register_header_on_basis(entryHash, dhtOp.header)(state);
         update_entry_dht_status(entryHash)(state);
     }
     else if (dhtOp.type === DHTOpType.RegisterAgentActivity) {
@@ -834,14 +842,14 @@ const putDhtOpMetadata = (dhtOp) => (state) => {
     }
     else if (dhtOp.type === DHTOpType.RegisterUpdatedContent ||
         dhtOp.type === DHTOpType.RegisterUpdatedElement) {
-        register_header_on_basis(dhtOp.header.header.content.original_header_address, dhtOp.header.header.content, headerHash)(state);
-        register_header_on_basis(dhtOp.header.header.content.original_entry_address, dhtOp.header.header.content, headerHash)(state);
+        register_header_on_basis(dhtOp.header.header.content.original_header_address, dhtOp.header)(state);
+        register_header_on_basis(dhtOp.header.header.content.original_entry_address, dhtOp.header)(state);
         update_entry_dht_status(dhtOp.header.header.content.original_entry_address)(state);
     }
     else if (dhtOp.type === DHTOpType.RegisterDeletedBy ||
         dhtOp.type === DHTOpType.RegisterDeletedEntryHeader) {
-        register_header_on_basis(dhtOp.header.header.content.deletes_address, dhtOp.header.header.content, headerHash)(state);
-        register_header_on_basis(dhtOp.header.header.content.deletes_entry_address, dhtOp.header.header.content, headerHash)(state);
+        register_header_on_basis(dhtOp.header.header.content.deletes_address, dhtOp.header)(state);
+        register_header_on_basis(dhtOp.header.header.content.deletes_entry_address, dhtOp.header)(state);
         update_entry_dht_status(dhtOp.header.header.content.deletes_entry_address)(state);
     }
     else if (dhtOp.type === DHTOpType.RegisterAddLink) {
@@ -880,16 +888,17 @@ const update_entry_dht_status = (entryHash) => (state) => {
         EntryStatus: entryIsAlive ? EntryDhtStatus.Live : EntryDhtStatus.Dead,
     };
 };
-const register_header_on_basis = (basis, header, headerHash) => (state) => {
+const register_header_on_basis = (basis, header) => (state) => {
     let value;
-    if (header.type === HeaderType.Create) {
-        value = { NewEntry: headerHash };
+    const headerType = header.header.content.type;
+    if (headerType === HeaderType.Create) {
+        value = { NewEntry: header.header.hash };
     }
-    else if (header.type === HeaderType.Update) {
-        value = { Update: headerHash };
+    else if (headerType === HeaderType.Update) {
+        value = { Update: header.header.hash };
     }
-    else if (header.type === HeaderType.Delete) {
-        value = { Delete: headerHash };
+    else if (headerType === HeaderType.Delete) {
+        value = { Delete: header.header.hash };
     }
     if (value) {
         putSystemMetadata(basis, value)(state);
@@ -1899,7 +1908,7 @@ class P2pCell {
         const gets = await this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], dht_hash, 1, // TODO: what about this?
         (cell) => this._executeNetworkRequest(cell, NetworkRequestType.GET_REQUEST, { hash: dht_hash, options }, (cell) => cell.handle_get(dht_hash, options)));
         const result = gets.find(get => !!get);
-        if (!result)
+        if (result === undefined)
             return undefined;
         if (result.signed_header) {
             return {
@@ -1941,7 +1950,7 @@ class P2pCell {
         const promises = newNeighbors.map(neighbor => this._executeNetworkRequest(neighbor, NetworkRequestType.ADD_NEIGHBOR, {}, (cell) => cell.handle_new_neighbor(agentPubKey)));
         await Promise.all(promises);
         if (this.neighbors.length < this.neighborNumber) {
-            setTimeout(() => this.syncNeighbors(), 4000);
+            setTimeout(() => this.syncNeighbors(), 400);
         }
     }
     _executeNetworkRequest(toCell, type, details, request) {
@@ -2172,14 +2181,15 @@ const sampleZome = {
     ],
     zome_functions: {
         create_entry: {
-            call: ({ create_entry }) => ({ content }) => {
-                return create_entry({ content, entry_def_id: 'sample_entry' });
+            call: ({ hash_entry, create_entry }) => async ({ content }) => {
+                await create_entry({ content, entry_def_id: 'sample_entry' });
+                return hash_entry({ content });
             },
             arguments: [{ name: 'content', type: 'any' }],
         },
         get: {
             call: ({ get }) => ({ hash }) => {
-                return get(hash);
+                return get(hash, { strategy: GetStrategy.Latest });
             },
             arguments: [{ name: 'hash', type: 'AnyDhtHash' }],
         },
