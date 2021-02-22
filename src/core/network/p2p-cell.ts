@@ -89,7 +89,7 @@ export class P2pCell {
       this.cellId[0],
       this.cellId[1],
       dht_hash,
-      0,
+      1, // TODO: what about this?
       (cell: Cell) =>
         this._executeNetworkRequest(
           cell,

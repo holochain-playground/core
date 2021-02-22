@@ -1896,7 +1896,8 @@ class P2pCell {
         await this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], dht_hash, this.redundancyFactor, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.PUBLISH_REQUEST, { dhtOps: ops }, (cell) => cell.handle_publish(this.cellId[1], dht_hash, ops)));
     }
     async get(dht_hash, options) {
-        const gets = await this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], dht_hash, 0, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.GET_REQUEST, { hash: dht_hash, options }, (cell) => cell.handle_get(dht_hash, options)));
+        const gets = await this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], dht_hash, 1, // TODO: what about this?
+        (cell) => this._executeNetworkRequest(cell, NetworkRequestType.GET_REQUEST, { hash: dht_hash, options }, (cell) => cell.handle_get(dht_hash, options)));
         const result = gets.find(get => !!get);
         if (!result)
             return undefined;
