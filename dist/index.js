@@ -1846,8 +1846,10 @@ class P2pCell {
         this.farKnownPeers = this.network.bootstrapService
             .getFarKnownPeers(dnaHash, agentPubKey)
             .map(p => p.agentPubKey);
-        const neighbors = this.network.bootstrapService.getNeighborhood(dnaHash, agentPubKey, this.neighborNumber);
-        const newNeighbors = neighbors.filter(cell => ![this.cellId[1], ...this.neighbors].includes(cell.agentPubKey));
+        const neighbors = this.network.bootstrapService
+            .getNeighborhood(dnaHash, agentPubKey, this.neighborNumber)
+            .filter(cell => cell.agentPubKey != agentPubKey);
+        const newNeighbors = neighbors.filter(cell => !this.neighbors.includes(cell.agentPubKey));
         this.neighbors = neighbors.map(n => n.agentPubKey);
         const promises = newNeighbors.map(neighbor => this._executeNetworkRequest(neighbor, NetworkRequestType.ADD_NEIGHBOR, {}, (cell) => cell.handle_new_neighbor(agentPubKey)));
         await Promise.all(promises);
