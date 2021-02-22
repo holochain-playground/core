@@ -112,16 +112,6 @@ export function wrap(uint: number): number {
   return uint;
 }
 
-export function compareBigInts(a: number, b: number): number {
-  if (a > b) {
-    return 1;
-  }
-  if (a < b) {
-    return -1;
-  }
-  return 0;
-}
-
 export function getHashType(hash: Hash): HashType {
   const hashExt = hash.slice(1, 5);
 
