@@ -153,7 +153,7 @@ export class P2pCell {
     const agentPubKey = this.cellId[1];
 
     this.farKnownPeers = this.network.bootstrapService
-      .getFarKnownPeers(dnaHash, agentPubKey, 2)
+      .getFarKnownPeers(dnaHash, agentPubKey)
       .map(p => p.agentPubKey);
 
     const neighbors = this.network.bootstrapService.getNeighborhood(
@@ -163,7 +163,7 @@ export class P2pCell {
     );
 
     const newNeighbors = neighbors.filter(
-      cell => !this.neighbors.includes(cell.agentPubKey)
+      cell => ![this.cellId[1], ...this.neighbors].includes(cell.agentPubKey)
     );
     this.neighbors = neighbors.map(n => n.agentPubKey);
 
