@@ -1844,7 +1844,7 @@ class P2pCell {
         const dnaHash = this.cellId[0];
         const agentPubKey = this.cellId[1];
         this.farKnownPeers = this.network.bootstrapService
-            .getFarKnownPeers(dnaHash, agentPubKey, 2)
+            .getFarKnownPeers(dnaHash, agentPubKey)
             .map(p => p.agentPubKey);
         const neighbors = this.network.bootstrapService.getNeighborhood(dnaHash, agentPubKey, this.neighborNumber);
         const newNeighbors = neighbors.filter(cell => ![this.cellId[1], ...this.neighbors].includes(cell.agentPubKey));
@@ -1958,13 +1958,20 @@ function getClosestNeighbors(peers, targetHash, numNeighbors) {
     });
     return sortedPeers.slice(0, numNeighbors);
 }
-function getFarthestNeighbors(peers, targetHash, numNeighbors) {
+function getFarthestNeighbors(peers, targetHash) {
     const sortedPeers = peers.sort((agentA, agentB) => {
-        const distanceA = distance(agentA, targetHash);
-        const distanceB = distance(agentB, targetHash);
-        return distanceB - distanceA;
+        return (wrap(location(agentA) - location(targetHash)) -
+            wrap(location(agentB) - location(targetHash)));
     });
-    return sortedPeers.slice(0, numNeighbors);
+    const index35 = Math.floor(sortedPeers.length * 0.35);
+    const index50 = Math.floor(sortedPeers.length / 2);
+    const index65 = Math.floor(sortedPeers.length * 0.65);
+    const neighbors = [
+        sortedPeers[index35],
+        sortedPeers[index50],
+        sortedPeers[index65],
+    ].filter(n => !!n);
+    return uniq(neighbors);
 }
 
 class Conductor {
@@ -2121,9 +2128,9 @@ class BootstrapService {
         const neighborsKeys = getClosestNeighbors(cells, basis_dht_hash, numNeighbors);
         return neighborsKeys.map(pubKey => this.cells[dnaHash][pubKey]);
     }
-    getFarKnownPeers(dnaHash, agentPubKey, numFarthest) {
+    getFarKnownPeers(dnaHash, agentPubKey) {
         const cells = Object.keys(this.cells[dnaHash]).filter(peerPubKey => peerPubKey !== agentPubKey);
-        const farthestKeys = getFarthestNeighbors(cells, agentPubKey, numFarthest);
+        const farthestKeys = getFarthestNeighbors(cells, agentPubKey);
         return farthestKeys.map(pubKey => this.cells[dnaHash][pubKey]);
     }
 }
