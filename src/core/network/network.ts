@@ -63,8 +63,9 @@ export class Network {
 
     const state: P2pCellState = {
       neighbors: [],
+      farKnownPeers: [],
       redundancyFactor: 3,
-      neighborNumber: 5
+      neighborNumber: 5,
     };
 
     const p2pCell = new P2pCell(state, cellId, this);

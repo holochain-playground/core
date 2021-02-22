@@ -17,9 +17,11 @@ import {
   NetworkRequest,
   NetworkRequestType,
 } from './network-request';
+import { getClosestNeighbors } from './utils';
 
 export type P2pCellState = {
-  neighbors: Hash[];
+  neighbors: AgentPubKey[];
+  farKnownPeers: AgentPubKey[];
   redundancyFactor: number;
   neighborNumber: number;
 };
@@ -27,6 +29,7 @@ export type P2pCellState = {
 // From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/lib.rs
 export class P2pCell {
   neighbors: AgentPubKey[];
+  farKnownPeers: AgentPubKey[];
 
   redundancyFactor: number;
   neighborNumber: number;
@@ -39,6 +42,7 @@ export class P2pCell {
     protected network: Network
   ) {
     this.neighbors = state.neighbors;
+    this.farKnownPeers = state.farKnownPeers;
     this.redundancyFactor = state.redundancyFactor;
     this.neighborNumber = state.neighborNumber;
   }
@@ -46,6 +50,7 @@ export class P2pCell {
   getState(): P2pCellState {
     return {
       neighbors: this.neighbors,
+      farKnownPeers: this.farKnownPeers,
       redundancyFactor: this.redundancyFactor,
       neighborNumber: this.neighborNumber,
     };
@@ -57,10 +62,6 @@ export class P2pCell {
     this.network.bootstrapService.announceCell(this.cellId, containerCell);
 
     await this.syncNeighbors();
-
-    setInterval(() => {
-      this.syncNeighbors();
-    }, 1000);
   }
 
   async leave(): Promise<void> {}
@@ -142,25 +143,34 @@ export class P2pCell {
     if (
       neighborPubKey !== this.cellId[1] &&
       !this.neighbors.includes(neighborPubKey)
-    )
-      this.neighbors.push(neighborPubKey);
+    ) {
+      this.neighbors = getClosestNeighbors(
+        [...this.neighbors, neighborPubKey],
+        this.cellId[1],
+        this.neighborNumber
+      );
+      this.syncNeighbors();
+    }
   }
 
   async syncNeighbors() {
     const dnaHash = this.cellId[0];
     const agentPubKey = this.cellId[1];
 
-    const neighbors = this.network.bootstrapService.getDhtPeers(
+    this.farKnownPeers = this.network.bootstrapService
+      .getFarKnownPeers(dnaHash, agentPubKey, 2)
+      .map(p => p.agentPubKey);
+
+    const neighbors = this.network.bootstrapService.getNeighborhood(
       dnaHash,
       agentPubKey,
-      this.neighborNumber - 2,
-      2
+      this.neighborNumber
     );
 
     const newNeighbors = neighbors.filter(
       cell => ![this.cellId[1], ...this.neighbors].includes(cell.agentPubKey)
     );
-    this.neighbors = newNeighbors.map(n => n.agentPubKey);
+    this.neighbors = neighbors.map(n => n.agentPubKey);
 
     const promises = newNeighbors.map(neighbor =>
       this._executeNetworkRequest(

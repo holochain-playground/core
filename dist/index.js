@@ -1777,6 +1777,23 @@ var NetworkRequestType;
     NetworkRequestType["GET_REQUEST"] = "Get Request";
 })(NetworkRequestType || (NetworkRequestType = {}));
 
+function getClosestNeighbors(peers, targetHash, numNeighbors) {
+    const sortedPeers = peers.sort((agentA, agentB) => {
+        const distanceA = Math.min(distance(targetHash, agentA), distance(agentA, targetHash));
+        const distanceB = Math.min(distance(targetHash, agentB), distance(agentB, targetHash));
+        return compareBigInts(distanceB, distanceA);
+    });
+    return sortedPeers.slice(0, numNeighbors);
+}
+function getFarthestNeighbors(peers, targetHash, numNeighbors) {
+    const sortedPeers = peers.sort((agentA, agentB) => {
+        const distanceA = Math.min(distance(targetHash, agentA), distance(agentA, targetHash));
+        const distanceB = Math.min(distance(targetHash, agentB), distance(agentB, targetHash));
+        return compareBigInts(distanceA, distanceB);
+    });
+    return sortedPeers.slice(0, numNeighbors);
+}
+
 // From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/lib.rs
 class P2pCell {
     constructor(state, cellId, network) {
@@ -1784,12 +1801,14 @@ class P2pCell {
         this.network = network;
         this.networkRequestsExecutor = new MiddlewareExecutor();
         this.neighbors = state.neighbors;
+        this.farKnownPeers = state.farKnownPeers;
         this.redundancyFactor = state.redundancyFactor;
         this.neighborNumber = state.neighborNumber;
     }
     getState() {
         return {
             neighbors: this.neighbors,
+            farKnownPeers: this.farKnownPeers,
             redundancyFactor: this.redundancyFactor,
             neighborNumber: this.neighborNumber,
         };
@@ -1798,9 +1817,6 @@ class P2pCell {
     async join(containerCell) {
         this.network.bootstrapService.announceCell(this.cellId, containerCell);
         await this.syncNeighbors();
-        setInterval(() => {
-            this.syncNeighbors();
-        }, 1000);
     }
     async leave() { }
     async publish(dht_hash, ops) {
@@ -1833,15 +1849,20 @@ class P2pCell {
     }
     addNeighbor(neighborPubKey) {
         if (neighborPubKey !== this.cellId[1] &&
-            !this.neighbors.includes(neighborPubKey))
-            this.neighbors.push(neighborPubKey);
+            !this.neighbors.includes(neighborPubKey)) {
+            this.neighbors = getClosestNeighbors([...this.neighbors, neighborPubKey], this.cellId[1], this.neighborNumber);
+            this.syncNeighbors();
+        }
     }
     async syncNeighbors() {
         const dnaHash = this.cellId[0];
         const agentPubKey = this.cellId[1];
-        const neighbors = this.network.bootstrapService.getDhtPeers(dnaHash, agentPubKey, this.neighborNumber - 2, 2);
+        this.farKnownPeers = this.network.bootstrapService
+            .getFarKnownPeers(dnaHash, agentPubKey, 2)
+            .map(p => p.agentPubKey);
+        const neighbors = this.network.bootstrapService.getNeighborhood(dnaHash, agentPubKey, this.neighborNumber);
         const newNeighbors = neighbors.filter(cell => ![this.cellId[1], ...this.neighbors].includes(cell.agentPubKey));
-        this.neighbors = newNeighbors.map(n => n.agentPubKey);
+        this.neighbors = neighbors.map(n => n.agentPubKey);
         const promises = newNeighbors.map(neighbor => this._executeNetworkRequest(neighbor, NetworkRequestType.ADD_NEIGHBOR, (cell) => cell.handle_new_neighbor(agentPubKey)));
         await Promise.all(promises);
     }
@@ -1925,8 +1946,9 @@ class Network {
         const dnaHash = cellId[0];
         const state = {
             neighbors: [],
+            farKnownPeers: [],
             redundancyFactor: 3,
-            neighborNumber: 5
+            neighborNumber: 5,
         };
         const p2pCell = new P2pCell(state, cellId, this);
         if (!this.p2pCells[dnaHash])
@@ -1940,23 +1962,6 @@ class Network {
             return request(localCell);
         return request(this.bootstrapService.cells[dna][toAgent]);
     }
-}
-
-function getClosestNeighbors(peers, targetHash, numNeighbors) {
-    const sortedPeers = peers.sort((agentA, agentB) => {
-        const distanceA = distance(targetHash, agentA);
-        const distanceB = distance(targetHash, agentB);
-        return compareBigInts(distanceB, distanceA);
-    });
-    return sortedPeers.slice(0, numNeighbors);
-}
-function getFarthestNeighbors(peers, targetHash, numNeighbors) {
-    const sortedPeers = peers.sort((agentA, agentB) => {
-        const distanceA = distance(targetHash, agentA);
-        const distanceB = distance(targetHash, agentB);
-        return compareBigInts(distanceA, distanceB);
-    });
-    return sortedPeers.slice(0, numNeighbors);
 }
 
 class Conductor {
@@ -2113,11 +2118,10 @@ class BootstrapService {
         const neighborsKeys = getClosestNeighbors(cells, basis_dht_hash, numNeighbors);
         return neighborsKeys.map(pubKey => this.cells[dnaHash][pubKey]);
     }
-    getDhtPeers(dnaHash, agentPubKey, numNeighbors, numFarthest) {
+    getFarKnownPeers(dnaHash, agentPubKey, numFarthest) {
         const cells = Object.keys(this.cells[dnaHash]).filter(peerPubKey => peerPubKey !== agentPubKey);
-        const neighborsKeys = getClosestNeighbors(cells, agentPubKey, numNeighbors);
         const farthestKeys = getFarthestNeighbors(cells, agentPubKey, numFarthest);
-        return [...neighborsKeys, ...farthestKeys].map(pubKey => this.cells[dnaHash][pubKey]);
+        return farthestKeys.map(pubKey => this.cells[dnaHash][pubKey]);
     }
 }
 

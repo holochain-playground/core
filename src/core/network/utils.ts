@@ -7,10 +7,10 @@ export function getClosestNeighbors(
   numNeighbors: number
 ): Hash[] {
   const sortedPeers = peers.sort((agentA: Hash, agentB: Hash) => {
-    const distanceA = distance(targetHash, agentA);
-    const distanceB = distance(targetHash, agentB);
+    const distanceA = Math.min(distance(targetHash, agentA), distance(agentA, targetHash));
+    const distanceB = Math.min(distance(targetHash, agentB), distance(agentB, targetHash));
     return compareBigInts(distanceB, distanceA);
-  });
+});
 
   return sortedPeers.slice(0, numNeighbors);
 }
@@ -21,10 +21,10 @@ export function getFarthestNeighbors(
   numNeighbors: number
 ): Hash[] {
   const sortedPeers = peers.sort((agentA: Hash, agentB: Hash) => {
-    const distanceA = distance(targetHash, agentA);
-    const distanceB = distance(targetHash, agentB);
+    const distanceA = Math.min(distance(targetHash, agentA), distance(agentA, targetHash));
+    const distanceB = Math.min(distance(targetHash, agentB), distance(agentB, targetHash));
     return compareBigInts(distanceA, distanceB);
-  });
+});
 
   return sortedPeers.slice(0, numNeighbors);
 }

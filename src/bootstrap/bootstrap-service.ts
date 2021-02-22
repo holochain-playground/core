@@ -36,19 +36,17 @@ export class BootstrapService {
     return neighborsKeys.map(pubKey => this.cells[dnaHash][pubKey]);
   }
 
-  getDhtPeers(
+  getFarKnownPeers(
     dnaHash: Hash,
     agentPubKey: string,
-    numNeighbors: number,
     numFarthest: number
   ): Cell[] {
-    const cells = Object.keys(this.cells[dnaHash]).filter(peerPubKey => peerPubKey !== agentPubKey);
+    const cells = Object.keys(this.cells[dnaHash]).filter(
+      peerPubKey => peerPubKey !== agentPubKey
+    );
 
-    const neighborsKeys = getClosestNeighbors(cells, agentPubKey, numNeighbors);
     const farthestKeys = getFarthestNeighbors(cells, agentPubKey, numFarthest);
 
-    return [...neighborsKeys, ...farthestKeys].map(
-      pubKey => this.cells[dnaHash][pubKey]
-    );
+    return farthestKeys.map(pubKey => this.cells[dnaHash][pubKey]);
   }
 }
