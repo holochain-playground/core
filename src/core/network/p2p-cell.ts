@@ -17,17 +17,22 @@ import {
   NetworkRequest,
   NetworkRequestType,
 } from './network-request';
+import { getClosestNeighbors } from './utils';
 
 export type P2pCellState = {
-  neighbors: Hash[];
+  neighbors: AgentPubKey[];
+  farKnownPeers: AgentPubKey[];
   redundancyFactor: number;
+  neighborNumber: number;
 };
 
 // From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/lib.rs
 export class P2pCell {
   neighbors: AgentPubKey[];
+  farKnownPeers: AgentPubKey[];
 
   redundancyFactor: number;
+  neighborNumber: number;
 
   networkRequestsExecutor = new MiddlewareExecutor<NetworkRequestInfo>();
 
@@ -37,13 +42,17 @@ export class P2pCell {
     protected network: Network
   ) {
     this.neighbors = state.neighbors;
+    this.farKnownPeers = state.farKnownPeers;
     this.redundancyFactor = state.redundancyFactor;
+    this.neighborNumber = state.neighborNumber;
   }
 
   getState(): P2pCellState {
     return {
       neighbors: this.neighbors,
+      farKnownPeers: this.farKnownPeers,
       redundancyFactor: this.redundancyFactor,
+      neighborNumber: this.neighborNumber,
     };
   }
 
@@ -52,7 +61,7 @@ export class P2pCell {
   async join(containerCell: Cell): Promise<void> {
     this.network.bootstrapService.announceCell(this.cellId, containerCell);
 
-    await this.addNeighborsFromNeighborhood();
+    await this.syncNeighbors();
   }
 
   async leave(): Promise<void> {}
@@ -134,23 +143,29 @@ export class P2pCell {
     if (
       neighborPubKey !== this.cellId[1] &&
       !this.neighbors.includes(neighborPubKey)
-    )
-      this.neighbors.push(neighborPubKey);
+    ) {
+      this.syncNeighbors();
+    }
   }
 
-  async addNeighborsFromNeighborhood() {
+  async syncNeighbors() {
     const dnaHash = this.cellId[0];
     const agentPubKey = this.cellId[1];
+
+    this.farKnownPeers = this.network.bootstrapService
+      .getFarKnownPeers(dnaHash, agentPubKey, 2)
+      .map(p => p.agentPubKey);
 
     const neighbors = this.network.bootstrapService.getNeighborhood(
       dnaHash,
       agentPubKey,
-      this.redundancyFactor
+      this.neighborNumber
     );
 
     const newNeighbors = neighbors.filter(
-      cell => ![this.cellId[1], ...this.neighbors].includes(cell.agentPubKey)
+      cell => !this.neighbors.includes(cell.agentPubKey)
     );
+    this.neighbors = neighbors.map(n => n.agentPubKey);
 
     const promises = newNeighbors.map(neighbor =>
       this._executeNetworkRequest(
@@ -160,15 +175,6 @@ export class P2pCell {
       )
     );
     await Promise.all(promises);
-
-    this.neighbors = [
-      ...newNeighbors.map(n => n.agentPubKey),
-      ...this.neighbors,
-    ];
-
-    if (this.neighbors.length < this.redundancyFactor) {
-      setTimeout(() => this.addNeighborsFromNeighborhood(), 1000);
-    }
   }
 
   private _executeNetworkRequest<T>(
