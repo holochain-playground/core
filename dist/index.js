@@ -1777,23 +1777,6 @@ var NetworkRequestType;
     NetworkRequestType["GET_REQUEST"] = "Get Request";
 })(NetworkRequestType || (NetworkRequestType = {}));
 
-function getClosestNeighbors(peers, targetHash, numNeighbors) {
-    const sortedPeers = peers.sort((agentA, agentB) => {
-        const distanceA = Math.min(distance(targetHash, agentA), distance(agentA, targetHash));
-        const distanceB = Math.min(distance(targetHash, agentB), distance(agentB, targetHash));
-        return compareBigInts(distanceB, distanceA);
-    });
-    return sortedPeers.slice(0, numNeighbors);
-}
-function getFarthestNeighbors(peers, targetHash, numNeighbors) {
-    const sortedPeers = peers.sort((agentA, agentB) => {
-        const distanceA = Math.min(distance(targetHash, agentA), distance(agentA, targetHash));
-        const distanceB = Math.min(distance(targetHash, agentB), distance(agentB, targetHash));
-        return compareBigInts(distanceA, distanceB);
-    });
-    return sortedPeers.slice(0, numNeighbors);
-}
-
 // From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/lib.rs
 class P2pCell {
     constructor(state, cellId, network) {
@@ -1850,7 +1833,6 @@ class P2pCell {
     addNeighbor(neighborPubKey) {
         if (neighborPubKey !== this.cellId[1] &&
             !this.neighbors.includes(neighborPubKey)) {
-            this.neighbors = getClosestNeighbors([...this.neighbors, neighborPubKey], this.cellId[1], this.neighborNumber);
             this.syncNeighbors();
         }
     }
@@ -1861,7 +1843,7 @@ class P2pCell {
             .getFarKnownPeers(dnaHash, agentPubKey, 2)
             .map(p => p.agentPubKey);
         const neighbors = this.network.bootstrapService.getNeighborhood(dnaHash, agentPubKey, this.neighborNumber);
-        const newNeighbors = neighbors.filter(cell => ![this.cellId[1], ...this.neighbors].includes(cell.agentPubKey));
+        const newNeighbors = neighbors.filter(cell => !this.neighbors.includes(cell.agentPubKey));
         this.neighbors = neighbors.map(n => n.agentPubKey);
         const promises = newNeighbors.map(neighbor => this._executeNetworkRequest(neighbor, NetworkRequestType.ADD_NEIGHBOR, (cell) => cell.handle_new_neighbor(agentPubKey)));
         await Promise.all(promises);
@@ -1962,6 +1944,23 @@ class Network {
             return request(localCell);
         return request(this.bootstrapService.cells[dna][toAgent]);
     }
+}
+
+function getClosestNeighbors(peers, targetHash, numNeighbors) {
+    const sortedPeers = peers.sort((agentA, agentB) => {
+        const distanceA = Math.min(distance(targetHash, agentA), distance(agentA, targetHash));
+        const distanceB = Math.min(distance(targetHash, agentB), distance(agentB, targetHash));
+        return compareBigInts(distanceB, distanceA);
+    });
+    return sortedPeers.slice(0, numNeighbors);
+}
+function getFarthestNeighbors(peers, targetHash, numNeighbors) {
+    const sortedPeers = peers.sort((agentA, agentB) => {
+        const distanceA = Math.min(distance(targetHash, agentA), distance(agentA, targetHash));
+        const distanceB = Math.min(distance(targetHash, agentB), distance(agentB, targetHash));
+        return compareBigInts(distanceA, distanceB);
+    });
+    return sortedPeers.slice(0, numNeighbors);
 }
 
 class Conductor {

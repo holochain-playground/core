@@ -144,11 +144,6 @@ export class P2pCell {
       neighborPubKey !== this.cellId[1] &&
       !this.neighbors.includes(neighborPubKey)
     ) {
-      this.neighbors = getClosestNeighbors(
-        [...this.neighbors, neighborPubKey],
-        this.cellId[1],
-        this.neighborNumber
-      );
       this.syncNeighbors();
     }
   }
@@ -168,7 +163,7 @@ export class P2pCell {
     );
 
     const newNeighbors = neighbors.filter(
-      cell => ![this.cellId[1], ...this.neighbors].includes(cell.agentPubKey)
+      cell => !this.neighbors.includes(cell.agentPubKey)
     );
     this.neighbors = neighbors.map(n => n.agentPubKey);
 
