@@ -26,7 +26,7 @@ import { Authority } from './cascade/authority';
 import { getHashType, HashType } from '../../processors/hash';
 import { valid_cap_grant } from './source-chain/utils';
 import { GetLinksOptions, GetOptions } from '../../types';
-import { Cascade } from './cascade';
+import { Cascade } from './cascade/cascade';
 import { cloneDeep } from 'lodash-es';
 import {
   buildZomeFunctionContext,

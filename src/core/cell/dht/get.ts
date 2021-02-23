@@ -12,6 +12,7 @@ import {
   Update,
   Delete,
   CreateLink,
+  DeleteLink,
 } from '@holochain-open-dev/core-types';
 import { isEqual, uniq } from 'lodash-es';
 import { GetLinksResponse, Link } from '../cascade/types';
@@ -65,15 +66,6 @@ export function getHeadersForEntry(
       return undefined;
     })
     .filter(header => !!header);
-}
-
-export function getCreateLinksForEntry(
-  state: CellState,
-  entryHash: Hash
-): LinkMetaVal[] {
-  return state.metadata.link_meta
-    .filter(({ key, value }) => isEqual(key.base, entryHash))
-    .map(({ key, value }) => value);
 }
 
 export function getEntryDhtStatus(
@@ -181,6 +173,45 @@ export function getDhtShard(state: CellState): Dictionary<EntryDHTInfo> {
   }
 
   return dhtShard;
+}
+
+export function getLinksForEntry(
+  state: CellState,
+  entryHash: Hash
+): GetLinksResponse {
+  const linkMetaVals = getCreateLinksForEntry(state, entryHash);
+
+  const link_adds: SignedHeaderHashed<CreateLink>[] = [];
+  const link_removes: SignedHeaderHashed<DeleteLink>[] = [];
+
+  for (const value of linkMetaVals) {
+    const header = state.CAS[value.link_add_hash];
+
+    if (header) {
+      link_adds.push(header);
+    }
+
+    const removes = getRemovesOnLinkAdd(state, value.link_add_hash);
+
+    for (const remove of removes) {
+      const removeHeader = state.CAS[remove];
+      link_removes.push(removeHeader);
+    }
+  }
+
+  return {
+    link_adds,
+    link_removes,
+  };
+}
+
+export function getCreateLinksForEntry(
+  state: CellState,
+  entryHash: Hash
+): LinkMetaVal[] {
+  return state.metadata.link_meta
+    .filter(({ key, value }) => isEqual(key.base, entryHash))
+    .map(({ key, value }) => value);
 }
 
 export function getRemovesOnLinkAdd(
