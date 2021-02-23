@@ -3,7 +3,7 @@ import { CellState, ValidationLimboStatus, ValidationLimboValue, IntegrationLimb
 export declare function getValidationLimboDhtOps(state: CellState, status: ValidationLimboStatus): Dictionary<ValidationLimboValue>;
 export declare function pullAllIntegrationLimboDhtOps(state: CellState): Dictionary<IntegrationLimboValue>;
 export declare function getHeadersForEntry(state: CellState, entryHash: Hash): SignedHeaderHashed[];
-export declare function getLinksForEntry(state: CellState, entryHash: Hash): LinkMetaVal[];
+export declare function getCreateLinksForEntry(state: CellState, entryHash: Hash): LinkMetaVal[];
 export declare function getEntryDhtStatus(state: CellState, entryHash: Hash): EntryDhtStatus | undefined;
 export declare function getEntryDetails(state: CellState, entryHash: Hash): EntryDetails;
 export declare function getHeaderModifiers(state: CellState, headerHash: Hash): {
@@ -19,3 +19,4 @@ export interface EntryDHTInfo {
     links: LinkMetaVal[];
 }
 export declare function getDhtShard(state: CellState): Dictionary<EntryDHTInfo>;
+export declare function getRemovesOnLinkAdd(state: CellState, link_add_hash: Hash): Hash[];

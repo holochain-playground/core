@@ -1,11 +1,11 @@
 import { GetStrategy } from '../types';
 import { SimulatedDnaTemplate, SimulatedZome } from './simulated-dna';
 
-export const sampleZome: SimulatedZome = {
-  name: 'sample',
+export const demoEntriesZome: SimulatedZome = {
+  name: 'demo_entries',
   entry_defs: [
     {
-      id: 'sample_entry',
+      id: 'demo_entry',
       visibility: 'Public',
     },
     {
@@ -16,7 +16,7 @@ export const sampleZome: SimulatedZome = {
   zome_functions: {
     create_entry: {
       call: ({ hash_entry, create_entry }) => async ({ content }) => {
-        await create_entry({ content, entry_def_id: 'sample_entry' });
+        await create_entry({ content, entry_def_id: 'demo_entry' });
         return hash_entry({ content });
       },
       arguments: [{ name: 'content', type: 'any' }],
@@ -27,16 +27,6 @@ export const sampleZome: SimulatedZome = {
       },
       arguments: [{ name: 'hash', type: 'AnyDhtHash' }],
     },
-    create_link: {
-      call: ({ create_link }) => ({ base, target, tag }) => {
-        return create_link({ base, target, tag });
-      },
-      arguments: [
-        { name: 'base', type: 'EntryHash' },
-        { name: 'target', type: 'EntryHash' },
-        { name: 'tag', type: 'any' },
-      ],
-    },
     update_entry: {
       call: ({ update_entry }) => ({
         original_header_address,
@@ -45,7 +35,7 @@ export const sampleZome: SimulatedZome = {
         return update_entry({
           original_header_address,
           content: new_content,
-          entry_def_id: 'sample_entry',
+          entry_def_id: 'demo_entry',
         });
       },
       arguments: [
@@ -62,8 +52,37 @@ export const sampleZome: SimulatedZome = {
   },
 };
 
-export function sampleDnaTemplate(): SimulatedDnaTemplate {
-  const zomes = [sampleZome];
+export const demoLinksZome: SimulatedZome = {
+  name: 'demo_links',
+  entry_defs: [],
+  zome_functions: {
+    create_link: {
+      call: ({ create_link }) => ({ base, target, tag }) => {
+        return create_link({ base, target, tag });
+      },
+      arguments: [
+        { name: 'base', type: 'EntryHash' },
+        { name: 'target', type: 'EntryHash' },
+        { name: 'tag', type: 'any' },
+      ],
+    },
+    get_links: {
+      call: ({ get_links }) => ({ base }) => {
+        return get_links(base);
+      },
+      arguments: [{ name: 'base', type: 'EntryHash' }],
+    },
+    delete_link: {
+      call: ({ delete_link }) => ({ add_link_header }) => {
+        return delete_link(add_link_header);
+      },
+      arguments: [{ name: 'add_link_header', type: 'HeaderHash' }],
+    },
+  },
+};
+
+export function demoDnaTemplate(): SimulatedDnaTemplate {
+  const zomes = [demoEntriesZome, demoLinksZome];
   return {
     zomes,
   };

@@ -1,4 +1,4 @@
-import { getSysMetaValHeaderHash, DHTOpType, serializeHash, getEntry, HeaderType, EntryDhtStatus, ChainStatus, now, elementToDHTOps } from '@holochain-open-dev/core-types';
+import { getSysMetaValHeaderHash, DHTOpType, getEntry, HeaderType, EntryDhtStatus, ChainStatus, serializeHash, now, elementToDHTOps } from '@holochain-open-dev/core-types';
 import { isEqual, uniq, cloneDeep } from 'lodash-es';
 
 function getValidationLimboDhtOps(state, status) {
@@ -30,7 +30,7 @@ function getHeadersForEntry(state, entryHash) {
     })
         .filter(header => !!header);
 }
-function getLinksForEntry(state, entryHash) {
+function getCreateLinksForEntry(state, entryHash) {
     return state.metadata.link_meta
         .filter(({ key, value }) => isEqual(key.base, entryHash))
         .map(({ key, value }) => value);
@@ -93,10 +93,147 @@ function getDhtShard(state) {
     for (const entryHash of heldEntries) {
         dhtShard[entryHash] = {
             details: getEntryDetails(state, entryHash),
-            links: getLinksForEntry(state, entryHash),
+            links: getCreateLinksForEntry(state, entryHash),
         };
     }
     return dhtShard;
+}
+function getRemovesOnLinkAdd(state, link_add_hash) {
+    const metadata = state.metadata.system_meta[link_add_hash];
+    if (!metadata)
+        return [];
+    const removes = [];
+    for (const val of metadata) {
+        if (val.DeleteLink) {
+            removes.push(val.DeleteLink);
+        }
+    }
+    return removes;
+}
+
+const putValidationLimboValue = (dhtOpHash, validationLimboValue) => (state) => {
+    state.validationLimbo[dhtOpHash] = validationLimboValue;
+};
+const deleteValidationLimboValue = (dhtOpHash) => (state) => {
+    delete state.validationLimbo[dhtOpHash];
+};
+const putIntegrationLimboValue = (dhtOpHash, integrationLimboValue) => (state) => {
+    state.integrationLimbo[dhtOpHash] = integrationLimboValue;
+};
+const putDhtOpData = (dhtOp) => async (state) => {
+    const headerHash = dhtOp.header.header.hash;
+    state.CAS[headerHash] = dhtOp.header;
+    const entry = getEntry(dhtOp);
+    if (entry) {
+        state.CAS[dhtOp.header.header.content.entry_hash] = entry;
+    }
+};
+const putDhtOpMetadata = (dhtOp) => (state) => {
+    const headerHash = dhtOp.header.header.hash;
+    if (dhtOp.type === DHTOpType.StoreElement) {
+        state.metadata.misc_meta[headerHash] = 'StoreElement';
+    }
+    else if (dhtOp.type === DHTOpType.StoreEntry) {
+        const entryHash = dhtOp.header.header.content.entry_hash;
+        if (dhtOp.header.header.content.type === HeaderType.Update) {
+            register_header_on_basis(headerHash, dhtOp.header)(state);
+            register_header_on_basis(entryHash, dhtOp.header)(state);
+        }
+        register_header_on_basis(entryHash, dhtOp.header)(state);
+        update_entry_dht_status(entryHash)(state);
+    }
+    else if (dhtOp.type === DHTOpType.RegisterAgentActivity) {
+        state.metadata.misc_meta[headerHash] = {
+            ChainItem: dhtOp.header.header.content.timestamp,
+        };
+        state.metadata.misc_meta[dhtOp.header.header.content.author] = {
+            ChainStatus: ChainStatus.Valid,
+        };
+    }
+    else if (dhtOp.type === DHTOpType.RegisterUpdatedContent ||
+        dhtOp.type === DHTOpType.RegisterUpdatedElement) {
+        register_header_on_basis(dhtOp.header.header.content.original_header_address, dhtOp.header)(state);
+        register_header_on_basis(dhtOp.header.header.content.original_entry_address, dhtOp.header)(state);
+        update_entry_dht_status(dhtOp.header.header.content.original_entry_address)(state);
+    }
+    else if (dhtOp.type === DHTOpType.RegisterDeletedBy ||
+        dhtOp.type === DHTOpType.RegisterDeletedEntryHeader) {
+        register_header_on_basis(dhtOp.header.header.content.deletes_address, dhtOp.header)(state);
+        register_header_on_basis(dhtOp.header.header.content.deletes_entry_address, dhtOp.header)(state);
+        update_entry_dht_status(dhtOp.header.header.content.deletes_entry_address)(state);
+    }
+    else if (dhtOp.type === DHTOpType.RegisterAddLink) {
+        const key = {
+            base: dhtOp.header.header.content.base_address,
+            header_hash: headerHash,
+            tag: dhtOp.header.header.content.tag,
+            zome_id: dhtOp.header.header.content.zome_id,
+        };
+        const value = {
+            link_add_hash: headerHash,
+            tag: dhtOp.header.header.content.tag,
+            target: dhtOp.header.header.content.target_address,
+            timestamp: dhtOp.header.header.content.timestamp,
+            zome_id: dhtOp.header.header.content.zome_id,
+        };
+        state.metadata.link_meta.push({ key, value });
+    }
+    else if (dhtOp.type === DHTOpType.RegisterRemoveLink) {
+        const val = {
+            DeleteLink: headerHash,
+        };
+        putSystemMetadata(dhtOp.header.header.content.link_add_address, val)(state);
+    }
+};
+const update_entry_dht_status = (entryHash) => (state) => {
+    const headers = getHeadersForEntry(state, entryHash);
+    const entryIsAlive = headers.some(header => {
+        const headerHash = header.header.hash;
+        const dhtHeaders = state.metadata.system_meta[headerHash];
+        return dhtHeaders
+            ? dhtHeaders.find(metaVal => metaVal.Delete)
+            : true;
+    });
+    state.metadata.misc_meta[entryHash] = {
+        EntryStatus: entryIsAlive ? EntryDhtStatus.Live : EntryDhtStatus.Dead,
+    };
+};
+const register_header_on_basis = (basis, header) => (state) => {
+    let value;
+    const headerType = header.header.content.type;
+    if (headerType === HeaderType.Create) {
+        value = { NewEntry: header.header.hash };
+    }
+    else if (headerType === HeaderType.Update) {
+        value = { Update: header.header.hash };
+    }
+    else if (headerType === HeaderType.Delete) {
+        value = { Delete: header.header.hash };
+    }
+    if (value) {
+        putSystemMetadata(basis, value)(state);
+    }
+};
+const putSystemMetadata = (basis, value) => (state) => {
+    if (!state.metadata.system_meta[basis]) {
+        state.metadata.system_meta[basis] = [];
+    }
+    state.metadata.system_meta[basis].push(value);
+};
+const putDhtOpToIntegrated = (dhtOpHash, integratedValue) => (state) => {
+    state.integratedDHTOps[dhtOpHash] = integratedValue;
+};
+
+/**
+ * Returns the header hashes which don't have their DHTOps in the authoredDHTOps DB
+ */
+function getNewHeaders(state) {
+    const dhtOps = Object.values(state.authoredDHTOps);
+    const headerHashesAlreadyPublished = dhtOps.map(dhtOp => dhtOp.op.header.header.hash);
+    return state.sourceChain.filter(headerHash => !headerHashesAlreadyPublished.includes(headerHash));
+}
+function getAllAuthoredHeaders(state) {
+    return state.sourceChain.map(headerHash => state.CAS[headerHash]);
 }
 
 var ERROR_MSG_INPUT = 'Input must be an string, Buffer or Uint8Array';
@@ -800,132 +937,6 @@ function getDHTOpBasis(dhtOp) {
     }
 }
 
-const putValidationLimboValue = (dhtOpHash, validationLimboValue) => (state) => {
-    state.validationLimbo[dhtOpHash] = validationLimboValue;
-};
-const deleteValidationLimboValue = (dhtOpHash) => (state) => {
-    delete state.validationLimbo[dhtOpHash];
-};
-const putIntegrationLimboValue = (dhtOpHash, integrationLimboValue) => (state) => {
-    state.integrationLimbo[dhtOpHash] = integrationLimboValue;
-};
-const putDhtOpData = (dhtOp) => async (state) => {
-    const headerHash = dhtOp.header.header.hash;
-    state.CAS[headerHash] = dhtOp.header;
-    const entry = getEntry(dhtOp);
-    if (entry) {
-        const entryHash = hashEntry(entry);
-        state.CAS[entryHash] = entry;
-    }
-};
-const putDhtOpMetadata = (dhtOp) => (state) => {
-    const headerHash = dhtOp.header.header.hash;
-    if (dhtOp.type === DHTOpType.StoreElement) {
-        state.metadata.misc_meta[headerHash] = 'StoreElement';
-    }
-    else if (dhtOp.type === DHTOpType.StoreEntry) {
-        const entryHash = dhtOp.header.header.content.entry_hash;
-        if (dhtOp.header.header.content.type === HeaderType.Update) {
-            register_header_on_basis(headerHash, dhtOp.header)(state);
-            register_header_on_basis(entryHash, dhtOp.header)(state);
-        }
-        register_header_on_basis(entryHash, dhtOp.header)(state);
-        update_entry_dht_status(entryHash)(state);
-    }
-    else if (dhtOp.type === DHTOpType.RegisterAgentActivity) {
-        state.metadata.misc_meta[headerHash] = {
-            ChainItem: dhtOp.header.header.content.timestamp,
-        };
-        state.metadata.misc_meta[dhtOp.header.header.content.author] = {
-            ChainStatus: ChainStatus.Valid,
-        };
-    }
-    else if (dhtOp.type === DHTOpType.RegisterUpdatedContent ||
-        dhtOp.type === DHTOpType.RegisterUpdatedElement) {
-        register_header_on_basis(dhtOp.header.header.content.original_header_address, dhtOp.header)(state);
-        register_header_on_basis(dhtOp.header.header.content.original_entry_address, dhtOp.header)(state);
-        update_entry_dht_status(dhtOp.header.header.content.original_entry_address)(state);
-    }
-    else if (dhtOp.type === DHTOpType.RegisterDeletedBy ||
-        dhtOp.type === DHTOpType.RegisterDeletedEntryHeader) {
-        register_header_on_basis(dhtOp.header.header.content.deletes_address, dhtOp.header)(state);
-        register_header_on_basis(dhtOp.header.header.content.deletes_entry_address, dhtOp.header)(state);
-        update_entry_dht_status(dhtOp.header.header.content.deletes_entry_address)(state);
-    }
-    else if (dhtOp.type === DHTOpType.RegisterAddLink) {
-        const key = {
-            base: dhtOp.header.header.content.base_address,
-            header_hash: headerHash,
-            tag: dhtOp.header.header.content.tag,
-            zome_id: dhtOp.header.header.content.zome_id,
-        };
-        const value = {
-            link_add_hash: headerHash,
-            tag: dhtOp.header.header.content.tag,
-            target: dhtOp.header.header.content.target_address,
-            timestamp: dhtOp.header.header.content.timestamp,
-            zome_id: dhtOp.header.header.content.zome_id,
-        };
-        state.metadata.link_meta.push({ key, value });
-    }
-    else if (dhtOp.type === DHTOpType.RegisterRemoveLink) {
-        const val = {
-            DeleteLink: headerHash,
-        };
-        putSystemMetadata(dhtOp.header.header.content.link_add_address, val)(state);
-    }
-};
-const update_entry_dht_status = (entryHash) => (state) => {
-    const headers = getHeadersForEntry(state, entryHash);
-    const entryIsAlive = headers.some(header => {
-        const headerHash = header.header.hash;
-        const dhtHeaders = state.metadata.system_meta[headerHash];
-        return dhtHeaders
-            ? dhtHeaders.find(metaVal => metaVal.Delete)
-            : true;
-    });
-    state.metadata.misc_meta[entryHash] = {
-        EntryStatus: entryIsAlive ? EntryDhtStatus.Live : EntryDhtStatus.Dead,
-    };
-};
-const register_header_on_basis = (basis, header) => (state) => {
-    let value;
-    const headerType = header.header.content.type;
-    if (headerType === HeaderType.Create) {
-        value = { NewEntry: header.header.hash };
-    }
-    else if (headerType === HeaderType.Update) {
-        value = { Update: header.header.hash };
-    }
-    else if (headerType === HeaderType.Delete) {
-        value = { Delete: header.header.hash };
-    }
-    if (value) {
-        putSystemMetadata(basis, value)(state);
-    }
-};
-const putSystemMetadata = (basis, value) => (state) => {
-    if (!state.metadata.system_meta[basis]) {
-        state.metadata.system_meta[basis] = [];
-    }
-    state.metadata.system_meta[basis].push(value);
-};
-const putDhtOpToIntegrated = (dhtOpHash, integratedValue) => (state) => {
-    state.integratedDHTOps[dhtOpHash] = integratedValue;
-};
-
-/**
- * Returns the header hashes which don't have their DHTOps in the authoredDHTOps DB
- */
-function getNewHeaders(state) {
-    const dhtOps = Object.values(state.authoredDHTOps);
-    const headerHashesAlreadyPublished = dhtOps.map(dhtOp => dhtOp.op.header.header.hash);
-    return state.sourceChain.filter(headerHash => !headerHashesAlreadyPublished.includes(headerHash));
-}
-function getAllAuthoredHeaders(state) {
-    return state.sourceChain.map(headerHash => state.CAS[headerHash]);
-}
-
 const putElement = (element) => (state) => {
     // Put header in CAS
     const headerHash = element.signed_header.header.hash;
@@ -1497,6 +1508,26 @@ class Authority {
             maybe_entry,
         };
     }
+    async handle_get_links(base_address, options) {
+        const linkMetaVals = getCreateLinksForEntry(this.state, base_address);
+        const link_adds = [];
+        const link_removes = [];
+        for (const value of linkMetaVals) {
+            const header = this.state.CAS[value.link_add_hash];
+            if (header) {
+                link_adds.push(header);
+            }
+            const removes = getRemovesOnLinkAdd(this.state, value.link_add_hash);
+            for (const remove of removes) {
+                const removeHeader = this.state.CAS[remove];
+                link_removes.push(removeHeader);
+            }
+        }
+        return {
+            link_adds,
+            link_removes,
+        };
+    }
 }
 
 var GetStrategy;
@@ -1538,6 +1569,34 @@ class Cascade {
             }
         }
         return this.p2p.get(hash, options);
+    }
+    async dht_get_links(base_address, options) {
+        // TODO: check if we are an authority
+        const linksResponses = await this.p2p.get_links(base_address, options);
+        // Map and flatten adds
+        const linkAdds = {};
+        for (const responses of linksResponses) {
+            for (const linkAdd of responses.link_adds) {
+                linkAdds[linkAdd.header.hash] = linkAdd.header.content;
+            }
+        }
+        for (const responses of linksResponses) {
+            for (const linkRemove of responses.link_removes) {
+                const removedAddress = linkRemove.header.content.link_add_address;
+                if (linkAdds[removedAddress])
+                    linkAdds[removedAddress] = undefined;
+            }
+        }
+        const resultingLinks = [];
+        for (const liveLink of Object.values(linkAdds)) {
+            if (liveLink)
+                resultingLinks.push({
+                    base: liveLink.base_address,
+                    target: liveLink.target_address,
+                    tag: liveLink.tag,
+                });
+        }
+        return resultingLinks;
     }
 }
 
@@ -1693,6 +1752,14 @@ const get = (workspace) => async (hash, options) => {
 };
 
 // Creates a new Create header and its entry in the source chain
+const get_links = (workspace) => async (base_address, options) => {
+    if (!base_address)
+        throw new Error(`Cannot get with undefined hash`);
+    options = options || { strategy: GetStrategy.Contents };
+    return workspace.cascade.dht_get_links(base_address, options);
+};
+
+// Creates a new Create header and its entry in the source chain
 const hash_entry = (worskpace) => async (args) => {
     const entry = { entry_type: 'App', content: args.content };
     return hashEntry(entry);
@@ -1726,6 +1793,7 @@ function buildZomeFunctionContext(workspace, zome_index) {
         get: get(workspace),
         create_link: create_link(workspace, zome_index),
         delete_link: delete_link(workspace),
+        get_links: get_links(workspace),
         create_cap_grant: create_cap_grant(workspace),
         delete_cap_grant: delete_cap_grant(workspace),
         call_remote: call_remote(workspace),
@@ -1815,6 +1883,10 @@ class Cell {
         }
         return undefined;
     }
+    async handle_get_links(base_address, options) {
+        const authority = new Authority(this._state, this.p2p);
+        return authority.handle_get_links(base_address, options);
+    }
     async handle_call_remote(from_agent, zome_name, fn_name, cap, payload) {
         return this.callZomeFn({
             zome: zome_name,
@@ -1827,7 +1899,7 @@ class Cell {
     /** Workflow internal execution */
     triggerWorkflow(workflow) {
         this._pendingWorkflows[workflow.type] = workflow;
-        setTimeout(() => this._runPendingWorkflows(), 300);
+        setTimeout(() => this._runPendingWorkflows(), 20);
     }
     async _runPendingWorkflows() {
         const workflowsToRun = this._pendingWorkflows;
@@ -1922,6 +1994,10 @@ class P2pCell {
                 entry: result.entry,
             };
         }
+    }
+    async get_links(base_address, options) {
+        return this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], base_address, 1, // TODO: what about this?
+        (cell) => this._executeNetworkRequest(cell, NetworkRequestType.GET_REQUEST, { hash: base_address, options }, (cell) => cell.handle_get_links(base_address, options)));
     }
     async call_remote(agent, zome, fnName, cap, payload) {
         return this.network.kitsune.rpc_single(this.cellId[0], this.cellId[1], agent, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.CALL_REMOTE, {}, (cell) => cell.handle_call_remote(this.cellId[1], zome, fnName, cap, payload)));
@@ -2167,11 +2243,11 @@ class Conductor {
     }
 }
 
-const sampleZome = {
-    name: 'sample',
+const demoEntriesZome = {
+    name: 'demo_entries',
     entry_defs: [
         {
-            id: 'sample_entry',
+            id: 'demo_entry',
             visibility: 'Public',
         },
         {
@@ -2182,7 +2258,7 @@ const sampleZome = {
     zome_functions: {
         create_entry: {
             call: ({ hash_entry, create_entry }) => async ({ content }) => {
-                await create_entry({ content, entry_def_id: 'sample_entry' });
+                await create_entry({ content, entry_def_id: 'demo_entry' });
                 return hash_entry({ content });
             },
             arguments: [{ name: 'content', type: 'any' }],
@@ -2193,22 +2269,12 @@ const sampleZome = {
             },
             arguments: [{ name: 'hash', type: 'AnyDhtHash' }],
         },
-        create_link: {
-            call: ({ create_link }) => ({ base, target, tag }) => {
-                return create_link({ base, target, tag });
-            },
-            arguments: [
-                { name: 'base', type: 'EntryHash' },
-                { name: 'target', type: 'EntryHash' },
-                { name: 'tag', type: 'any' },
-            ],
-        },
         update_entry: {
             call: ({ update_entry }) => ({ original_header_address, new_content, }) => {
                 return update_entry({
                     original_header_address,
                     content: new_content,
-                    entry_def_id: 'sample_entry',
+                    entry_def_id: 'demo_entry',
                 });
             },
             arguments: [
@@ -2224,8 +2290,36 @@ const sampleZome = {
         },
     },
 };
-function sampleDnaTemplate() {
-    const zomes = [sampleZome];
+const demoLinksZome = {
+    name: 'demo_links',
+    entry_defs: [],
+    zome_functions: {
+        create_link: {
+            call: ({ create_link }) => ({ base, target, tag }) => {
+                return create_link({ base, target, tag });
+            },
+            arguments: [
+                { name: 'base', type: 'EntryHash' },
+                { name: 'target', type: 'EntryHash' },
+                { name: 'tag', type: 'any' },
+            ],
+        },
+        get_links: {
+            call: ({ get_links }) => ({ base }) => {
+                return get_links(base);
+            },
+            arguments: [{ name: 'base', type: 'EntryHash' }],
+        },
+        delete_link: {
+            call: ({ delete_link }) => ({ add_link_header }) => {
+                return delete_link(add_link_header);
+            },
+            arguments: [{ name: 'add_link_header', type: 'HeaderHash' }],
+        },
+    },
+};
+function demoDnaTemplate() {
+    const zomes = [demoEntriesZome, demoLinksZome];
     return {
         zomes,
     };
@@ -2275,5 +2369,5 @@ async function createConductors(conductorsToCreate, currentConductors, dnaTempla
     return allConductors;
 }
 
-export { AGENT_PREFIX, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, GetStrategy, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDeleteLink, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, createConductors, deleteValidationLimboValue, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingElement, isHoldingEntry, location, locationDistance, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sampleDnaTemplate, sampleZome, sleep, sys_validation, sys_validation_task, valid_cap_grant, workflowPriority, wrap };
+export { AGENT_PREFIX, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, GetStrategy, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDeleteLink, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, createConductors, deleteValidationLimboValue, demoDnaTemplate, demoEntriesZome, demoLinksZome, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getCreateLinksForEntry, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getRemovesOnLinkAdd, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingElement, isHoldingEntry, location, locationDistance, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sleep, sys_validation, sys_validation_task, valid_cap_grant, workflowPriority, wrap };
 //# sourceMappingURL=index.js.map
