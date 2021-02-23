@@ -110,6 +110,32 @@ function getRemovesOnLinkAdd(state, link_add_hash) {
     }
     return removes;
 }
+function getLiveLinks(getLinksResponses) {
+    // Map and flatten adds
+    const linkAdds = {};
+    for (const responses of getLinksResponses) {
+        for (const linkAdd of responses.link_adds) {
+            linkAdds[linkAdd.header.hash] = linkAdd.header.content;
+        }
+    }
+    for (const responses of getLinksResponses) {
+        for (const linkRemove of responses.link_removes) {
+            const removedAddress = linkRemove.header.content.link_add_address;
+            if (linkAdds[removedAddress])
+                linkAdds[removedAddress] = undefined;
+        }
+    }
+    const resultingLinks = [];
+    for (const liveLink of Object.values(linkAdds)) {
+        if (liveLink)
+            resultingLinks.push({
+                base: liveLink.base_address,
+                target: liveLink.target_address,
+                tag: liveLink.tag,
+            });
+    }
+    return resultingLinks;
+}
 
 const putValidationLimboValue = (dhtOpHash, validationLimboValue) => (state) => {
     state.validationLimbo[dhtOpHash] = validationLimboValue;
@@ -1573,30 +1599,7 @@ class Cascade {
     async dht_get_links(base_address, options) {
         // TODO: check if we are an authority
         const linksResponses = await this.p2p.get_links(base_address, options);
-        // Map and flatten adds
-        const linkAdds = {};
-        for (const responses of linksResponses) {
-            for (const linkAdd of responses.link_adds) {
-                linkAdds[linkAdd.header.hash] = linkAdd.header.content;
-            }
-        }
-        for (const responses of linksResponses) {
-            for (const linkRemove of responses.link_removes) {
-                const removedAddress = linkRemove.header.content.link_add_address;
-                if (linkAdds[removedAddress])
-                    linkAdds[removedAddress] = undefined;
-            }
-        }
-        const resultingLinks = [];
-        for (const liveLink of Object.values(linkAdds)) {
-            if (liveLink)
-                resultingLinks.push({
-                    base: liveLink.base_address,
-                    target: liveLink.target_address,
-                    tag: liveLink.tag,
-                });
-        }
-        return resultingLinks;
+        return getLiveLinks(linksResponses);
     }
 }
 
@@ -2369,5 +2372,5 @@ async function createConductors(conductorsToCreate, currentConductors, dnaTempla
     return allConductors;
 }
 
-export { AGENT_PREFIX, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, GetStrategy, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDeleteLink, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, createConductors, deleteValidationLimboValue, demoDnaTemplate, demoEntriesZome, demoLinksZome, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getCreateLinksForEntry, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getRemovesOnLinkAdd, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingElement, isHoldingEntry, location, locationDistance, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sleep, sys_validation, sys_validation_task, valid_cap_grant, workflowPriority, wrap };
+export { AGENT_PREFIX, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, GetStrategy, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDeleteLink, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, createConductors, deleteValidationLimboValue, demoDnaTemplate, demoEntriesZome, demoLinksZome, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getCreateLinksForEntry, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLiveLinks, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getRemovesOnLinkAdd, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingElement, isHoldingEntry, location, locationDistance, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sleep, sys_validation, sys_validation_task, valid_cap_grant, workflowPriority, wrap };
 //# sourceMappingURL=index.js.map

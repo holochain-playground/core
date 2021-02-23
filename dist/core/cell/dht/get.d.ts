@@ -1,4 +1,5 @@
 import { Dictionary, Hash, LinkMetaVal, EntryDhtStatus, EntryDetails, SignedHeaderHashed, Update, Delete } from '@holochain-open-dev/core-types';
+import { GetLinksResponse, Link } from '../cascade/types';
 import { CellState, ValidationLimboStatus, ValidationLimboValue, IntegrationLimboValue } from '../state';
 export declare function getValidationLimboDhtOps(state: CellState, status: ValidationLimboStatus): Dictionary<ValidationLimboValue>;
 export declare function pullAllIntegrationLimboDhtOps(state: CellState): Dictionary<IntegrationLimboValue>;
@@ -20,3 +21,4 @@ export interface EntryDHTInfo {
 }
 export declare function getDhtShard(state: CellState): Dictionary<EntryDHTInfo>;
 export declare function getRemovesOnLinkAdd(state: CellState, link_add_hash: Hash): Hash[];
+export declare function getLiveLinks(getLinksResponses: Array<GetLinksResponse>): Array<Link>;

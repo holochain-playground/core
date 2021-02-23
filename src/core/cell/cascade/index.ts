@@ -10,6 +10,7 @@ import { getHashType, HashType } from '../../../processors/hash';
 import { GetLinksOptions, GetOptions, GetStrategy } from '../../../types';
 import { P2pCell } from '../../network/p2p-cell';
 import { Cell } from '../cell';
+import { getLiveLinks } from '../dht/get';
 import { CellState } from '../state';
 import { Authority } from './authority';
 import { GetLinksResponse, Link } from './types';
@@ -68,32 +69,6 @@ export class Cascade {
     // TODO: check if we are an authority
 
     const linksResponses = await this.p2p.get_links(base_address, options);
-    // Map and flatten adds
-    const linkAdds: Dictionary<CreateLink | undefined> = {};
-    for (const responses of linksResponses) {
-      for (const linkAdd of responses.link_adds) {
-        linkAdds[linkAdd.header.hash] = linkAdd.header.content;
-      }
-    }
-
-    for (const responses of linksResponses) {
-      for (const linkRemove of responses.link_removes) {
-        const removedAddress = linkRemove.header.content.link_add_address;
-        if (linkAdds[removedAddress]) linkAdds[removedAddress] = undefined;
-      }
-    }
-
-    const resultingLinks: Link[] = [];
-
-    for (const liveLink of Object.values(linkAdds)) {
-      if (liveLink)
-        resultingLinks.push({
-          base: liveLink.base_address,
-          target: liveLink.target_address,
-          tag: liveLink.tag,
-        });
-    }
-
-    return resultingLinks;
+    return getLiveLinks(linksResponses);
   }
 }
