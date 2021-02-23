@@ -1,5 +1,5 @@
 import { getSysMetaValHeaderHash, DHTOpType, getEntry, HeaderType, EntryDhtStatus, ChainStatus, serializeHash, now, elementToDHTOps } from '@holochain-open-dev/core-types';
-import { isEqual, uniq, cloneDeep } from 'lodash-es';
+import { uniq, isEqual, cloneDeep } from 'lodash-es';
 
 function getValidationLimboDhtOps(state, status) {
     const pendingDhtOps = {};
@@ -29,11 +29,6 @@ function getHeadersForEntry(state, entryHash) {
         return undefined;
     })
         .filter(header => !!header);
-}
-function getCreateLinksForEntry(state, entryHash) {
-    return state.metadata.link_meta
-        .filter(({ key, value }) => isEqual(key.base, entryHash))
-        .map(({ key, value }) => value);
 }
 function getEntryDhtStatus(state, entryHash) {
     const meta = state.metadata.misc_meta[entryHash];
@@ -97,6 +92,31 @@ function getDhtShard(state) {
         };
     }
     return dhtShard;
+}
+function getLinksForEntry(state, entryHash) {
+    const linkMetaVals = getCreateLinksForEntry(state, entryHash);
+    const link_adds = [];
+    const link_removes = [];
+    for (const value of linkMetaVals) {
+        const header = state.CAS[value.link_add_hash];
+        if (header) {
+            link_adds.push(header);
+        }
+        const removes = getRemovesOnLinkAdd(state, value.link_add_hash);
+        for (const remove of removes) {
+            const removeHeader = state.CAS[remove];
+            link_removes.push(removeHeader);
+        }
+    }
+    return {
+        link_adds,
+        link_removes,
+    };
+}
+function getCreateLinksForEntry(state, entryHash) {
+    return state.metadata.link_meta
+        .filter(({ key, value }) => isEqual(key.base, entryHash))
+        .map(({ key, value }) => value);
 }
 function getRemovesOnLinkAdd(state, link_add_hash) {
     const metadata = state.metadata.system_meta[link_add_hash];
@@ -1535,24 +1555,7 @@ class Authority {
         };
     }
     async handle_get_links(base_address, options) {
-        const linkMetaVals = getCreateLinksForEntry(this.state, base_address);
-        const link_adds = [];
-        const link_removes = [];
-        for (const value of linkMetaVals) {
-            const header = this.state.CAS[value.link_add_hash];
-            if (header) {
-                link_adds.push(header);
-            }
-            const removes = getRemovesOnLinkAdd(this.state, value.link_add_hash);
-            for (const remove of removes) {
-                const removeHeader = this.state.CAS[remove];
-                link_removes.push(removeHeader);
-            }
-        }
-        return {
-            link_adds,
-            link_removes,
-        };
+        return getLinksForEntry(this.state, base_address);
     }
 }
 
@@ -2372,5 +2375,5 @@ async function createConductors(conductorsToCreate, currentConductors, dnaTempla
     return allConductors;
 }
 
-export { AGENT_PREFIX, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, GetStrategy, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDeleteLink, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, createConductors, deleteValidationLimboValue, demoDnaTemplate, demoEntriesZome, demoLinksZome, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getCreateLinksForEntry, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLiveLinks, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getRemovesOnLinkAdd, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingElement, isHoldingEntry, location, locationDistance, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sleep, sys_validation, sys_validation_task, valid_cap_grant, workflowPriority, wrap };
+export { AGENT_PREFIX, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, GetStrategy, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDeleteLink, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, createConductors, deleteValidationLimboValue, demoDnaTemplate, demoEntriesZome, demoLinksZome, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getCreateLinksForEntry, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getLiveLinks, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getRemovesOnLinkAdd, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingElement, isHoldingEntry, location, locationDistance, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sleep, sys_validation, sys_validation_task, valid_cap_grant, workflowPriority, wrap };
 //# sourceMappingURL=index.js.map
