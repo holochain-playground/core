@@ -1,286 +1,5 @@
-import { getSysMetaValHeaderHash, DHTOpType, getEntry, HeaderType, EntryDhtStatus, ChainStatus, serializeHash, now, elementToDHTOps } from '@holochain-open-dev/core-types';
+import { serializeHash, getSysMetaValHeaderHash, DHTOpType, getEntry, HeaderType, EntryDhtStatus, ChainStatus, now, elementToDHTOps } from '@holochain-open-dev/core-types';
 import { uniq, isEqual, cloneDeep } from 'lodash-es';
-
-function getValidationLimboDhtOps(state, status) {
-    const pendingDhtOps = {};
-    for (const dhtOpHash of Object.keys(state.validationLimbo)) {
-        const limboValue = state.validationLimbo[dhtOpHash];
-        if (limboValue.status === status) {
-            pendingDhtOps[dhtOpHash] = limboValue;
-        }
-    }
-    return pendingDhtOps;
-}
-function pullAllIntegrationLimboDhtOps(state) {
-    const dhtOps = state.integrationLimbo;
-    state.integrationLimbo = {};
-    return dhtOps;
-}
-function getHeadersForEntry(state, entryHash) {
-    const entryMetadata = state.metadata.system_meta[entryHash];
-    if (!entryMetadata)
-        return [];
-    return entryMetadata
-        .map(h => {
-        const hash = getSysMetaValHeaderHash(h);
-        if (hash) {
-            return state.CAS[hash];
-        }
-        return undefined;
-    })
-        .filter(header => !!header);
-}
-function getEntryDhtStatus(state, entryHash) {
-    const meta = state.metadata.misc_meta[entryHash];
-    return meta
-        ? meta.EntryStatus
-        : undefined;
-}
-function getEntryDetails(state, entryHash) {
-    const entry = state.CAS[entryHash];
-    const headers = getHeadersForEntry(state, entryHash);
-    const dhtStatus = getEntryDhtStatus(state, entryHash);
-    return {
-        entry,
-        headers: headers,
-        entry_dht_status: dhtStatus,
-    };
-}
-function getHeaderModifiers(state, headerHash) {
-    const allModifiers = state.metadata.system_meta[headerHash];
-    if (!allModifiers)
-        return {
-            updates: [],
-            deletes: [],
-        };
-    const updates = allModifiers
-        .filter(m => m.Update)
-        .map(m => state.CAS[m.Update]);
-    const deletes = allModifiers
-        .filter(m => m.Delete)
-        .map(m => state.CAS[m.Delete]);
-    return {
-        updates,
-        deletes,
-    };
-}
-function getAllHeldEntries(state) {
-    const newEntryHeaders = Object.values(state.integratedDHTOps)
-        .filter(dhtOpValue => dhtOpValue.op.type === DHTOpType.StoreEntry)
-        .map(dhtOpValue => dhtOpValue.op.header);
-    const allEntryHashes = newEntryHeaders.map(h => h.header.content.entry_hash);
-    return uniq(allEntryHashes);
-}
-function getAllAuthoredEntries(state) {
-    const allHeaders = Object.values(state.authoredDHTOps).map(dhtOpValue => dhtOpValue.op.header);
-    const newEntryHeaders = allHeaders.filter(h => h.header.content.entry_hash);
-    return newEntryHeaders.map(h => h.header.content.entry_hash);
-}
-function isHoldingEntry(state, entryHash) {
-    return state.metadata.system_meta[entryHash] !== undefined;
-}
-function isHoldingElement(state, headerHash) {
-    return state.metadata.misc_meta[headerHash] === 'StoreElement';
-}
-function getDhtShard(state) {
-    const heldEntries = getAllHeldEntries(state);
-    const dhtShard = {};
-    for (const entryHash of heldEntries) {
-        dhtShard[entryHash] = {
-            details: getEntryDetails(state, entryHash),
-            links: getCreateLinksForEntry(state, entryHash),
-        };
-    }
-    return dhtShard;
-}
-function getLinksForEntry(state, entryHash) {
-    const linkMetaVals = getCreateLinksForEntry(state, entryHash);
-    const link_adds = [];
-    const link_removes = [];
-    for (const value of linkMetaVals) {
-        const header = state.CAS[value.link_add_hash];
-        if (header) {
-            link_adds.push(header);
-        }
-        const removes = getRemovesOnLinkAdd(state, value.link_add_hash);
-        for (const remove of removes) {
-            const removeHeader = state.CAS[remove];
-            link_removes.push(removeHeader);
-        }
-    }
-    return {
-        link_adds,
-        link_removes,
-    };
-}
-function getCreateLinksForEntry(state, entryHash) {
-    return state.metadata.link_meta
-        .filter(({ key, value }) => isEqual(key.base, entryHash))
-        .map(({ key, value }) => value);
-}
-function getRemovesOnLinkAdd(state, link_add_hash) {
-    const metadata = state.metadata.system_meta[link_add_hash];
-    if (!metadata)
-        return [];
-    const removes = [];
-    for (const val of metadata) {
-        if (val.DeleteLink) {
-            removes.push(val.DeleteLink);
-        }
-    }
-    return removes;
-}
-function getLiveLinks(getLinksResponses) {
-    // Map and flatten adds
-    const linkAdds = {};
-    for (const responses of getLinksResponses) {
-        for (const linkAdd of responses.link_adds) {
-            linkAdds[linkAdd.header.hash] = linkAdd.header.content;
-        }
-    }
-    for (const responses of getLinksResponses) {
-        for (const linkRemove of responses.link_removes) {
-            const removedAddress = linkRemove.header.content.link_add_address;
-            if (linkAdds[removedAddress])
-                linkAdds[removedAddress] = undefined;
-        }
-    }
-    const resultingLinks = [];
-    for (const liveLink of Object.values(linkAdds)) {
-        if (liveLink)
-            resultingLinks.push({
-                base: liveLink.base_address,
-                target: liveLink.target_address,
-                tag: liveLink.tag,
-            });
-    }
-    return resultingLinks;
-}
-
-const putValidationLimboValue = (dhtOpHash, validationLimboValue) => (state) => {
-    state.validationLimbo[dhtOpHash] = validationLimboValue;
-};
-const deleteValidationLimboValue = (dhtOpHash) => (state) => {
-    delete state.validationLimbo[dhtOpHash];
-};
-const putIntegrationLimboValue = (dhtOpHash, integrationLimboValue) => (state) => {
-    state.integrationLimbo[dhtOpHash] = integrationLimboValue;
-};
-const putDhtOpData = (dhtOp) => async (state) => {
-    const headerHash = dhtOp.header.header.hash;
-    state.CAS[headerHash] = dhtOp.header;
-    const entry = getEntry(dhtOp);
-    if (entry) {
-        state.CAS[dhtOp.header.header.content.entry_hash] = entry;
-    }
-};
-const putDhtOpMetadata = (dhtOp) => (state) => {
-    const headerHash = dhtOp.header.header.hash;
-    if (dhtOp.type === DHTOpType.StoreElement) {
-        state.metadata.misc_meta[headerHash] = 'StoreElement';
-    }
-    else if (dhtOp.type === DHTOpType.StoreEntry) {
-        const entryHash = dhtOp.header.header.content.entry_hash;
-        if (dhtOp.header.header.content.type === HeaderType.Update) {
-            register_header_on_basis(headerHash, dhtOp.header)(state);
-            register_header_on_basis(entryHash, dhtOp.header)(state);
-        }
-        register_header_on_basis(entryHash, dhtOp.header)(state);
-        update_entry_dht_status(entryHash)(state);
-    }
-    else if (dhtOp.type === DHTOpType.RegisterAgentActivity) {
-        state.metadata.misc_meta[headerHash] = {
-            ChainItem: dhtOp.header.header.content.timestamp,
-        };
-        state.metadata.misc_meta[dhtOp.header.header.content.author] = {
-            ChainStatus: ChainStatus.Valid,
-        };
-    }
-    else if (dhtOp.type === DHTOpType.RegisterUpdatedContent ||
-        dhtOp.type === DHTOpType.RegisterUpdatedElement) {
-        register_header_on_basis(dhtOp.header.header.content.original_header_address, dhtOp.header)(state);
-        register_header_on_basis(dhtOp.header.header.content.original_entry_address, dhtOp.header)(state);
-        update_entry_dht_status(dhtOp.header.header.content.original_entry_address)(state);
-    }
-    else if (dhtOp.type === DHTOpType.RegisterDeletedBy ||
-        dhtOp.type === DHTOpType.RegisterDeletedEntryHeader) {
-        register_header_on_basis(dhtOp.header.header.content.deletes_address, dhtOp.header)(state);
-        register_header_on_basis(dhtOp.header.header.content.deletes_entry_address, dhtOp.header)(state);
-        update_entry_dht_status(dhtOp.header.header.content.deletes_entry_address)(state);
-    }
-    else if (dhtOp.type === DHTOpType.RegisterAddLink) {
-        const key = {
-            base: dhtOp.header.header.content.base_address,
-            header_hash: headerHash,
-            tag: dhtOp.header.header.content.tag,
-            zome_id: dhtOp.header.header.content.zome_id,
-        };
-        const value = {
-            link_add_hash: headerHash,
-            tag: dhtOp.header.header.content.tag,
-            target: dhtOp.header.header.content.target_address,
-            timestamp: dhtOp.header.header.content.timestamp,
-            zome_id: dhtOp.header.header.content.zome_id,
-        };
-        state.metadata.link_meta.push({ key, value });
-    }
-    else if (dhtOp.type === DHTOpType.RegisterRemoveLink) {
-        const val = {
-            DeleteLink: headerHash,
-        };
-        putSystemMetadata(dhtOp.header.header.content.link_add_address, val)(state);
-    }
-};
-const update_entry_dht_status = (entryHash) => (state) => {
-    const headers = getHeadersForEntry(state, entryHash);
-    const entryIsAlive = headers.some(header => {
-        const headerHash = header.header.hash;
-        const dhtHeaders = state.metadata.system_meta[headerHash];
-        return dhtHeaders
-            ? dhtHeaders.find(metaVal => metaVal.Delete)
-            : true;
-    });
-    state.metadata.misc_meta[entryHash] = {
-        EntryStatus: entryIsAlive ? EntryDhtStatus.Live : EntryDhtStatus.Dead,
-    };
-};
-const register_header_on_basis = (basis, header) => (state) => {
-    let value;
-    const headerType = header.header.content.type;
-    if (headerType === HeaderType.Create) {
-        value = { NewEntry: header.header.hash };
-    }
-    else if (headerType === HeaderType.Update) {
-        value = { Update: header.header.hash };
-    }
-    else if (headerType === HeaderType.Delete) {
-        value = { Delete: header.header.hash };
-    }
-    if (value) {
-        putSystemMetadata(basis, value)(state);
-    }
-};
-const putSystemMetadata = (basis, value) => (state) => {
-    if (!state.metadata.system_meta[basis]) {
-        state.metadata.system_meta[basis] = [];
-    }
-    state.metadata.system_meta[basis].push(value);
-};
-const putDhtOpToIntegrated = (dhtOpHash, integratedValue) => (state) => {
-    state.integratedDHTOps[dhtOpHash] = integratedValue;
-};
-
-/**
- * Returns the header hashes which don't have their DHTOps in the authoredDHTOps DB
- */
-function getNewHeaders(state) {
-    const dhtOps = Object.values(state.authoredDHTOps);
-    const headerHashesAlreadyPublished = dhtOps.map(dhtOp => dhtOp.op.header.header.hash);
-    return state.sourceChain.filter(headerHash => !headerHashesAlreadyPublished.includes(headerHash));
-}
-function getAllAuthoredHeaders(state) {
-    return state.sourceChain.map(headerHash => state.CAS[headerHash]);
-}
 
 var ERROR_MSG_INPUT = 'Input must be an string, Buffer or Uint8Array';
 
@@ -942,6 +661,419 @@ function getHashType(hash) {
     throw new Error('Could not get hash type');
 }
 
+var GetStrategy;
+(function (GetStrategy) {
+    GetStrategy[GetStrategy["Latest"] = 0] = "Latest";
+    GetStrategy[GetStrategy["Contents"] = 1] = "Contents";
+})(GetStrategy || (GetStrategy = {}));
+
+function getValidationLimboDhtOps(state, status) {
+    const pendingDhtOps = {};
+    for (const dhtOpHash of Object.keys(state.validationLimbo)) {
+        const limboValue = state.validationLimbo[dhtOpHash];
+        if (limboValue.status === status) {
+            pendingDhtOps[dhtOpHash] = limboValue;
+        }
+    }
+    return pendingDhtOps;
+}
+function pullAllIntegrationLimboDhtOps(state) {
+    const dhtOps = state.integrationLimbo;
+    state.integrationLimbo = {};
+    return dhtOps;
+}
+function getHeadersForEntry(state, entryHash) {
+    const entryMetadata = state.metadata.system_meta[entryHash];
+    if (!entryMetadata)
+        return [];
+    return entryMetadata
+        .map(h => {
+        const hash = getSysMetaValHeaderHash(h);
+        if (hash) {
+            return state.CAS[hash];
+        }
+        return undefined;
+    })
+        .filter(header => !!header);
+}
+function getEntryDhtStatus(state, entryHash) {
+    const meta = state.metadata.misc_meta[entryHash];
+    return meta
+        ? meta.EntryStatus
+        : undefined;
+}
+function getEntryDetails(state, entryHash) {
+    const entry = state.CAS[entryHash];
+    const headers = getHeadersForEntry(state, entryHash);
+    const dhtStatus = getEntryDhtStatus(state, entryHash);
+    return {
+        entry,
+        headers: headers,
+        entry_dht_status: dhtStatus,
+    };
+}
+function getHeaderModifiers(state, headerHash) {
+    const allModifiers = state.metadata.system_meta[headerHash];
+    if (!allModifiers)
+        return {
+            updates: [],
+            deletes: [],
+        };
+    const updates = allModifiers
+        .filter(m => m.Update)
+        .map(m => state.CAS[m.Update]);
+    const deletes = allModifiers
+        .filter(m => m.Delete)
+        .map(m => state.CAS[m.Delete]);
+    return {
+        updates,
+        deletes,
+    };
+}
+function getAllHeldEntries(state) {
+    const newEntryHeaders = Object.values(state.integratedDHTOps)
+        .filter(dhtOpValue => dhtOpValue.op.type === DHTOpType.StoreEntry)
+        .map(dhtOpValue => dhtOpValue.op.header);
+    const allEntryHashes = newEntryHeaders.map(h => h.header.content.entry_hash);
+    return uniq(allEntryHashes);
+}
+function getAllAuthoredEntries(state) {
+    const allHeaders = Object.values(state.authoredDHTOps).map(dhtOpValue => dhtOpValue.op.header);
+    const newEntryHeaders = allHeaders.filter(h => h.header.content.entry_hash);
+    return newEntryHeaders.map(h => h.header.content.entry_hash);
+}
+function isHoldingEntry(state, entryHash) {
+    return state.metadata.system_meta[entryHash] !== undefined;
+}
+function isHoldingElement(state, headerHash) {
+    return state.metadata.misc_meta[headerHash] === 'StoreElement';
+}
+function getDhtShard(state) {
+    const heldEntries = getAllHeldEntries(state);
+    const dhtShard = {};
+    for (const entryHash of heldEntries) {
+        dhtShard[entryHash] = {
+            details: getEntryDetails(state, entryHash),
+            links: getCreateLinksForEntry(state, entryHash),
+        };
+    }
+    return dhtShard;
+}
+function getLinksForEntry(state, entryHash) {
+    const linkMetaVals = getCreateLinksForEntry(state, entryHash);
+    const link_adds = [];
+    const link_removes = [];
+    for (const value of linkMetaVals) {
+        const header = state.CAS[value.link_add_hash];
+        if (header) {
+            link_adds.push(header);
+        }
+        const removes = getRemovesOnLinkAdd(state, value.link_add_hash);
+        for (const remove of removes) {
+            const removeHeader = state.CAS[remove];
+            link_removes.push(removeHeader);
+        }
+    }
+    return {
+        link_adds,
+        link_removes,
+    };
+}
+function getCreateLinksForEntry(state, entryHash) {
+    return state.metadata.link_meta
+        .filter(({ key, value }) => isEqual(key.base, entryHash))
+        .map(({ key, value }) => value);
+}
+function getRemovesOnLinkAdd(state, link_add_hash) {
+    const metadata = state.metadata.system_meta[link_add_hash];
+    if (!metadata)
+        return [];
+    const removes = [];
+    for (const val of metadata) {
+        if (val.DeleteLink) {
+            removes.push(val.DeleteLink);
+        }
+    }
+    return removes;
+}
+function getLiveLinks(getLinksResponses) {
+    // Map and flatten adds
+    const linkAdds = {};
+    for (const responses of getLinksResponses) {
+        for (const linkAdd of responses.link_adds) {
+            linkAdds[linkAdd.header.hash] = linkAdd.header.content;
+        }
+    }
+    for (const responses of getLinksResponses) {
+        for (const linkRemove of responses.link_removes) {
+            const removedAddress = linkRemove.header.content.link_add_address;
+            if (linkAdds[removedAddress])
+                linkAdds[removedAddress] = undefined;
+        }
+    }
+    const resultingLinks = [];
+    for (const liveLink of Object.values(linkAdds)) {
+        if (liveLink)
+            resultingLinks.push({
+                base: liveLink.base_address,
+                target: liveLink.target_address,
+                tag: liveLink.tag,
+            });
+    }
+    return resultingLinks;
+}
+
+var ValidationStatus;
+(function (ValidationStatus) {
+    ValidationStatus[ValidationStatus["Valid"] = 0] = "Valid";
+    ValidationStatus[ValidationStatus["Rejected"] = 1] = "Rejected";
+    ValidationStatus[ValidationStatus["Abandoned"] = 2] = "Abandoned";
+})(ValidationStatus || (ValidationStatus = {}));
+var ValidationLimboStatus;
+(function (ValidationLimboStatus) {
+    ValidationLimboStatus[ValidationLimboStatus["Pending"] = 0] = "Pending";
+    ValidationLimboStatus[ValidationLimboStatus["AwaitingSysDeps"] = 1] = "AwaitingSysDeps";
+    ValidationLimboStatus[ValidationLimboStatus["SysValidated"] = 2] = "SysValidated";
+    ValidationLimboStatus[ValidationLimboStatus["AwaitingAppDeps"] = 3] = "AwaitingAppDeps";
+})(ValidationLimboStatus || (ValidationLimboStatus = {}));
+
+// From https://github.com/holochain/holochain/blob/develop/crates/holochain_cascade/src/authority.rs
+class Authority {
+    constructor(state, p2p) {
+        this.state = state;
+        this.p2p = p2p;
+    }
+    async handle_get_entry(entry_hash, options) {
+        const entry = this.state.CAS[entry_hash];
+        if (!entry)
+            return undefined;
+        const allHeaders = getHeadersForEntry(this.state, entry_hash);
+        let entry_type = undefined;
+        const live_headers = [];
+        const updates = [];
+        const deletes = [];
+        for (const header of allHeaders) {
+            const headerContent = header.header.content;
+            if (headerContent.original_entry_address &&
+                headerContent.original_entry_address === entry_hash) {
+                updates.push(header);
+            }
+            else if (headerContent.entry_hash &&
+                headerContent.entry_hash === entry_hash) {
+                live_headers.push(header);
+                if (!entry_type) {
+                    entry_type = headerContent.entry_type;
+                }
+            }
+            else if (headerContent.deletes_entry_address === entry_hash) {
+                deletes.push(header);
+            }
+        }
+        return {
+            entry,
+            entry_type: entry_type,
+            live_headers,
+            updates,
+            deletes,
+        };
+    }
+    async handle_get_element(header_hash, options) {
+        if (this.state.metadata.misc_meta[header_hash] !== 'StoreElement') {
+            return undefined;
+        }
+        const header = this.state.CAS[header_hash];
+        let maybe_entry = undefined;
+        let validation_status = ValidationStatus.Valid;
+        if (header) {
+            if (header.header.content.entry_hash) {
+                const entryHash = header.header
+                    .content.entry_hash;
+                maybe_entry = this.state.CAS[entryHash];
+            }
+        }
+        else {
+            validation_status = ValidationStatus.Rejected;
+        }
+        const modifiers = getHeaderModifiers(this.state, header_hash);
+        return {
+            deletes: modifiers.deletes,
+            updates: modifiers.updates,
+            signed_header: header,
+            validation_status,
+            maybe_entry,
+        };
+    }
+    async handle_get_links(base_address, options) {
+        return getLinksForEntry(this.state, base_address);
+    }
+}
+
+class Cascade {
+    constructor(state, p2p) {
+        this.state = state;
+        this.p2p = p2p;
+    }
+    async dht_get(hash, options) {
+        // TODO rrDHT arcs
+        new Authority(this.state, this.p2p);
+        const isPresent = this.state.CAS[hash];
+        // TODO only return local if GetOptions::content() is given
+        if (isPresent && options.strategy === GetStrategy.Contents) {
+            const hashType = getHashType(hash);
+            if (hashType === HashType.ENTRY) {
+                const entry = this.state.CAS[hash];
+                const signed_header = Object.values(this.state.CAS).find(header => header.header &&
+                    header.header.content
+                        .entry_hash === hash);
+                return {
+                    entry,
+                    signed_header,
+                };
+            }
+            if (hashType === HashType.HEADER) {
+                const signed_header = this.state.CAS[hash];
+                const entry = this.state.CAS[signed_header.header.content
+                    .entry_hash];
+                return {
+                    entry,
+                    signed_header,
+                };
+            }
+        }
+        return this.p2p.get(hash, options);
+    }
+    async dht_get_links(base_address, options) {
+        // TODO: check if we are an authority
+        const linksResponses = await this.p2p.get_links(base_address, options);
+        return getLiveLinks(linksResponses);
+    }
+}
+
+const putValidationLimboValue = (dhtOpHash, validationLimboValue) => (state) => {
+    state.validationLimbo[dhtOpHash] = validationLimboValue;
+};
+const deleteValidationLimboValue = (dhtOpHash) => (state) => {
+    delete state.validationLimbo[dhtOpHash];
+};
+const putIntegrationLimboValue = (dhtOpHash, integrationLimboValue) => (state) => {
+    state.integrationLimbo[dhtOpHash] = integrationLimboValue;
+};
+const putDhtOpData = (dhtOp) => async (state) => {
+    const headerHash = dhtOp.header.header.hash;
+    state.CAS[headerHash] = dhtOp.header;
+    const entry = getEntry(dhtOp);
+    if (entry) {
+        state.CAS[dhtOp.header.header.content.entry_hash] = entry;
+    }
+};
+const putDhtOpMetadata = (dhtOp) => (state) => {
+    const headerHash = dhtOp.header.header.hash;
+    if (dhtOp.type === DHTOpType.StoreElement) {
+        state.metadata.misc_meta[headerHash] = 'StoreElement';
+    }
+    else if (dhtOp.type === DHTOpType.StoreEntry) {
+        const entryHash = dhtOp.header.header.content.entry_hash;
+        if (dhtOp.header.header.content.type === HeaderType.Update) {
+            register_header_on_basis(headerHash, dhtOp.header)(state);
+            register_header_on_basis(entryHash, dhtOp.header)(state);
+        }
+        register_header_on_basis(entryHash, dhtOp.header)(state);
+        update_entry_dht_status(entryHash)(state);
+    }
+    else if (dhtOp.type === DHTOpType.RegisterAgentActivity) {
+        state.metadata.misc_meta[headerHash] = {
+            ChainItem: dhtOp.header.header.content.timestamp,
+        };
+        state.metadata.misc_meta[dhtOp.header.header.content.author] = {
+            ChainStatus: ChainStatus.Valid,
+        };
+    }
+    else if (dhtOp.type === DHTOpType.RegisterUpdatedContent ||
+        dhtOp.type === DHTOpType.RegisterUpdatedElement) {
+        register_header_on_basis(dhtOp.header.header.content.original_header_address, dhtOp.header)(state);
+        register_header_on_basis(dhtOp.header.header.content.original_entry_address, dhtOp.header)(state);
+        update_entry_dht_status(dhtOp.header.header.content.original_entry_address)(state);
+    }
+    else if (dhtOp.type === DHTOpType.RegisterDeletedBy ||
+        dhtOp.type === DHTOpType.RegisterDeletedEntryHeader) {
+        register_header_on_basis(dhtOp.header.header.content.deletes_address, dhtOp.header)(state);
+        register_header_on_basis(dhtOp.header.header.content.deletes_entry_address, dhtOp.header)(state);
+        update_entry_dht_status(dhtOp.header.header.content.deletes_entry_address)(state);
+    }
+    else if (dhtOp.type === DHTOpType.RegisterAddLink) {
+        const key = {
+            base: dhtOp.header.header.content.base_address,
+            header_hash: headerHash,
+            tag: dhtOp.header.header.content.tag,
+            zome_id: dhtOp.header.header.content.zome_id,
+        };
+        const value = {
+            link_add_hash: headerHash,
+            tag: dhtOp.header.header.content.tag,
+            target: dhtOp.header.header.content.target_address,
+            timestamp: dhtOp.header.header.content.timestamp,
+            zome_id: dhtOp.header.header.content.zome_id,
+        };
+        state.metadata.link_meta.push({ key, value });
+    }
+    else if (dhtOp.type === DHTOpType.RegisterRemoveLink) {
+        const val = {
+            DeleteLink: headerHash,
+        };
+        putSystemMetadata(dhtOp.header.header.content.link_add_address, val)(state);
+    }
+};
+const update_entry_dht_status = (entryHash) => (state) => {
+    const headers = getHeadersForEntry(state, entryHash);
+    const entryIsAlive = headers.some(header => {
+        const headerHash = header.header.hash;
+        const dhtHeaders = state.metadata.system_meta[headerHash];
+        return dhtHeaders
+            ? dhtHeaders.find(metaVal => metaVal.Delete)
+            : true;
+    });
+    state.metadata.misc_meta[entryHash] = {
+        EntryStatus: entryIsAlive ? EntryDhtStatus.Live : EntryDhtStatus.Dead,
+    };
+};
+const register_header_on_basis = (basis, header) => (state) => {
+    let value;
+    const headerType = header.header.content.type;
+    if (headerType === HeaderType.Create) {
+        value = { NewEntry: header.header.hash };
+    }
+    else if (headerType === HeaderType.Update) {
+        value = { Update: header.header.hash };
+    }
+    else if (headerType === HeaderType.Delete) {
+        value = { Delete: header.header.hash };
+    }
+    if (value) {
+        putSystemMetadata(basis, value)(state);
+    }
+};
+const putSystemMetadata = (basis, value) => (state) => {
+    if (!state.metadata.system_meta[basis]) {
+        state.metadata.system_meta[basis] = [];
+    }
+    state.metadata.system_meta[basis].push(value);
+};
+const putDhtOpToIntegrated = (dhtOpHash, integratedValue) => (state) => {
+    state.integratedDHTOps[dhtOpHash] = integratedValue;
+};
+
+/**
+ * Returns the header hashes which don't have their DHTOps in the authoredDHTOps DB
+ */
+function getNewHeaders(state) {
+    const dhtOps = Object.values(state.authoredDHTOps);
+    const headerHashesAlreadyPublished = dhtOps.map(dhtOp => dhtOp.op.header.header.hash);
+    return state.sourceChain.filter(headerHash => !headerHashesAlreadyPublished.includes(headerHash));
+}
+function getAllAuthoredHeaders(state) {
+    return state.sourceChain.map(headerHash => state.CAS[headerHash]);
+}
+
 function hashEntry(entry) {
     if (entry.entry_type === 'Agent')
         return entry.content;
@@ -1169,20 +1301,6 @@ function buildCommon(state) {
         timestamp,
     };
 }
-
-var ValidationStatus;
-(function (ValidationStatus) {
-    ValidationStatus[ValidationStatus["Valid"] = 0] = "Valid";
-    ValidationStatus[ValidationStatus["Rejected"] = 1] = "Rejected";
-    ValidationStatus[ValidationStatus["Abandoned"] = 2] = "Abandoned";
-})(ValidationStatus || (ValidationStatus = {}));
-var ValidationLimboStatus;
-(function (ValidationLimboStatus) {
-    ValidationLimboStatus[ValidationLimboStatus["Pending"] = 0] = "Pending";
-    ValidationLimboStatus[ValidationLimboStatus["AwaitingSysDeps"] = 1] = "AwaitingSysDeps";
-    ValidationLimboStatus[ValidationLimboStatus["SysValidated"] = 2] = "SysValidated";
-    ValidationLimboStatus[ValidationLimboStatus["AwaitingAppDeps"] = 3] = "AwaitingAppDeps";
-})(ValidationLimboStatus || (ValidationLimboStatus = {}));
 
 var WorkflowType;
 (function (WorkflowType) {
@@ -1488,124 +1606,6 @@ class MiddlewareExecutor {
     }
 }
 
-// From https://github.com/holochain/holochain/blob/develop/crates/holochain_cascade/src/authority.rs
-class Authority {
-    constructor(state, p2p) {
-        this.state = state;
-        this.p2p = p2p;
-    }
-    async handle_get_entry(entry_hash, options) {
-        const entry = this.state.CAS[entry_hash];
-        if (!entry)
-            return undefined;
-        const allHeaders = getHeadersForEntry(this.state, entry_hash);
-        let entry_type = undefined;
-        const live_headers = [];
-        const updates = [];
-        const deletes = [];
-        for (const header of allHeaders) {
-            const headerContent = header.header.content;
-            if (headerContent.original_entry_address &&
-                headerContent.original_entry_address === entry_hash) {
-                updates.push(header);
-            }
-            else if (headerContent.entry_hash &&
-                headerContent.entry_hash === entry_hash) {
-                live_headers.push(header);
-                if (!entry_type) {
-                    entry_type = headerContent.entry_type;
-                }
-            }
-            else if (headerContent.deletes_entry_address === entry_hash) {
-                deletes.push(header);
-            }
-        }
-        return {
-            entry,
-            entry_type: entry_type,
-            live_headers,
-            updates,
-            deletes,
-        };
-    }
-    async handle_get_element(header_hash, options) {
-        if (this.state.metadata.misc_meta[header_hash] !== 'StoreElement') {
-            return undefined;
-        }
-        const header = this.state.CAS[header_hash];
-        let maybe_entry = undefined;
-        let validation_status = ValidationStatus.Valid;
-        if (header) {
-            if (header.header.content.entry_hash) {
-                const entryHash = header.header
-                    .content.entry_hash;
-                maybe_entry = this.state.CAS[entryHash];
-            }
-        }
-        else {
-            validation_status = ValidationStatus.Rejected;
-        }
-        const modifiers = getHeaderModifiers(this.state, header_hash);
-        return {
-            deletes: modifiers.deletes,
-            updates: modifiers.updates,
-            signed_header: header,
-            validation_status,
-            maybe_entry,
-        };
-    }
-    async handle_get_links(base_address, options) {
-        return getLinksForEntry(this.state, base_address);
-    }
-}
-
-var GetStrategy;
-(function (GetStrategy) {
-    GetStrategy[GetStrategy["Latest"] = 0] = "Latest";
-    GetStrategy[GetStrategy["Contents"] = 1] = "Contents";
-})(GetStrategy || (GetStrategy = {}));
-
-class Cascade {
-    constructor(state, p2p) {
-        this.state = state;
-        this.p2p = p2p;
-    }
-    async dht_get(hash, options) {
-        // TODO rrDHT arcs
-        new Authority(this.state, this.p2p);
-        const isPresent = this.state.CAS[hash];
-        // TODO only return local if GetOptions::content() is given
-        if (isPresent && options.strategy === GetStrategy.Contents) {
-            const hashType = getHashType(hash);
-            if (hashType === HashType.ENTRY) {
-                const entry = this.state.CAS[hash];
-                const signed_header = Object.values(this.state.CAS).find(header => header.header &&
-                    header.header.content
-                        .entry_hash === hash);
-                return {
-                    entry,
-                    signed_header,
-                };
-            }
-            if (hashType === HashType.HEADER) {
-                const signed_header = this.state.CAS[hash];
-                const entry = this.state.CAS[signed_header.header.content
-                    .entry_hash];
-                return {
-                    entry,
-                    signed_header,
-                };
-            }
-        }
-        return this.p2p.get(hash, options);
-    }
-    async dht_get_links(base_address, options) {
-        // TODO: check if we are an authority
-        const linksResponses = await this.p2p.get_links(base_address, options);
-        return getLiveLinks(linksResponses);
-    }
-}
-
 function common_create(worskpace, entry, entry_type) {
     const create = buildCreate(worskpace.state, entry, entry_type);
     const element = {
@@ -1809,9 +1809,9 @@ function buildZomeFunctionContext(workspace, zome_index) {
 }
 
 var index = /*#__PURE__*/Object.freeze({
-    __proto__: null,
-    create_entry: create_entry,
-    buildZomeFunctionContext: buildZomeFunctionContext
+  __proto__: null,
+  create_entry: create_entry,
+  buildZomeFunctionContext: buildZomeFunctionContext
 });
 
 class Cell {
@@ -2375,5 +2375,5 @@ async function createConductors(conductorsToCreate, currentConductors, dnaTempla
     return allConductors;
 }
 
-export { AGENT_PREFIX, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, GetStrategy, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDeleteLink, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, createConductors, deleteValidationLimboValue, demoDnaTemplate, demoEntriesZome, demoLinksZome, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getCreateLinksForEntry, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getLiveLinks, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getRemovesOnLinkAdd, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingElement, isHoldingEntry, location, locationDistance, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sleep, sys_validation, sys_validation_task, valid_cap_grant, workflowPriority, wrap };
+export { AGENT_PREFIX, Authority, Cascade, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, GetStrategy, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDeleteLink, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, createConductors, deleteValidationLimboValue, demoDnaTemplate, demoEntriesZome, demoLinksZome, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getCreateLinksForEntry, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getLiveLinks, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getRemovesOnLinkAdd, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingElement, isHoldingEntry, location, locationDistance, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, sleep, sys_validation, sys_validation_task, valid_cap_grant, workflowPriority, wrap };
 //# sourceMappingURL=index.js.map
