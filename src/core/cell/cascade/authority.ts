@@ -1,6 +1,8 @@
 import {
   Create,
+  CreateLink,
   Delete,
+  DeleteLink,
   Element,
   Entry,
   EntryType,
@@ -10,11 +12,16 @@ import {
   Update,
 } from '@holochain-open-dev/core-types';
 import { P2pCell } from '../../..';
-import { GetOptions } from '../../../types';
+import { GetLinksOptions, GetOptions } from '../../../types';
 import { Cell } from '../cell';
-import { getHeaderModifiers, getHeadersForEntry } from '../dht/get';
+import {
+  getCreateLinksForEntry,
+  getHeaderModifiers,
+  getHeadersForEntry,
+  getRemovesOnLinkAdd,
+} from '../dht/get';
 import { CellState, ValidationStatus } from '../state';
-import { GetEntryFull, GetElementFull } from './types';
+import { GetEntryFull, GetElementFull, GetLinksResponse } from './types';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain_cascade/src/authority.rs
 export class Authority {
@@ -98,6 +105,36 @@ export class Authority {
       signed_header: header,
       validation_status,
       maybe_entry,
+    };
+  }
+
+  public async handle_get_links(
+    base_address: Hash,
+    options: GetLinksOptions
+  ): Promise<GetLinksResponse> {
+    const linkMetaVals = getCreateLinksForEntry(this.state, base_address);
+
+    const link_adds: SignedHeaderHashed<CreateLink>[] = [];
+    const link_removes: SignedHeaderHashed<DeleteLink>[] = [];
+
+    for (const value of linkMetaVals) {
+      const header = this.state.CAS[value.link_add_hash];
+
+      if (header) {
+        link_adds.push(header);
+      }
+
+      const removes = getRemovesOnLinkAdd(this.state, value.link_add_hash);
+
+      for (const remove of removes) {
+        const removeHeader = this.state.CAS[remove];
+        link_removes.push(removeHeader);
+      }
+    }
+
+    return {
+      link_adds,
+      link_removes,
     };
   }
 }

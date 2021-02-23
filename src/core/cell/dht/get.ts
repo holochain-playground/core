@@ -65,7 +65,7 @@ export function getHeadersForEntry(
     .filter(header => !!header);
 }
 
-export function getLinksForEntry(
+export function getCreateLinksForEntry(
   state: CellState,
   entryHash: Hash
 ): LinkMetaVal[] {
@@ -174,9 +174,26 @@ export function getDhtShard(state: CellState): Dictionary<EntryDHTInfo> {
   for (const entryHash of heldEntries) {
     dhtShard[entryHash] = {
       details: getEntryDetails(state, entryHash),
-      links: getLinksForEntry(state, entryHash),
+      links: getCreateLinksForEntry(state, entryHash),
     };
   }
 
   return dhtShard;
+}
+
+export function getRemovesOnLinkAdd(
+  state: CellState,
+  link_add_hash: Hash
+): Hash[] {
+  const metadata = state.metadata.system_meta[link_add_hash];
+
+  if (!metadata) return [];
+
+  const removes: Hash[] = [];
+  for (const val of metadata) {
+    if ((val as { DeleteLink: Hash }).DeleteLink) {
+      removes.push((val as { DeleteLink: Hash }).DeleteLink);
+    }
+  }
+  return removes;
 }
