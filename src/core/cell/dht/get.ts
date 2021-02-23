@@ -11,8 +11,10 @@ import {
   DHTOpType,
   Update,
   Delete,
+  CreateLink,
 } from '@holochain-open-dev/core-types';
 import { isEqual, uniq } from 'lodash-es';
+import { GetLinksResponse, Link } from '../cascade/types';
 import {
   CellState,
   ValidationLimboStatus,
@@ -196,4 +198,36 @@ export function getRemovesOnLinkAdd(
     }
   }
   return removes;
+}
+
+export function getLiveLinks(
+  getLinksResponses: Array<GetLinksResponse>
+): Array<Link> {
+  // Map and flatten adds
+  const linkAdds: Dictionary<CreateLink | undefined> = {};
+  for (const responses of getLinksResponses) {
+    for (const linkAdd of responses.link_adds) {
+      linkAdds[linkAdd.header.hash] = linkAdd.header.content;
+    }
+  }
+
+  for (const responses of getLinksResponses) {
+    for (const linkRemove of responses.link_removes) {
+      const removedAddress = linkRemove.header.content.link_add_address;
+      if (linkAdds[removedAddress]) linkAdds[removedAddress] = undefined;
+    }
+  }
+
+  const resultingLinks: Link[] = [];
+
+  for (const liveLink of Object.values(linkAdds)) {
+    if (liveLink)
+      resultingLinks.push({
+        base: liveLink.base_address,
+        target: liveLink.target_address,
+        tag: liveLink.tag,
+      });
+  }
+
+  return resultingLinks;
 }
