@@ -38,3 +38,6 @@ export function sys_validation_task(): SysValidationWorkflow {
     task: worskpace => sys_validation(worskpace),
   };
 }
+
+
+function validate_op() {}
