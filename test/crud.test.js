@@ -43,7 +43,7 @@ describe('CRUD', () => {
     });
 
     expect(entryHash).to.be.ok;
-
+ 
     try {
       await conductors[0].callZomeFn({
         cellId: cell.cellId,
