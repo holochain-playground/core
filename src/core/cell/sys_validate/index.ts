@@ -1,15 +1,38 @@
 import {
+  AgentPubKey,
   AppEntryType,
   Create,
   Entry,
   EntryType,
+  Hash,
   Header,
   HeaderType,
   Metadata,
+  NewEntryHeader,
+  Signature,
+  Update,
 } from '@holochain-open-dev/core-types';
 import { EntryDef, SimulatedDna } from '../../../dnas/simulated-dna';
+import { hashEntry } from '../utils';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/sys_validate.rs
+
+/// Verify the signature for this header
+export async function verify_header_signature(
+  sig: Signature,
+  header: Header
+): Promise<boolean> {
+  return true; // TODO: actually implement signatures
+}
+
+/// Verify the author key was valid at the time
+/// of signing with dpki
+/// TODO: This is just a stub until we have dpki.
+export async function author_key_is_valid(
+  author: AgentPubKey
+): Promise<boolean> {
+  return true;
+}
 
 export function check_prev_header(header: Header): void {
   if (header.type === HeaderType.Dna) return;
@@ -97,4 +120,40 @@ export function check_app_entry_type(
 export function check_not_private(entry_def: EntryDef): void {
   if (entry_def.visibility === 'Private')
     throw new Error(`Trying to validate as public a private entry type`);
+}
+
+export function check_entry_hash(hash: Hash, entry: Entry): void {
+  if (hashEntry(entry) !== hash) throw new Error(`Entry hash is invalid`);
+}
+
+export function check_new_entry_header(header: Header): void {
+  if (!(header.type === HeaderType.Create || header.type === HeaderType.Update))
+    throw new Error(
+      `A header refering a new entry is not of type Create or Update`
+    );
+}
+
+export const MAX_ENTRY_SIZE = 16 * 1000 * 1000;
+
+export function check_entry_size(entry: Entry): void {
+  if (JSON.stringify(entry.content).length > MAX_ENTRY_SIZE)
+    throw new Error(`Entry size exceeds the MAX_ENTRY_SIZE`);
+}
+
+export const MAX_TAG_SIZE = 400;
+
+export function check_tag_size(tag: string): void {
+  if (tag.length > MAX_TAG_SIZE)
+    throw new Error(`The given tag size exceeds the MAX_TAG_SIZE`);
+}
+
+export function check_update_reference(
+  update: Update,
+  original_entry_header: NewEntryHeader
+): void {
+  if (
+    JSON.stringify(update.entry_type) !==
+    JSON.stringify(original_entry_header.entry_type)
+  )
+    throw new Error(`An entry must be updated to the same entry type`);
 }

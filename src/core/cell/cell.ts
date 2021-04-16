@@ -223,10 +223,11 @@ export class Cell {
 
   private buildWorkspace(zomeIndex?: number): Workspace {
     let zomeFnContext: SimulatedZomeFunctionContext | undefined = undefined;
+    const cascade = this.getCascade();
 
     if (zomeIndex !== undefined) {
       const hostFnWorkspace: HostFnWorkspace = {
-        cascade: this.getCascade(),
+        cascade,
         state: this._state,
         dna: this.getSimulatedDna(),
         p2p: this.p2p,
@@ -235,6 +236,7 @@ export class Cell {
     }
 
     return {
+      cascade,
       state: this._state,
       p2p: this.p2p,
       dna: this.getSimulatedDna(),
