@@ -32,6 +32,7 @@ import {
   verify_header_signature,
 } from '../sys_validate';
 import { GetStrategy } from '../../../types';
+import { Cascade } from '../cascade/cascade';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/sys_validation_workflow.rs
 export const sys_validation = async (
@@ -135,12 +136,12 @@ export async function store_element(
 
   const prev_header_hash = (header as Create).prev_header;
   if (prev_header_hash) {
-    const prev_header = await workspace.cascade.retrieve_header(
-      prev_header_hash,
-      {
-        strategy: GetStrategy.Contents,
-      }
-    );
+    const prev_header = await new Cascade(
+      workspace.state,
+      workspace.p2p
+    ).retrieve_header(prev_header_hash, {
+      strategy: GetStrategy.Contents,
+    });
 
     if (!prev_header)
       return {
@@ -169,10 +170,12 @@ export async function store_entry(
   check_entry_size(entry);
 
   if (header.type === HeaderType.Update) {
-    const signed_header = await workspace.cascade.retrieve_header(
-      header.original_header_address,
-      { strategy: GetStrategy.Contents }
-    );
+    const signed_header = await new Cascade(
+      workspace.state,
+      workspace.p2p
+    ).retrieve_header(header.original_header_address, {
+      strategy: GetStrategy.Contents,
+    });
     if (!signed_header) {
       return {
         depsHashes: [header.original_header_address],

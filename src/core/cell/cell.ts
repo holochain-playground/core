@@ -73,10 +73,6 @@ export class Cell {
     return this.conductor.registeredDnas[this.dnaHash];
   }
 
-  private getCascade(): Cascade {
-    return new Cascade(this._state, this.p2p);
-  }
-
   static async create(
     conductor: Conductor,
     cellId: CellId,
@@ -209,7 +205,7 @@ export class Cell {
     }
 
     const result = await this.workflowExecutor.execute(
-      () => workflow.task(this.buildWorkspace(zomeIndex)),
+      () => workflow.task(this.buildWorkspace()),
       workflow
     );
 
@@ -221,26 +217,11 @@ export class Cell {
 
   /** Private helpers */
 
-  private buildWorkspace(zomeIndex?: number): Workspace {
-    let zomeFnContext: SimulatedZomeFunctionContext | undefined = undefined;
-    const cascade = this.getCascade();
-
-    if (zomeIndex !== undefined) {
-      const hostFnWorkspace: HostFnWorkspace = {
-        cascade,
-        state: this._state,
-        dna: this.getSimulatedDna(),
-        p2p: this.p2p,
-      };
-      zomeFnContext = buildZomeFunctionContext(hostFnWorkspace, zomeIndex);
-    }
-
+  private buildWorkspace(): Workspace {
     return {
-      cascade,
       state: this._state,
       p2p: this.p2p,
       dna: this.getSimulatedDna(),
-      zomeFnContext,
     };
   }
 }
