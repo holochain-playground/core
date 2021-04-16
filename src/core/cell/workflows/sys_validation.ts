@@ -93,9 +93,15 @@ export async function sys_validate_element(
   );
   if (maybeDepsMissing) return maybeDepsMissing;
 
+  const entry_type = (element.signed_header.header.content as NewEntryHeader)
+    .entry_type;
+    
   if (
     element.entry &&
-    ((element.signed_header.header.content as NewEntryHeader).entry_type as {
+    (entry_type as {
+      App: AppEntryType;
+    }).App &&
+    (entry_type as {
       App: AppEntryType;
     }).App.visibility === 'Public'
   ) {

@@ -76,6 +76,8 @@ export const callZomeFn = (
 
       const depsMissing = await sys_validate_element(element, worskpace, worskpace.p2p);
       if (depsMissing) throw new Error(`Could not validate a new element due to missing dependencies`);
+
+      i++;
     }
 
     triggers.push(produce_dht_ops_task());
