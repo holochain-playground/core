@@ -6,7 +6,7 @@ describe('CRUD', () => {
   it('create, update and delete an entry', async function () {
     this.timeout(0);
 
-    const conductors = await createConductors(10, [], demoDnaTemplate());
+    const conductors = await createConductors(3, [], demoDnaTemplate());
     await sleep(10000);
 
     const cell = conductors[0].getAllCells()[0];
