@@ -18,7 +18,7 @@ describe('CRUD', () => {
       payload: { content: 'hi' },
       zome: 'demo_entries',
     });
-
+    
     expect(headerHash).to.be.ok;
     await sleep(4000);
 
