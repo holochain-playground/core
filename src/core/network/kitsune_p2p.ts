@@ -69,11 +69,7 @@ export class Discover {
       dna_hash,
       basis,
       remote_agent_count
-      );
-      if (basis === 'undefined') {
-        debugger
-      }
-      console.log('basis', basis, agents.map(a => a.agentPubKey), remote_agent_count)
+    );
 
     const promises = agents.map(cell => networkRequest(cell));
     return Promise.all(promises);
