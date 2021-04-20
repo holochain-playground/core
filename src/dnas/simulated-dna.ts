@@ -29,7 +29,7 @@ export interface SimulatedZome {
   name: string;
   entry_defs: Array<EntryDef>;
   zome_functions: Dictionary<SimulatedZomeFunction>;
-  validate_functions: Dictionary<SimulatedValidateFunction>;
+  validation_functions: Dictionary<SimulatedValidateFunction>;
   blocklyCode?: string;
 }
 

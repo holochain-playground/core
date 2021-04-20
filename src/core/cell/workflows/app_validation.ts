@@ -179,13 +179,13 @@ async function run_validation_callback_inner(
 
   for (const zome of zomes_to_invoke) {
     for (const validateFn of fnsToCall) {
-      if (zome.validate_functions[validateFn]) {
+      if (zome.validation_functions[validateFn]) {
         const context = buildValidationFunctionContext(
           hostFnWorkspace,
           workspace.dna.zomes.findIndex(z => z === zome)
         );
 
-        const outcome: ValidationOutcome = await zome.validate_functions[
+        const outcome: ValidationOutcome = await zome.validation_functions[
           validateFn
         ](context)(element);
         if (!outcome.resolved) return outcome;
@@ -206,7 +206,7 @@ export async function run_create_link_validation_callback(
 ): Promise<ValidationOutcome> {
   const validateCreateLink = 'validate_create_link';
 
-  if (zome.validate_functions[validateCreateLink]) {
+  if (zome.validation_functions[validateCreateLink]) {
     const hostFnWorkspace: HostFnWorkspace = {
       cascade: new Cascade(workspace.state, workspace.p2p),
       state: workspace.state,
@@ -218,7 +218,7 @@ export async function run_create_link_validation_callback(
       workspace.dna.zomes.findIndex(z => z === zome)
     );
 
-    const outcome: ValidationOutcome = await zome.validate_functions[
+    const outcome: ValidationOutcome = await zome.validation_functions[
       validateCreateLink
     ](context)({ link_add, base, target });
 
@@ -238,7 +238,7 @@ export async function run_delete_link_validation_callback(
 ): Promise<ValidationOutcome> {
   const validateCreateLink = 'validate_delete_link';
 
-  if (zome.validate_functions[validateCreateLink]) {
+  if (zome.validation_functions[validateCreateLink]) {
     const hostFnWorkspace: HostFnWorkspace = {
       cascade: new Cascade(workspace.state, workspace.p2p),
       state: workspace.state,
@@ -250,7 +250,7 @@ export async function run_delete_link_validation_callback(
       workspace.dna.zomes.findIndex(z => z === zome)
     );
 
-    const outcome: ValidationOutcome = await zome.validate_functions[
+    const outcome: ValidationOutcome = await zome.validation_functions[
       validateCreateLink
     ](context)({ delete_link });
 

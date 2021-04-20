@@ -7,7 +7,7 @@ const dna = {
     {
       name: 'demo_entries',
       entry_defs: [],
-      validate_functions: {},
+      validation_functions: {},
       zome_functions: {
         create_cap: {
           call: ({ create_cap_grant }) => agentPubKeyToGrant => {
