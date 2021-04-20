@@ -122,6 +122,8 @@ export class Cascade {
 
     const result = await this.p2p.get(hash, options);
 
+    if (!result) return undefined;
+
     if ((result as GetElementResponse).signed_header) {
       return {
         entry: (result as GetElementResponse).maybe_entry,

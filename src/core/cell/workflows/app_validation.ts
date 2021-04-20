@@ -4,11 +4,13 @@ import {
   IntegrationLimboValue,
   ValidationStatus,
   CellState,
+  ValidationLimboValue,
 } from '../state';
 import { getValidationLimboDhtOps } from '../dht/get';
 import {
   deleteValidationLimboValue,
   putIntegrationLimboValue,
+  putValidationLimboValue,
 } from '../dht/put';
 import { integrate_dht_ops_task } from './integrate_dht_ops';
 import { WorkflowReturn, WorkflowType, Workspace } from './workflows';
@@ -18,11 +20,14 @@ import {
   SimulatedZome,
 } from '../../../dnas/simulated-dna';
 import {
+  AgentPubKey,
   AppEntryType,
   CreateLink,
   DeleteLink,
+  DHTOp,
   Element,
   Entry,
+  getEntry,
   HeaderType,
   NewEntryHeader,
 } from '@holochain-open-dev/core-types';
@@ -30,32 +35,40 @@ import { ValidationOutcome } from '../sys_validate/types';
 import { GetStrategy } from '../../../types';
 import { DepsMissing } from './sys_validation';
 import { HostFnWorkspace } from '../../hdk/host-fn';
-import {
-  buildValidationFunctionContext,
-  buildZomeFunctionContext,
-} from '../../hdk/context';
+import { buildValidationFunctionContext } from '../../hdk/context';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/app_validation_workflow.rs
 export const app_validation = async (
   worskpace: Workspace
 ): Promise<WorkflowReturn<void>> => {
-  const pendingDhtOps = getValidationLimboDhtOps(
-    worskpace.state,
-    ValidationLimboStatus.SysValidated
-  );
+  const pendingDhtOps = getValidationLimboDhtOps(worskpace.state, [
+    ValidationLimboStatus.SysValidated,
+    ValidationLimboStatus.AwaitingAppDeps,
+  ]);
 
-  // TODO: actually validate
   for (const dhtOpHash of Object.keys(pendingDhtOps)) {
     deleteValidationLimboValue(dhtOpHash)(worskpace.state);
 
     const validationLimboValue = pendingDhtOps[dhtOpHash];
 
-    const value: IntegrationLimboValue = {
-      op: validationLimboValue.op,
-      validation_status: ValidationStatus.Valid,
-    };
+    const outcome = await validate_op(
+      validationLimboValue.op,
+      validationLimboValue.from_agent,
+      worskpace
+    );
+    if (!outcome.resolved) {
+      validationLimboValue.status = ValidationLimboStatus.AwaitingAppDeps;
+      putValidationLimboValue(dhtOpHash, validationLimboValue);
+    } else {
+      const value: IntegrationLimboValue = {
+        op: validationLimboValue.op,
+        validation_status: outcome.valid
+          ? ValidationStatus.Valid
+          : ValidationStatus.Rejected,
+      };
 
-    putIntegrationLimboValue(dhtOpHash, value)(worskpace.state);
+      putIntegrationLimboValue(dhtOpHash, value)(worskpace.state);
+    }
   }
 
   return {
@@ -71,6 +84,99 @@ export function app_validation_task(): AppValidationWorkflow {
     type: WorkflowType.APP_VALIDATION,
     details: undefined,
     task: worskpace => app_validation(worskpace),
+  };
+}
+
+async function validate_op(
+  op: DHTOp,
+  from_agent: AgentPubKey | undefined,
+  workspace: Workspace
+): Promise<ValidationOutcome> {
+  const element = dht_ops_to_element(op);
+
+  const entry_type = (element.signed_header.header.content as NewEntryHeader)
+    .entry_type;
+  if (entry_type === 'CapClaim' || entry_type === 'CapGrant')
+    return {
+      valid: true,
+      resolved: true,
+    };
+
+  // TODO: implement validation package
+
+  const maybeEntryDef = await get_associated_entry_def(
+    element,
+    workspace.dna,
+    workspace
+  );
+  if (maybeEntryDef && (maybeEntryDef as DepsMissing).depsHashes)
+    return {
+      resolved: false,
+      depsHashes: (maybeEntryDef as DepsMissing).depsHashes,
+    };
+
+  const zomes_to_invoke = await get_zomes_to_invoke(element, workspace);
+
+  if (zomes_to_invoke && (zomes_to_invoke as DepsMissing).depsHashes)
+    return {
+      resolved: false,
+      depsHashes: (zomes_to_invoke as DepsMissing).depsHashes,
+    };
+
+  const zomes = zomes_to_invoke as Array<SimulatedZome>;
+
+  const header = element.signed_header.header.content;
+  if (header.type === HeaderType.DeleteLink) {
+    return run_delete_link_validation_callback(zomes[0], header, workspace);
+  } else if (header.type === HeaderType.CreateLink) {
+    const cascade = new Cascade(workspace.state, workspace.p2p);
+
+    const maybeBaseEntry = await cascade.retrieve_entry(header.base_address, {
+      strategy: GetStrategy.Contents,
+    });
+    if (!maybeBaseEntry)
+      return {
+        resolved: false,
+        depsHashes: [header.base_address],
+      };
+
+    const maybeTargetEntry = await cascade.retrieve_entry(
+      header.target_address,
+      { strategy: GetStrategy.Contents }
+    );
+    if (!maybeTargetEntry)
+      return {
+        resolved: false,
+        depsHashes: [header.target_address],
+      };
+
+    return run_create_link_validation_callback(
+      zomes[0],
+      header,
+      maybeBaseEntry,
+      maybeTargetEntry,
+      workspace
+    );
+  } else {
+    return run_validation_callback_inner(
+      zomes,
+      element,
+      maybeEntryDef as EntryDef,
+      workspace
+    );
+  }
+}
+
+function dht_ops_to_element(op: DHTOp): Element {
+  const header = op.header;
+  let entry = undefined;
+  if ((header.header.content as NewEntryHeader).entry_hash) {
+    entry = getEntry(op);
+  }
+
+  return {
+    entry,
+    signed_header: header,
   };
 }
 
@@ -157,6 +263,43 @@ async function get_app_entry_type_from_dep(
   )
     return undefined;
   return entryType.App;
+}
+
+async function get_zomes_to_invoke(
+  element: Element,
+  workspace: Workspace
+): Promise<DepsMissing | Array<SimulatedZome>> {
+  const cascade = new Cascade(workspace.state, workspace.p2p);
+  const maybeAppEntryType = await get_app_entry_type(element, cascade);
+
+  if (maybeAppEntryType && (maybeAppEntryType as DepsMissing).depsHashes)
+    return maybeAppEntryType as DepsMissing;
+
+  if (maybeAppEntryType) {
+    // It's a newEntryHeader
+    return [workspace.dna.zomes[(maybeAppEntryType as AppEntryType).zome_id]];
+  } else {
+    const header = element.signed_header.header.content;
+    if (header.type === HeaderType.CreateLink) {
+      return [workspace.dna.zomes[header.zome_id]];
+    } else if (header.type === HeaderType.DeleteLink) {
+      const maybeHeader = await cascade.retrieve_header(
+        header.link_add_address,
+        { strategy: GetStrategy.Contents }
+      );
+
+      if (!maybeHeader)
+        return {
+          depsHashes: [header.link_add_address],
+        };
+
+      return [
+        workspace.dna.zomes[(maybeHeader.header.content as CreateLink).zome_id],
+      ];
+    }
+
+    return workspace.dna.zomes;
+  }
 }
 
 async function run_validation_callback_inner(
