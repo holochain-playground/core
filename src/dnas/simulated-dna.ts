@@ -3,7 +3,10 @@ import {
   EntryVisibility,
   Hash,
 } from '@holochain-open-dev/core-types';
-import { SimulatedZomeFunctionContext } from '../core/hdk';
+import {
+  SimulatedValidateFunctionContext,
+  SimulatedZomeFunctionContext,
+} from '../core/hdk';
 
 export interface SimulatedZomeFunctionArgument {
   name: string;
@@ -12,7 +15,7 @@ export interface SimulatedZomeFunctionArgument {
 
 export interface SimulatedZomeFunction {
   call: (
-    context: SimulatedZomeFunctionContext
+    context: SimulatedZomeFunctionContext | SimulatedValidateFunctionContext
   ) => (payload: any) => Promise<any>;
   arguments: SimulatedZomeFunctionArgument[];
 }

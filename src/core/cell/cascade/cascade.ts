@@ -5,6 +5,7 @@ import {
   Dictionary,
   Element,
   ElementDetails,
+  Entry,
   EntryDetails,
   Hash,
   NewEntryHeader,
@@ -37,7 +38,9 @@ export class Cascade {
     options: GetOptions
   ): Promise<SignedHeaderHashed | undefined> {
     if (getHashType(hash) !== HashType.HEADER)
-      throw new Error(`Trying to retrieve a header with an entry hash`);
+      throw new Error(
+        `Trying to retrieve a header with a hash of another type`
+      );
 
     const isPresent = this.state.CAS[hash];
 
@@ -51,6 +54,28 @@ export class Cascade {
 
     if (result && (result as GetElementResponse).signed_header) {
       return (result as GetElementResponse).signed_header;
+    } else return undefined;
+  }
+
+  public async retrieve_entry(
+    hash: Hash,
+    options: GetOptions
+  ): Promise<Entry | undefined> {
+    if (getHashType(hash) !== HashType.ENTRY)
+      throw new Error(`Trying to retrieve a entry with a hash of another type`);
+
+    const isPresent = this.state.CAS[hash];
+
+    // TODO only return local if GetOptions::content() is given
+    if (isPresent && options.strategy === GetStrategy.Contents) {
+      const entry = this.state.CAS[hash];
+      return entry;
+    }
+
+    const result = await this.p2p.get(hash, options);
+
+    if (result && (result as GetEntryResponse).entry) {
+      return (result as GetEntryResponse).entry;
     } else return undefined;
   }
 

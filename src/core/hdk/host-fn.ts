@@ -5,7 +5,7 @@ import { Cascade } from '../cell/cascade/cascade';
 
 export type HostFn<Fn extends Function> = (
   hostFnWorkspace: HostFnWorkspace,
-  zome_index: number
+  zome_index?: number
 ) => Fn;
 
 export interface HostFnWorkspace {
