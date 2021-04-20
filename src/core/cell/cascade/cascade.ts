@@ -61,12 +61,12 @@ export class Cascade {
     hash: Hash,
     options: GetOptions
   ): Promise<Entry | undefined> {
-    if (getHashType(hash) !== HashType.ENTRY)
+    const hashType = getHashType(hash);
+    if (hashType !== HashType.ENTRY && hashType !== HashType.AGENT)
       throw new Error(`Trying to retrieve a entry with a hash of another type`);
 
     const isPresent = this.state.CAS[hash];
 
-    // TODO only return local if GetOptions::content() is given
     if (isPresent && options.strategy === GetStrategy.Contents) {
       const entry = this.state.CAS[hash];
       return entry;

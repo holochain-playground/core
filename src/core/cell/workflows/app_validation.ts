@@ -82,17 +82,20 @@ export async function run_validation_callback_direct(
 ): Promise<ValidationOutcome> {
   const maybeEntryDef = await get_associated_entry_def(element, dna, workspace);
 
-  if ((maybeEntryDef as DepsMissing).depsHashes)
+  if (maybeEntryDef && (maybeEntryDef as DepsMissing).depsHashes)
     return {
       resolved: false,
       depsHashes: (maybeEntryDef as DepsMissing).depsHashes,
     };
 
-  const entryDef = maybeEntryDef as EntryDef;
-
   // TODO: implement validation package
 
-  return run_validation_callback_inner([zome], element, entryDef, workspace);
+  return run_validation_callback_inner(
+    [zome],
+    element,
+    maybeEntryDef as EntryDef | undefined,
+    workspace
+  );
 }
 
 async function get_associated_entry_def(
@@ -173,14 +176,18 @@ async function run_validation_callback_inner(
     dna: workspace.dna,
     p2p: workspace.p2p,
   };
-  const context = buildValidationFunctionContext(hostFnWorkspace);
 
   for (const zome of zomes_to_invoke) {
     for (const validateFn of fnsToCall) {
-      if (zome.zome_functions[validateFn]) {
-        const outcome: ValidationOutcome = await zome.zome_functions[
+      if (zome.validate_functions[validateFn]) {
+        const context = buildValidationFunctionContext(
+          hostFnWorkspace,
+          workspace.dna.zomes.findIndex(z => z === zome)
+        );
+
+        const outcome: ValidationOutcome = await zome.validate_functions[
           validateFn
-        ].call(context)(element);
+        ](context)(element);
         if (!outcome.resolved) return outcome;
         else if (!outcome.valid) return outcome;
       }
@@ -199,18 +206,21 @@ export async function run_create_link_validation_callback(
 ): Promise<ValidationOutcome> {
   const validateCreateLink = 'validate_create_link';
 
-  if (zome.zome_functions[validateCreateLink]) {
+  if (zome.validate_functions[validateCreateLink]) {
     const hostFnWorkspace: HostFnWorkspace = {
       cascade: new Cascade(workspace.state, workspace.p2p),
       state: workspace.state,
       dna: workspace.dna,
       p2p: workspace.p2p,
     };
-    const context = buildValidationFunctionContext(hostFnWorkspace);
+    const context = buildValidationFunctionContext(
+      hostFnWorkspace,
+      workspace.dna.zomes.findIndex(z => z === zome)
+    );
 
-    const outcome: ValidationOutcome = await zome.zome_functions[
+    const outcome: ValidationOutcome = await zome.validate_functions[
       validateCreateLink
-    ].call(context)({ link_add, base, target });
+    ](context)({ link_add, base, target });
 
     return outcome;
   }
@@ -228,18 +238,21 @@ export async function run_delete_link_validation_callback(
 ): Promise<ValidationOutcome> {
   const validateCreateLink = 'validate_delete_link';
 
-  if (zome.zome_functions[validateCreateLink]) {
+  if (zome.validate_functions[validateCreateLink]) {
     const hostFnWorkspace: HostFnWorkspace = {
       cascade: new Cascade(workspace.state, workspace.p2p),
       state: workspace.state,
       dna: workspace.dna,
       p2p: workspace.p2p,
     };
-    const context = buildValidationFunctionContext(hostFnWorkspace);
+    const context = buildValidationFunctionContext(
+      hostFnWorkspace,
+      workspace.dna.zomes.findIndex(z => z === zome)
+    );
 
-    const outcome: ValidationOutcome = await zome.zome_functions[
+    const outcome: ValidationOutcome = await zome.validate_functions[
       validateCreateLink
-    ].call(context)({ delete_link });
+    ](context)({ delete_link });
 
     return outcome;
   }
@@ -262,11 +275,13 @@ function get_element_validate_functions_to_invoke(
   if (header.type === HeaderType.Update) fnsComponents.push('update');
   if (header.type === HeaderType.Delete) fnsComponents.push('delete');
 
-  if ((header as NewEntryHeader).entry_type === 'Agent')
-    fnsComponents.push('agent');
-  if (((header as NewEntryHeader).entry_type as { App: AppEntryType }).App) {
-    fnsComponents.push('entry');
-    if (maybeEntryDef) fnsComponents.push(maybeEntryDef.id);
+  const entry_type = (header as NewEntryHeader).entry_type;
+  if (entry_type) {
+    if (entry_type === 'Agent') fnsComponents.push('agent');
+    if ((entry_type as { App: AppEntryType }).App) {
+      fnsComponents.push('entry');
+      if (maybeEntryDef) fnsComponents.push(maybeEntryDef.id);
+    }
   }
 
   return unpackValidateFnsComponents(fnsComponents);

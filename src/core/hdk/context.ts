@@ -45,13 +45,14 @@ export interface SimulatedZomeFunctionContext extends Hdk {
 }
 
 export function buildValidationFunctionContext(
-  workspace: HostFnWorkspace
+  workspace: HostFnWorkspace,
+  zome_index: number
 ): SimulatedValidateFunctionContext {
   return {
-    hash_entry: hash_entry(workspace),
-    get: get(workspace),
-    get_details: get_details(workspace),
-    get_links: get_links(workspace),
+    hash_entry: hash_entry(workspace, zome_index),
+    get: get(workspace, zome_index),
+    get_details: get_details(workspace, zome_index),
+    get_links: get_links(workspace, zome_index),
   };
 }
 
@@ -60,7 +61,7 @@ export function buildZomeFunctionContext(
   zome_index: number
 ): SimulatedZomeFunctionContext {
   const hdk: Hdk = {
-    ...buildValidationFunctionContext(workspace),
+    ...buildValidationFunctionContext(workspace, zome_index),
     create_entry: create_entry(workspace, zome_index),
     delete_entry: delete_entry(workspace, zome_index),
     update_entry: update_entry(workspace, zome_index),

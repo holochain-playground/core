@@ -3,6 +3,7 @@ import {
   EntryVisibility,
   Hash,
 } from '@holochain-open-dev/core-types';
+import { ValidationOutcome } from '../core/cell/sys_validate/types';
 import {
   SimulatedValidateFunctionContext,
   SimulatedZomeFunctionContext,
@@ -15,15 +16,20 @@ export interface SimulatedZomeFunctionArgument {
 
 export interface SimulatedZomeFunction {
   call: (
-    context: SimulatedZomeFunctionContext | SimulatedValidateFunctionContext
+    context: SimulatedZomeFunctionContext
   ) => (payload: any) => Promise<any>;
   arguments: SimulatedZomeFunctionArgument[];
 }
+
+export type SimulatedValidateFunction = (
+  context: SimulatedValidateFunctionContext
+) => (payload: any) => Promise<ValidationOutcome>;
 
 export interface SimulatedZome {
   name: string;
   entry_defs: Array<EntryDef>;
   zome_functions: Dictionary<SimulatedZomeFunction>;
+  validate_functions: Dictionary<SimulatedValidateFunction>;
   blocklyCode?: string;
 }
 
