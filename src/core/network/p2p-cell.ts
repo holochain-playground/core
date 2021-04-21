@@ -15,6 +15,7 @@ import {
   GetEntryResponse,
   GetLinksResponse,
 } from '../cell/cascade/types';
+import { SpaceActor } from './gossip/space_actor';
 import { Network } from './network';
 import {
   NetworkRequestInfo,
@@ -66,6 +67,12 @@ export class P2pCell {
 
   async join(containerCell: Cell): Promise<void> {
     this.network.bootstrapService.announceCell(this.cellId, containerCell);
+
+    // If there is no space actor for this dna, create one
+    const dnaHash = this.cellId[0];
+    if (!this.network.spaces[dnaHash]) {
+      this.network.spaces[dnaHash] = new SpaceActor(this.network, dnaHash);
+    }
 
     await this.syncNeighbors();
   }
