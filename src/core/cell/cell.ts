@@ -5,6 +5,7 @@ import {
   Dictionary,
   DHTOp,
   CapSecret,
+  Timestamp,
 } from '@holochain-open-dev/core-types';
 import { Conductor } from '../conductor';
 import { genesis, genesis_task } from './workflows/genesis';
@@ -14,7 +15,12 @@ import {
 } from './workflows/call_zome_fn';
 import { P2pCell } from '../network/p2p-cell';
 import { incoming_dht_ops_task } from './workflows/incoming_dht_ops';
-import { CellState } from './state';
+import {
+  CellState,
+  IntegratedDhtOpsValue,
+  query_dht_ops,
+  ValidationStatus,
+} from './state';
 import { Workflow, WorkflowType, Workspace } from './workflows/workflows';
 import { MiddlewareExecutor } from '../../executor/middleware-executor';
 import { GetLinksResponse, GetResult } from './cascade/types';
@@ -22,6 +28,8 @@ import { Authority } from './cascade/authority';
 import { getHashType, HashType } from '../../processors/hash';
 import { GetLinksOptions, GetOptions } from '../../types';
 import { cloneDeep } from 'lodash-es';
+import { DhtArc } from '../network/dht_arc';
+import { getDHTOpBasis } from './utils';
 
 export type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export type CellSignalListener = (payload: any) => void;
@@ -119,10 +127,10 @@ export class Cell {
 
   public handle_publish(
     from_agent: AgentPubKey,
-    dht_hash: Hash, // The basis for the DHTOps
+    request_validation_receipt: boolean,
     ops: Dictionary<DHTOp>
   ): Promise<void> {
-    return this._runWorkflow(incoming_dht_ops_task(from_agent, dht_hash, ops));
+    return this._runWorkflow(incoming_dht_ops_task(from_agent, ops));
   }
 
   public async handle_get(
@@ -162,6 +170,38 @@ export class Cell {
       payload,
       provenance: from_agent,
     });
+  }
+
+  /** Gossips */
+
+  public handle_fetch_op_hashes_for_constraints(
+    dht_arc: DhtArc,
+    since: number | undefined,
+    until: number | undefined
+  ): Array<Hash> {
+    return query_dht_ops(this._state.integratedDHTOps, since, until, dht_arc);
+  }
+
+  public handle_fetch_op_hash_data(op_hashes: Array<Hash>): Dictionary<DHTOp> {
+    const result: Dictionary<DHTOp> = {};
+    for (const opHash of op_hashes) {
+      const value = this._state.integratedDHTOps[opHash];
+      if (value) {
+        result[opHash] = value.op;
+      }
+    }
+    return result;
+  }
+
+  public handle_gossip_ops(op_hashes: Array<Hash>): Dictionary<DHTOp> {
+    const result: Dictionary<DHTOp> = {};
+    for (const opHash of op_hashes) {
+      const value = this._state.integratedDHTOps[opHash];
+      if (value) {
+        result[opHash] = value.op;
+      }
+    }
+    return result;
   }
 
   /** Workflow internal execution */

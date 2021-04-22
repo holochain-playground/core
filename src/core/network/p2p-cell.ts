@@ -15,7 +15,17 @@ import {
   GetEntryResponse,
   GetLinksResponse,
 } from '../cell/cascade/types';
+import { DhtArc } from './dht_arc';
 import { SpaceActor } from './gossip/space_actor';
+import {
+  GossipEvt,
+  OpConsistency,
+  OpCount,
+  OpDataAgentInfo,
+  OpHashesAgentHashes,
+  ReqOpDataEvt,
+  ReqOpHashesEvt,
+} from './gossip/types';
 import { Network } from './network';
 import {
   NetworkRequestInfo,
@@ -36,7 +46,7 @@ export class P2pCell {
   neighbors: AgentPubKey[];
   farKnownPeers: AgentPubKey[];
 
-  redundancyFactor: number;
+  storageArc: DhtArc;
   neighborNumber: number;
 
   networkRequestsExecutor = new MiddlewareExecutor<
@@ -61,6 +71,13 @@ export class P2pCell {
       redundancyFactor: this.redundancyFactor,
       neighborNumber: this.neighborNumber,
     };
+  }
+
+  get cell(): Cell {
+    return this.network.conductor.getCell(
+      this.cellId[0],
+      this.cellId[1]
+    ) as Cell;
   }
 
   /** P2p actions */
@@ -90,7 +107,7 @@ export class P2pCell {
           cell,
           NetworkRequestType.PUBLISH_REQUEST,
           { dhtOps: ops },
-          (cell: Cell) => cell.handle_publish(this.cellId[1], dht_hash, ops)
+          (cell: Cell) => cell.handle_publish(this.cellId[1], true, ops)
         )
     );
   }
@@ -203,6 +220,96 @@ export class P2pCell {
       setTimeout(() => this.syncNeighbors(), 400);
     }
   }
+
+  /** Gossip */
+
+  public async fetch_op_hashes_for_constraints(
+    input: ReqOpHashesEvt
+  ): Promise<OpHashesAgentHashes> {
+    // TODO: remove peer discovery?
+    return this.network.kitsune.rpc_single(
+      this.cellId[0],
+      this.cellId[1],
+      input.to_agent,
+      (cell: Cell) =>
+        this._executeNetworkRequest(
+          cell,
+          NetworkRequestType.GOSSIP,
+          {},
+          (cell: Cell) => cell.p2p.handle_fetch_op_hashes_for_constraints(input)
+        )
+    );
+  }
+
+  public async handle_fetch_op_hashes_for_constraints(
+    input: ReqOpHashesEvt
+  ): Promise<OpHashesAgentHashes> {
+    const dhtOpsHashes = this.cell.handle_fetch_op_hashes_for_constraints(
+      input.dht_arc,
+      input.since_utc_epoch_s,
+      input.until_utc_epoch_s
+    );
+    const neighbors: Array<[string, number]> = this.neighbors.map(n => [n, 0]); // TODO: what to do with this 0?
+
+    const consistentCount = (input.op_count as { Consistent: number })
+      .Consistent;
+    let consistency: OpConsistency = 'Consistent';
+    if (consistentCount) {
+      if (consistentCount === dhtOpsHashes.length) {
+        consistency = 'Consistent';
+      } else {
+        consistency = { Variance: dhtOpsHashes };
+      }
+    } else {
+      consistency = { Variance: dhtOpsHashes };
+    }
+
+    return [consistency, neighbors];
+  }
+  public async fetch_op_data(input: ReqOpDataEvt): Promise<OpDataAgentInfo> {
+    // TODO: remove peer discovery?
+    return this.network.kitsune.rpc_single(
+      this.cellId[0],
+      this.cellId[1],
+      input.to_agent,
+      (cell: Cell) =>
+        this._executeNetworkRequest(
+          cell,
+          NetworkRequestType.GOSSIP,
+          {},
+          (cell: Cell) => cell.p2p.handle_fetch_op_data(input)
+        )
+    );
+  }
+
+  public async handle_fetch_op_data(
+    input: ReqOpDataEvt
+  ): Promise<OpDataAgentInfo> {
+    const dhtOps = this.cell.handle_fetch_op_hash_data(input.op_hashes);
+    return [dhtOps, this.neighbors];
+  }
+
+  public async gossip_ops(input: GossipEvt): Promise<void> {
+    // TODO: remove peer discovery?
+    await this.network.kitsune.rpc_single(
+      this.cellId[0],
+      this.cellId[1],
+      input.to_agent,
+      (cell: Cell) =>
+        this._executeNetworkRequest(
+          cell,
+          NetworkRequestType.GOSSIP,
+          {},
+          (cell: Cell) => cell.p2p.handle_gossip_ops(input)
+        )
+    );
+  }
+
+  public async handle_gossip_ops(input: GossipEvt): Promise<void> {
+    await this.cell.handle_publish(input.from_agent, false, input.ops);
+  }
+
+  /** Executors */
 
   private _executeNetworkRequest<R, T extends NetworkRequestType, D>(
     toCell: Cell,

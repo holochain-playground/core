@@ -4,7 +4,10 @@ import {
   Dictionary,
   Hash,
   Metadata,
+  Timestamp,
 } from '@holochain-open-dev/core-types';
+import { location } from '../../processors/hash';
+import { contains, DhtArc } from '../network/dht_arc';
 
 export interface CellState {
   dnaHash: Hash;
@@ -58,4 +61,23 @@ export interface ValidationLimboValue {
   last_try: number | undefined;
   num_tries: number;
   from_agent: AgentPubKey | undefined;
+}
+
+export function query_dht_ops(
+  integratedDHTOps: Dictionary<IntegratedDhtOpsValue>,
+  from: number | undefined,
+  to: number | undefined,
+  dht_arc: DhtArc
+): Array<Hash> {
+  const isDhtOpsInFilter = ([dhtOpHash, dhtOpValue]: [
+    Hash,
+    IntegratedDhtOpsValue
+  ]) => {
+    if (from && dhtOpValue.when_integrated < from) return false;
+    if (to && dhtOpValue.when_integrated > to) return false;
+    if (dht_arc && !contains(dht_arc, location(dhtOpHash))) return false;
+  };
+
+  const ops = Object.entries(integratedDHTOps).filter(isDhtOpsInFilter);
+  return ops.map(op => op[0]);
 }

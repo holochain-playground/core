@@ -13,10 +13,10 @@ import {
 import { putValidationLimboValue } from '../dht/put';
 import { sys_validation_task } from './sys_validation';
 import { WorkflowReturn, WorkflowType, Workspace } from './workflows';
+import { getDHTOpBasis } from '../utils';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/incoming_dht_ops_workflow.rs
 export const incoming_dht_ops = (
-  basis: Hash,
   dhtOps: Dictionary<DHTOp>,
   from_agent: AgentPubKey | undefined
 ) => async (worskpace: Workspace): Promise<WorkflowReturn<void>> => {
@@ -27,6 +27,8 @@ export const incoming_dht_ops = (
       !worskpace.state.validationLimbo[dhtOpHash]
     ) {
       const dhtOp = dhtOps[dhtOpHash];
+
+      const basis = getDHTOpBasis(dhtOp);
 
       const validationLimboValue: ValidationLimboValue = {
         basis,
@@ -49,22 +51,20 @@ export const incoming_dht_ops = (
 };
 
 export type IncomingDhtOpsWorkflow = Workflow<
-  { from_agent: AgentPubKey; dht_hash: Hash; ops: Dictionary<DHTOp> },
+  { from_agent: AgentPubKey; ops: Dictionary<DHTOp> },
   void
 >;
 
 export function incoming_dht_ops_task(
   from_agent: AgentPubKey,
-  dht_hash: Hash, // The basis for the DHTOps
   ops: Dictionary<DHTOp>
 ): IncomingDhtOpsWorkflow {
   return {
     type: WorkflowType.INCOMING_DHT_OPS,
     details: {
       from_agent,
-      dht_hash,
       ops,
     },
-    task: worskpace => incoming_dht_ops(dht_hash, ops, from_agent)(worskpace),
+    task: worskpace => incoming_dht_ops(ops, from_agent)(worskpace),
   };
 }

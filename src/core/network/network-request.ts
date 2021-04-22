@@ -7,6 +7,7 @@ export enum NetworkRequestType {
   ADD_NEIGHBOR = 'Add Neighbor',
   PUBLISH_REQUEST = 'Publish Request',
   GET_REQUEST = 'Get Request',
+  GOSSIP = 'Gossip',
 }
 
 export type NetworkRequest<T> = (cell: Cell) => Promise<T>;
