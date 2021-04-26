@@ -18,7 +18,8 @@
   "dependencies": {
     "@holochain-open-dev/core-types": "git+https://github.com/holochain-open-dev/core-types.git#build",
     "blakejs": "^1.1.0",
-    "lodash-es": "^4.17.20"
+    "lodash-es": "^4.17.20",
+    "unique-names-generator": "^4.4.0"
   },
   "devDependencies": {
     "@esm-bundle/chai": "^4.1.5",

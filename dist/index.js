@@ -1,5 +1,6 @@
 import { serializeHash, getSysMetaValHeaderHash, DHTOpType, HeaderType, EntryDhtStatus, DetailsType, getEntry, ChainStatus, now, elementToDHTOps } from '@holochain-open-dev/core-types';
 import { uniq, isEqual, cloneDeep } from 'lodash-es';
+import { uniqueNamesGenerator, names } from 'unique-names-generator';
 
 var ERROR_MSG_INPUT = 'Input must be an string, Buffer or Uint8Array';
 
@@ -2779,6 +2780,7 @@ class Conductor {
         this.network = new Network(state.networkState, this, bootstrapService);
         this.registeredDnas = state.registeredDnas;
         this.registeredTemplates = state.registeredTemplates;
+        this.name = state.name;
         this.cells = {};
         for (const [dnaHash, dnaCellsStates] of Object.entries(state.cellsState)) {
             if (!this.cells[dnaHash])
@@ -2788,7 +2790,7 @@ class Conductor {
             }
         }
     }
-    static async create(bootstrapService) {
+    static async create(bootstrapService, name) {
         const state = {
             cellsState: {},
             networkState: {
@@ -2796,6 +2798,7 @@ class Conductor {
             },
             registeredDnas: {},
             registeredTemplates: {},
+            name,
         };
         return new Conductor(state, bootstrapService);
     }
@@ -2807,6 +2810,7 @@ class Conductor {
             }
         }
         return {
+            name: this.name,
             networkState: this.network.getState(),
             cellsState,
             registeredDnas: this.registeredDnas,
@@ -3007,13 +3011,17 @@ class BootstrapService {
     }
 }
 
+const config = {
+    dictionaries: [names],
+};
 async function createConductors(conductorsToCreate, currentConductors, dnaTemplate) {
     const bootstrapService = currentConductors.length === 0
         ? new BootstrapService()
         : currentConductors[0].network.bootstrapService;
     const newConductorsPromises = [];
     for (let i = 0; i < conductorsToCreate; i++) {
-        const conductor = Conductor.create(bootstrapService);
+        const characterName = uniqueNamesGenerator(config);
+        const conductor = Conductor.create(bootstrapService, characterName);
         newConductorsPromises.push(conductor);
     }
     const newConductors = await Promise.all(newConductorsPromises);
