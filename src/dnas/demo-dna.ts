@@ -1,5 +1,9 @@
 import { GetStrategy } from '../types';
-import { SimulatedDna, SimulatedZome } from './simulated-dna';
+import {
+  SimulatedDna,
+  SimulatedHappBundle,
+  SimulatedZome,
+} from './simulated-dna';
 
 export const demoEntriesZome: SimulatedZome = {
   name: 'demo_entries',
@@ -107,11 +111,24 @@ export const demoPathsZome: SimulatedZome = {
   validation_functions: {},
 };
 
-export function demoDnaTemplate(): SimulatedDna {
+export function demoDna(): SimulatedDna {
   const zomes = [demoEntriesZome, demoLinksZome, demoPathsZome];
   return {
     properties: {},
     uid: '',
     zomes,
+  };
+}
+
+export function demoHapp(): SimulatedHappBundle {
+  return {
+    name: 'demo-happ',
+    description: '',
+    slots: {
+      default: {
+        dna: demoDna(),
+        deferred: false,
+      },
+    },
   };
 }
