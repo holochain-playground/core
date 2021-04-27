@@ -1,5 +1,5 @@
 import { GetStrategy } from '../types';
-import { SimulatedDnaTemplate, SimulatedZome } from './simulated-dna';
+import { SimulatedDna, SimulatedZome } from './simulated-dna';
 
 export const demoEntriesZome: SimulatedZome = {
   name: 'demo_entries',
@@ -107,9 +107,11 @@ export const demoPathsZome: SimulatedZome = {
   validation_functions: {},
 };
 
-export function demoDnaTemplate(): SimulatedDnaTemplate {
+export function demoDnaTemplate(): SimulatedDna {
   const zomes = [demoEntriesZome, demoLinksZome, demoPathsZome];
   return {
+    properties: {},
+    uid: '',
     zomes,
   };
 }
