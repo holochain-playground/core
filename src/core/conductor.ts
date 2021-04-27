@@ -161,6 +161,7 @@ export class Conductor {
     this.installedHapps[installedAppId].slots[slotNick].clones.push(
       cell.cellId
     );
+    this.registeredDnas[newDnaHash] = dna;
 
     return cell;
   }
