@@ -1,6 +1,6 @@
 import { BootstrapService } from '../bootstrap/bootstrap-service';
 import { Conductor } from '../core/conductor';
-import { SimulatedDna, SimulatedHappBundle } from '../dnas/simulated-dna';
+import { SimulatedHappBundle } from '../dnas/simulated-dna';
 import { uniqueNamesGenerator, Config, names } from 'unique-names-generator';
 
 const config: Config = {
@@ -10,7 +10,7 @@ const config: Config = {
 export async function createConductors(
   conductorsToCreate: number,
   currentConductors: Conductor[],
-  dna: SimulatedDna
+  happ: SimulatedHappBundle
 ): Promise<Conductor[]> {
   const bootstrapService =
     currentConductors.length === 0
@@ -27,17 +27,6 @@ export async function createConductors(
   const newConductors = await Promise.all(newConductorsPromises);
 
   const allConductors = [...currentConductors, ...newConductors];
-
-  const happ: SimulatedHappBundle = {
-    name: 'simulated-app',
-    description: '',
-    slots: {
-      default: {
-        dna,
-        deferred: false,
-      },
-    },
-  };
 
   await Promise.all(allConductors.map(async c => c.installHapp(happ, {})));
 
