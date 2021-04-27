@@ -2779,7 +2779,7 @@ class Conductor {
     constructor(state, bootstrapService) {
         this.network = new Network(state.networkState, this, bootstrapService);
         this.registeredDnas = state.registeredDnas;
-        this.registeredTemplates = state.registeredTemplates;
+        this.installedHapps = state.installedHapps;
         this.name = state.name;
         this.cells = {};
         for (const [dnaHash, dnaCellsStates] of Object.entries(state.cellsState)) {
@@ -2797,7 +2797,7 @@ class Conductor {
                 p2pCellsState: {},
             },
             registeredDnas: {},
-            registeredTemplates: {},
+            installedHapps: {},
             name,
         };
         return new Conductor(state, bootstrapService);
@@ -2814,7 +2814,7 @@ class Conductor {
             networkState: this.network.getState(),
             cellsState,
             registeredDnas: this.registeredDnas,
-            registeredTemplates: this.registeredTemplates,
+            installedHapps: this.installedHapps,
         };
     }
     getAllCells() {
@@ -2828,32 +2828,60 @@ class Conductor {
     getCell(dnaHash, agentPubKey) {
         return this.cells[dnaHash] ? this.cells[dnaHash][agentPubKey] : undefined;
     }
-    async registerDna(dna_template) {
-        const templateHash = hash(dna_template, HashType.DNA);
-        this.registeredTemplates[templateHash] = dna_template;
-        return templateHash;
+    /** Admin API */
+    /*
+    async registerDna(dna_template: SimulatedDna): Promise<Hash> {
+      const templateHash = hash(dna_template, HashType.DNA);
+  
+      this.registeredDnas[templateHash] = dna_template;
+      return templateHash;
+    } */
+    async cloneCell(installedAppId, slotNick, uid, properties, membraneProof) {
+        if (!this.installedHapps[installedAppId])
+            throw new Error(`Given app id doesn't exist`);
+        const installedApp = this.installedHapps[installedAppId];
+        if (!installedApp.slots[slotNick])
+            throw new Error(`The slot nick doesn't exist for the given app id`);
+        const slotToClone = installedApp.slots[slotNick];
+        const hashOfDnaToClone = slotToClone.base_cell_id[0];
+        const dnaToClone = this.registeredDnas[hashOfDnaToClone];
+        if (!dnaToClone) {
+            throw new Error(`The dna to be cloned is not registered on this conductor`);
+        }
+        const dna = dnaToClone;
+        if (uid)
+            dna.uid = uid;
+        if (properties)
+            dna.properties = properties;
+        const newDnaHash = hash(dna, HashType.DNA);
+        if (newDnaHash === hashOfDnaToClone)
+            throw new Error(`Trying to clone a dna would create exactly the same DNA`);
+        const cell = await this.createCell(dna, installedApp.agent_pub_key, membraneProof);
+        this.installedHapps[installedAppId].slots[slotNick].clones.push(cell.cellId);
+        return cell;
     }
-    async installApp(dna_hash, membrane_proof, properties, uuid) {
+    async installHapp(happ, membrane_proofs // segmented by CellNick
+    ) {
         const rand = `${Math.random().toString()}/${Date.now()}`;
         const agentId = hash(rand, HashType.AGENT);
-        const template = this.registeredTemplates[dna_hash];
-        if (!template) {
-            throw new Error(`The given dna is not registered on this conductor`);
+        for (const [cellNick, dnaSlot] of Object.entries(happ.slots)) {
+            const dnaHash = hash(dnaSlot.dna, HashType.DNA);
+            this.registeredDnas[dnaHash] = dnaSlot.dna;
+            if (!dnaSlot.deferred) {
+                this.createCell(dnaSlot.dna, agentId, membrane_proofs[cellNick]);
+            }
         }
-        const dna = {
-            ...template,
-            properties,
-            uuid,
-        };
-        const dnaHash = hash(dna, HashType.DNA);
-        this.registeredDnas[dnaHash] = dna;
-        const cellId = [dnaHash, agentId];
-        const cell = await Cell.create(this, cellId, membrane_proof);
+    }
+    async createCell(dna, agentPubKey, membraneProof) {
+        const newDnaHash = hash(dna, HashType.DNA);
+        const cellId = [newDnaHash, agentPubKey];
+        const cell = await Cell.create(this, cellId, membraneProof);
         if (!this.cells[cell.dnaHash])
             this.cells[cell.dnaHash] = {};
         this.cells[cell.dnaHash][cell.agentPubKey] = cell;
         return cell;
     }
+    /** App API */
     callZomeFn(args) {
         const dnaHash = args.cellId[0];
         const agentPubKey = args.cellId[1];
@@ -2978,10 +3006,24 @@ const demoPathsZome = {
     },
     validation_functions: {},
 };
-function demoDnaTemplate() {
+function demoDna() {
     const zomes = [demoEntriesZome, demoLinksZome, demoPathsZome];
     return {
+        properties: {},
+        uid: '',
         zomes,
+    };
+}
+function demoHapp() {
+    return {
+        name: 'demo-happ',
+        description: '',
+        slots: {
+            default: {
+                dna: demoDna(),
+                deferred: false,
+            },
+        },
     };
 }
 
@@ -3014,7 +3056,7 @@ class BootstrapService {
 const config = {
     dictionaries: [names],
 };
-async function createConductors(conductorsToCreate, currentConductors, dnaTemplate) {
+async function createConductors(conductorsToCreate, currentConductors, happ) {
     const bootstrapService = currentConductors.length === 0
         ? new BootstrapService()
         : currentConductors[0].network.bootstrapService;
@@ -3026,12 +3068,9 @@ async function createConductors(conductorsToCreate, currentConductors, dnaTempla
     }
     const newConductors = await Promise.all(newConductorsPromises);
     const allConductors = [...currentConductors, ...newConductors];
-    await Promise.all(allConductors.map(async (c) => {
-        const dnaHash = await c.registerDna(dnaTemplate);
-        await c.installApp(dnaHash, null, null, '');
-    }));
+    await Promise.all(allConductors.map(async (c) => c.installHapp(happ, {})));
     return allConductors;
 }
 
-export { AGENT_PREFIX, Authority, Cascade, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, GetStrategy, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDeleteLink, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, computeDhtStatus, counterfeit_check, createConductors, deleteValidationLimboValue, demoDnaTemplate, demoEntriesZome, demoLinksZome, demoPathsZome, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAllHeldHeaders, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getCreateLinksForEntry, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getLiveLinks, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getRemovesOnLinkAdd, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingElement, isHoldingEntry, location, locationDistance, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, run_create_link_validation_callback, run_delete_link_validation_callback, run_validation_callback_direct, sleep, store_element, store_entry, sys_validate_element, sys_validation, sys_validation_task, valid_cap_grant, workflowPriority, wrap };
+export { AGENT_PREFIX, Authority, Cascade, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, GetStrategy, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDeleteLink, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, computeDhtStatus, counterfeit_check, createConductors, deleteValidationLimboValue, demoDna, demoEntriesZome, demoHapp, demoLinksZome, demoPathsZome, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAllHeldHeaders, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getCreateLinksForEntry, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getLiveLinks, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getRemovesOnLinkAdd, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingElement, isHoldingEntry, location, locationDistance, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, run_create_link_validation_callback, run_delete_link_validation_callback, run_validation_callback_direct, sleep, store_element, store_entry, sys_validate_element, sys_validation, sys_validation_task, valid_cap_grant, workflowPriority, wrap };
 //# sourceMappingURL=index.js.map

@@ -8,7 +8,11 @@ import { Cell, getCellId } from '../core/cell';
 import { hash, HashType } from '../processors/hash';
 import { Network, NetworkState } from './network/network';
 
-import { SimulatedDna, SimulatedDnaTemplate } from '../dnas/simulated-dna';
+import {
+  InstalledHapps,
+  SimulatedDna,
+  SimulatedHappBundle,
+} from '../dnas/simulated-dna';
 import { CellState } from './cell/state';
 import { BootstrapService } from '../bootstrap/bootstrap-service';
 
@@ -16,15 +20,15 @@ export interface ConductorState {
   // DnaHash / AgentPubKey
   cellsState: Dictionary<Dictionary<CellState>>;
   networkState: NetworkState;
-  registeredTemplates: Dictionary<SimulatedDnaTemplate>;
   registeredDnas: Dictionary<SimulatedDna>;
+  installedHapps: Dictionary<InstalledHapps>;
   name: string;
 }
 
 export class Conductor {
   readonly cells: Dictionary<Dictionary<Cell>>;
-  registeredTemplates!: Dictionary<SimulatedDnaTemplate>;
   registeredDnas!: Dictionary<SimulatedDna>;
+  installedHapps!: Dictionary<InstalledHapps>;
 
   network: Network;
   name: string;
@@ -32,7 +36,7 @@ export class Conductor {
   constructor(state: ConductorState, bootstrapService: BootstrapService) {
     this.network = new Network(state.networkState, this, bootstrapService);
     this.registeredDnas = state.registeredDnas;
-    this.registeredTemplates = state.registeredTemplates;
+    this.installedHapps = state.installedHapps;
     this.name = state.name;
 
     this.cells = {};
@@ -59,7 +63,7 @@ export class Conductor {
         p2pCellsState: {},
       },
       registeredDnas: {},
-      registeredTemplates: {},
+      installedHapps: {},
       name,
     };
 
@@ -82,7 +86,7 @@ export class Conductor {
       networkState: this.network.getState(),
       cellsState,
       registeredDnas: this.registeredDnas,
-      registeredTemplates: this.registeredTemplates,
+      installedHapps: this.installedHapps,
     };
   }
 
@@ -103,37 +107,90 @@ export class Conductor {
     return this.cells[dnaHash] ? this.cells[dnaHash][agentPubKey] : undefined;
   }
 
-  async registerDna(dna_template: SimulatedDnaTemplate): Promise<Hash> {
+  /** Admin API */
+  /* 
+  async registerDna(dna_template: SimulatedDna): Promise<Hash> {
     const templateHash = hash(dna_template, HashType.DNA);
 
-    this.registeredTemplates[templateHash] = dna_template;
+    this.registeredDnas[templateHash] = dna_template;
     return templateHash;
+  } */
+
+  async cloneCell(
+    installedAppId: string,
+    slotNick: string,
+    uid?: string,
+    properties?: Dictionary<any>,
+    membraneProof?: any
+  ): Promise<Cell> {
+    if (!this.installedHapps[installedAppId])
+      throw new Error(`Given app id doesn't exist`);
+
+    const installedApp = this.installedHapps[installedAppId];
+    if (!installedApp.slots[slotNick])
+      throw new Error(`The slot nick doesn't exist for the given app id`);
+
+    const slotToClone = installedApp.slots[slotNick];
+
+    const hashOfDnaToClone = slotToClone.base_cell_id[0];
+    const dnaToClone = this.registeredDnas[hashOfDnaToClone];
+
+    if (!dnaToClone) {
+      throw new Error(
+        `The dna to be cloned is not registered on this conductor`
+      );
+    }
+
+    const dna: SimulatedDna = dnaToClone;
+
+    if (uid) dna.uid = uid;
+    if (properties) dna.properties = properties;
+
+    const newDnaHash = hash(dna, HashType.DNA);
+
+    if (newDnaHash === hashOfDnaToClone)
+      throw new Error(
+        `Trying to clone a dna would create exactly the same DNA`
+      );
+
+    const cell = await this.createCell(
+      dna,
+      installedApp.agent_pub_key,
+      membraneProof
+    );
+    this.installedHapps[installedAppId].slots[slotNick].clones.push(
+      cell.cellId
+    );
+
+    return cell;
   }
 
-  async installApp(
-    dna_hash: Hash,
-    membrane_proof: any,
-    properties: any,
-    uuid: string
-  ): Promise<Cell> {
+  async installHapp(
+    happ: SimulatedHappBundle,
+    membrane_proofs: Dictionary<any> // segmented by CellNick
+  ): Promise<void> {
     const rand = `${Math.random().toString()}/${Date.now()}`;
     const agentId = hash(rand, HashType.AGENT);
 
-    const template = this.registeredTemplates[dna_hash];
-    if (!template) {
-      throw new Error(`The given dna is not registered on this conductor`);
+    for (const [cellNick, dnaSlot] of Object.entries(happ.slots)) {
+      const dnaHash = hash(dnaSlot.dna, HashType.DNA);
+      this.registeredDnas[dnaHash] = dnaSlot.dna;
+
+      if (!dnaSlot.deferred) {
+        this.createCell(dnaSlot.dna, agentId, membrane_proofs[cellNick]);
+      }
     }
+  }
 
-    const dna: SimulatedDna = {
-      ...template,
-      properties,
-      uuid,
-    };
-    const dnaHash = hash(dna, HashType.DNA);
-    this.registeredDnas[dnaHash] = dna;
+  private async createCell(
+    dna: SimulatedDna,
+    agentPubKey: string,
+    membraneProof?: any
+  ): Promise<Cell> {
+    const newDnaHash = hash(dna, HashType.DNA);
 
-    const cellId: CellId = [dnaHash, agentId];
-    const cell = await Cell.create(this, cellId, membrane_proof);
+    const cellId: CellId = [newDnaHash, agentPubKey];
+    const cell = await Cell.create(this, cellId, membraneProof);
 
     if (!this.cells[cell.dnaHash]) this.cells[cell.dnaHash] = {};
 
@@ -141,6 +198,8 @@ export class Conductor {
 
     return cell;
   }
+
+  /** App API */
 
   callZomeFn(args: {
     cellId: CellId;
