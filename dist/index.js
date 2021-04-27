@@ -2864,11 +2864,21 @@ class Conductor {
     ) {
         const rand = `${Math.random().toString()}/${Date.now()}`;
         const agentId = hash(rand, HashType.AGENT);
+        this.installedHapps[happ.name] = {
+            agent_pub_key: agentId,
+            app_id: happ.name,
+            slots: {},
+        };
         for (const [cellNick, dnaSlot] of Object.entries(happ.slots)) {
             const dnaHash = hash(dnaSlot.dna, HashType.DNA);
             this.registeredDnas[dnaHash] = dnaSlot.dna;
+            this.installedHapps[happ.name].slots[cellNick] = {
+                base_cell_id: [dnaHash, agentId],
+                is_provisioned: !dnaSlot.deferred,
+                clones: [],
+            };
             if (!dnaSlot.deferred) {
-                this.createCell(dnaSlot.dna, agentId, membrane_proofs[cellNick]);
+                await this.createCell(dnaSlot.dna, agentId, membrane_proofs[cellNick]);
             }
         }
     }

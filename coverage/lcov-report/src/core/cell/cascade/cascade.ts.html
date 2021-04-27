@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">90.52% </span>
+                <span class="strong">90.95% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>210/232</span>
+                <span class='fraction'>211/232</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">56.1% </span>
+                <span class="strong">63.41% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>23/41</span>
+                <span class='fraction'>26/41</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">90.52% </span>
+                <span class="strong">90.95% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>210/232</span>
+                <span class='fraction'>211/232</span>
             </div>
         
             
@@ -337,38 +337,38 @@
 <span class="cline-any cline-yes">65x</span>
 <span class="cline-any cline-yes">65x</span>
 <span class="cline-any cline-yes">66x</span>
-<span class="cline-any cline-yes">61x</span>
-<span class="cline-any cline-yes">61x</span>
-<span class="cline-any cline-yes">61x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">58x</span>
+<span class="cline-any cline-yes">58x</span>
+<span class="cline-any cline-yes">58x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">66x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-yes">16x</span>
-<span class="cline-any cline-yes">66x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">40x</span>
-<span class="cline-any cline-yes">40x</span>
-<span class="cline-any cline-yes">40x</span>
-<span class="cline-any cline-yes">40x</span>
-<span class="cline-any cline-yes">40x</span>
-<span class="cline-any cline-yes">40x</span>
-<span class="cline-any cline-yes">40x</span>
-<span class="cline-any cline-yes">40x</span>
-<span class="cline-any cline-yes">40x</span>
-<span class="cline-any cline-yes">40x</span>
-<span class="cline-any cline-yes">27x</span>
-<span class="cline-any cline-yes">27x</span>
-<span class="cline-any cline-yes">27x</span>
-<span class="cline-any cline-yes">13x</span>
-<span class="cline-any cline-yes">13x</span>
-<span class="cline-any cline-yes">13x</span>
-<span class="cline-any cline-yes">40x</span>
 <span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">40x</span>
-<span class="cline-any cline-yes">40x</span>
+<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-yes">66x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">46x</span>
+<span class="cline-any cline-yes">46x</span>
+<span class="cline-any cline-yes">46x</span>
+<span class="cline-any cline-yes">46x</span>
+<span class="cline-any cline-yes">46x</span>
+<span class="cline-any cline-yes">46x</span>
+<span class="cline-any cline-yes">46x</span>
+<span class="cline-any cline-yes">46x</span>
+<span class="cline-any cline-yes">46x</span>
+<span class="cline-any cline-yes">46x</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-yes">17x</span>
+<span class="cline-any cline-yes">17x</span>
+<span class="cline-any cline-yes">17x</span>
+<span class="cline-any cline-yes">46x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">46x</span>
+<span class="cline-any cline-yes">46x</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">4x</span>
@@ -572,11 +572,11 @@ export class Cascade {
       const signed_header = this.state.CAS[hash];
       return signed_header;
     }
-<span class="branch-0 cbranch-no" title="branch not covered" ></span>
+&nbsp;
     const result = await this.p2p.get(hash, options);
 &nbsp;
-    if (result<span class="branch-0 cbranch-no" title="branch not covered" > &amp;&amp; (result as GetElementResponse).signed_header)</span> <span class="branch-0 cbranch-no" title="branch not covered" ><span class="branch-0 cbranch-no" title="branch not covered" >{</span></span>
-<span class="cstat-no" title="statement not covered" >      return (result as GetElementResponse).signed_header;</span>
+    if (result<span class="branch-0 cbranch-no" title="branch not covered" > &amp;&amp; (result as GetElementResponse).signed_header)</span> <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
+      return (result as GetElementResponse).signed_header;
     } else return undefined;
   }
 &nbsp;
@@ -597,7 +597,7 @@ export class Cascade {
 &nbsp;
     const result = await this.p2p.get(hash, options);
 &nbsp;
-    if (result<span class="branch-0 cbranch-no" title="branch not covered" > &amp;&amp; (result as GetEntryResponse).entry)</span> {
+    if (result &amp;&amp; (result as GetEntryResponse).entry) {
       return (result as GetEntryResponse).entry;
     } else return undefined;
   }
@@ -760,7 +760,7 @@ export class Cascade {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank">istanbul</a>
-                at Tue Apr 27 2021 18:19:06 GMT+0200 (Hora d’estiu del Centre d’Europa)
+                at Tue Apr 27 2021 18:45:24 GMT+0200 (Hora d’estiu del Centre d’Europa)
             </div>
         </div>
         <script src="../../../../prettify.js"></script>
