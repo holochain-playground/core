@@ -2848,7 +2848,7 @@ class Conductor {
         if (!dnaToClone) {
             throw new Error(`The dna to be cloned is not registered on this conductor`);
         }
-        const dna = dnaToClone;
+        const dna = { ...dnaToClone };
         if (uid)
             dna.uid = uid;
         if (properties)

@@ -141,7 +141,7 @@ export class Conductor {
       );
     }
 
-    const dna: SimulatedDna = dnaToClone;
+    const dna: SimulatedDna = { ...dnaToClone };
 
     if (uid) dna.uid = uid;
     if (properties) dna.properties = properties;
