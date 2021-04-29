@@ -141,7 +141,7 @@ export class Conductor {
       );
     }
 
-    const dna: SimulatedDna = dnaToClone;
+    const dna: SimulatedDna = { ...dnaToClone };
 
     if (uid) dna.uid = uid;
     if (properties) dna.properties = properties;
@@ -161,6 +161,7 @@ export class Conductor {
     this.installedHapps[installedAppId].slots[slotNick].clones.push(
       cell.cellId
     );
+    this.registeredDnas[newDnaHash] = dna;
 
     return cell;
   }
@@ -172,12 +173,28 @@ export class Conductor {
     const rand = `${Math.random().toString()}/${Date.now()}`;
     const agentId = hash(rand, HashType.AGENT);
 
+    this.installedHapps[happ.name] = {
+      agent_pub_key: agentId,
+      app_id: happ.name,
+      slots: {},
+    };
+
     for (const [cellNick, dnaSlot] of Object.entries(happ.slots)) {
       const dnaHash = hash(dnaSlot.dna, HashType.DNA);
       this.registeredDnas[dnaHash] = dnaSlot.dna;
 
+      this.installedHapps[happ.name].slots[cellNick] = {
+        base_cell_id: [dnaHash, agentId],
+        is_provisioned: !dnaSlot.deferred,
+        clones: [],
+      };
+
       if (!dnaSlot.deferred) {
-        this.createCell(dnaSlot.dna, agentId, membrane_proofs[cellNick]);
+        const cell = await this.createCell(
+          dnaSlot.dna,
+          agentId,
+          membrane_proofs[cellNick]
+        );
       }
     }
   }
