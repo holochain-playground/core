@@ -15,6 +15,7 @@ import {
 } from '../dnas/simulated-dna';
 import { CellState } from './cell/state';
 import { BootstrapService } from '../bootstrap/bootstrap-service';
+import { BadAgent, BadAgentConfig } from './bad-agent';
 
 export interface ConductorState {
   // DnaHash / AgentPubKey
@@ -23,6 +24,7 @@ export interface ConductorState {
   registeredDnas: Dictionary<SimulatedDna>;
   installedHapps: Dictionary<InstalledHapps>;
   name: string;
+  badAgent: BadAgent | undefined;
 }
 
 export class Conductor {
@@ -32,6 +34,8 @@ export class Conductor {
 
   network: Network;
   name: string;
+
+  badAgent: BadAgent | undefined; // If undefined, this is an honest agent
 
   constructor(state: ConductorState, bootstrapService: BootstrapService) {
     this.network = new Network(state.networkState, this, bootstrapService);
@@ -65,6 +69,7 @@ export class Conductor {
       registeredDnas: {},
       installedHapps: {},
       name,
+      badAgent: undefined,
     };
 
     return new Conductor(state, bootstrapService);
@@ -87,6 +92,7 @@ export class Conductor {
       cellsState,
       registeredDnas: this.registeredDnas,
       installedHapps: this.installedHapps,
+      badAgent: this.badAgent,
     };
   }
 
@@ -105,6 +111,22 @@ export class Conductor {
 
   getCell(dnaHash: Hash, agentPubKey: AgentPubKey): Cell | undefined {
     return this.cells[dnaHash] ? this.cells[dnaHash][agentPubKey] : undefined;
+  }
+
+  /** Bad agents */
+
+  setBadAgent(badAgentConfig: BadAgentConfig) {
+    if (!this.badAgent)
+      this.badAgent = { config: badAgentConfig, counterfeitDnas: {} };
+    this.badAgent.config = badAgentConfig;
+  }
+
+  setCounterfeitDna(cellId: CellId, dna: SimulatedDna) {
+    if (!this.badAgent) throw new Error('This is not a bad agent');
+
+    if (!this.badAgent.counterfeitDnas[cellId[0]])
+      this.badAgent.counterfeitDnas[cellId[0]] = {};
+    this.badAgent.counterfeitDnas[cellId[0]][cellId[1]] = dna;
   }
 
   /** Admin API */

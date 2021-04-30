@@ -6,6 +6,8 @@ import {
   Dictionary,
   Element,
   Hash,
+  ValidationReceipt,
+  ValidationStatus,
 } from '@holochain-open-dev/core-types';
 import { MiddlewareExecutor } from '../../executor/middleware-executor';
 import { hash, HashType } from '../../processors/hash';
@@ -82,12 +84,14 @@ export class P2pCell {
       this.cellId[1],
       dht_hash,
       this.redundancyFactor,
+      this.badAgents,
+
       (cell: Cell) =>
         this._executeNetworkRequest(
           cell,
           NetworkRequestType.PUBLISH_REQUEST,
           { dhtOps: ops },
-          (cell: Cell) => cell.handle_publish(this.cellId[1], dht_hash, ops)
+          (cell: Cell) => cell.handle_publish(this.cellId[1], dht_hash, ops, [])
         )
     );
   }
@@ -101,6 +105,8 @@ export class P2pCell {
       this.cellId[1],
       dht_hash,
       1, // TODO: what about this?
+      this.badAgents,
+
       (cell: Cell) =>
         this._executeNetworkRequest(
           cell,
@@ -122,6 +128,7 @@ export class P2pCell {
       this.cellId[1],
       base_address,
       1, // TODO: what about this?
+      this.badAgents,
       (cell: Cell) =>
         this._executeNetworkRequest(
           cell,
@@ -154,15 +161,30 @@ export class P2pCell {
     );
   }
 
-  async gossip_bad_agent(dhtOp: DHTOp): Promise<void> {
-    const badAgent = dhtOp.header.header.content.author;
+  async gossip_bad_agents(
+    dhtOp: DHTOp,
+    myReceipt: ValidationReceipt,
+    existingReceipts: ValidationReceipt[]
+  ): Promise<void> {
+    const badAgents: AgentPubKey[] = [];
 
-    // We already gossiped this bad agent
-    if (this.badAgents.includes(badAgent)) return;
+    if (myReceipt.validation_status === ValidationStatus.Rejected)
+      badAgents.push(dhtOp.header.header.content.author);
 
-    this.badAgents.push(badAgent);
-    this.neighbors = this.neighbors.filter(agent => badAgent !== agent);
-    this.farKnownPeers = this.farKnownPeers.filter(agent => badAgent !== agent);
+    for (const existingReceipt of existingReceipts) {
+      if (existingReceipt.validation_status !== myReceipt.validation_status) {
+        badAgents.push(existingReceipt.validator);
+      }
+    }
+
+    for (const badAgent of badAgents) {
+      if (!this.badAgents.includes(badAgent)) this.badAgents.push(badAgent);
+    }
+
+    this.neighbors = this.neighbors.filter(agent => !badAgents.includes(agent));
+    this.farKnownPeers = this.farKnownPeers.filter(
+      agent => !badAgents.includes(agent)
+    );
 
     const dhtOpHash = hash(dhtOp, HashType.DHTOP);
     const promises = this.neighbors.map(neighborAgent => {
@@ -176,7 +198,14 @@ export class P2pCell {
             NetworkRequestType.GOSSIP,
             {},
             (cell: Cell) =>
-              cell.handle_publish(badAgent, dhtOpHash, { [dhtOpHash]: dhtOp })
+              cell.handle_publish(
+                this.cellId[1],
+                dhtOpHash,
+                {
+                  [dhtOpHash]: dhtOp,
+                },
+                [myReceipt, ...existingReceipts]
+              )
           )
       );
     });
@@ -259,8 +288,7 @@ export class P2pCell {
     fromAgent: AgentPubKey,
     request: NetworkRequest<R>
   ) {
-    if (this.badAgents.includes(fromAgent))
-      throw new Error('Network Request from Bad Agent!');
+    if (this.badAgents.includes(fromAgent)) throw new Error('Bad Agent!');
 
     const cell = this.network.conductor.getCell(
       this.cellId[0],

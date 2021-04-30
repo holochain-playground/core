@@ -3,6 +3,7 @@ import {
   Dictionary,
   DHTOp,
   AgentPubKey,
+  ValidationReceipt,
 } from '@holochain-open-dev/core-types';
 import { Cell, Workflow } from '../../cell';
 import {
@@ -10,7 +11,7 @@ import {
   ValidationLimboStatus,
   CellState,
 } from '../state';
-import { putValidationLimboValue } from '../dht/put';
+import { putValidationLimboValue, putValidationReceipt } from '../dht/put';
 import { sys_validation_task } from './sys_validation';
 import { WorkflowReturn, WorkflowType, Workspace } from './workflows';
 
@@ -18,7 +19,8 @@ import { WorkflowReturn, WorkflowType, Workspace } from './workflows';
 export const incoming_dht_ops = (
   basis: Hash,
   dhtOps: Dictionary<DHTOp>,
-  from_agent: AgentPubKey | undefined
+  from_agent: AgentPubKey | undefined,
+  validation_receipts: ValidationReceipt[]
 ) => async (worskpace: Workspace): Promise<WorkflowReturn<void>> => {
   for (const dhtOpHash of Object.keys(dhtOps)) {
     if (
@@ -41,6 +43,10 @@ export const incoming_dht_ops = (
       putValidationLimboValue(dhtOpHash, validationLimboValue)(worskpace.state);
     }
   }
+  // TODO: change this when alarm is implemented
+  for (const receipt of validation_receipts) {
+    putValidationReceipt(receipt.dht_op_hash, receipt)(worskpace.state);
+  }
 
   return {
     result: undefined,
@@ -56,7 +62,8 @@ export type IncomingDhtOpsWorkflow = Workflow<
 export function incoming_dht_ops_task(
   from_agent: AgentPubKey,
   dht_hash: Hash, // The basis for the DHTOps
-  ops: Dictionary<DHTOp>
+  ops: Dictionary<DHTOp>,
+  validation_receipts: ValidationReceipt[]
 ): IncomingDhtOpsWorkflow {
   return {
     type: WorkflowType.INCOMING_DHT_OPS,
@@ -65,6 +72,12 @@ export function incoming_dht_ops_task(
       dht_hash,
       ops,
     },
-    task: worskpace => incoming_dht_ops(dht_hash, ops, from_agent)(worskpace),
+    task: worskpace =>
+      incoming_dht_ops(
+        dht_hash,
+        ops,
+        from_agent,
+        validation_receipts
+      )(worskpace),
   };
 }

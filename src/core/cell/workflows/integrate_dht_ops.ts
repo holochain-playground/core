@@ -20,8 +20,12 @@ export const integrate_dht_ops = async (
     const dhtOp = integrationLimboValue.op;
 
     if (integrationLimboValue.validation_status === ValidationStatus.Valid) {
-      await putDhtOpData(dhtOp)(worskpace.state);
+      putDhtOpData(dhtOp)(worskpace.state);
       putDhtOpMetadata(dhtOp)(worskpace.state);
+    } else if (
+      integrationLimboValue.validation_status === ValidationStatus.Rejected
+    ) {
+      putDhtOpData(dhtOp)(worskpace.state);
     }
 
     const value: IntegratedDhtOpsValue = {

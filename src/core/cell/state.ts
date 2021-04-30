@@ -4,6 +4,7 @@ import {
   Dictionary,
   Hash,
   Metadata,
+  ValidationReceipt,
 } from '@holochain-open-dev/core-types';
 import { SimulatedDna } from '../../dnas/simulated-dna';
 
@@ -17,8 +18,7 @@ export interface CellState {
   authoredDHTOps: Dictionary<AuthoredDhtOpsValue>; // Key is the hash of the DHT op
   integrationLimbo: Dictionary<IntegrationLimboValue>; // Key is the hash of the DHT op
   validationLimbo: Dictionary<ValidationLimboValue>; // Key is the hash of the DHT op
-  badAgent: boolean;
-  badAgentDna: SimulatedDna | undefined;
+  validationReceipts: Dictionary<Dictionary<ValidationReceipt>>; // Segmented by dhtOpHash/authorOfReceipt
 }
 
 export interface IntegratedDhtOpsValue {
