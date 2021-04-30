@@ -1,3 +1,4 @@
+import { Update } from '@holochain-open-dev/core-types';
 import { GetStrategy } from '../types';
 import {
   SimulatedDna,
@@ -60,7 +61,28 @@ export const demoEntriesZome: SimulatedZome = {
       arguments: [{ name: 'deletes_address', type: 'HeaderHash' }],
     },
   },
-  validation_functions: {},
+  validation_functions: {
+    validate_update_entry_demo_entry: hdk => async element => {
+      const update = element.signed_header.header.content as Update;
+      const updateAuthor = update.author;
+
+      const originalHeader = await hdk.get(update.original_header_address);
+
+      if (!originalHeader)
+        return {
+          resolved: false,
+          depsHashes: [update.original_header_address],
+        };
+
+      if (originalHeader.signed_header.header.content.author !== updateAuthor)
+        return {
+          valid: false,
+          resolved: true,
+        };
+
+      return { valid: true, resolved: true };
+    },
+  },
 };
 
 export const demoLinksZome: SimulatedZome = {

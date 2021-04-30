@@ -1,4 +1,4 @@
-import { serializeHash, getSysMetaValHeaderHash, DHTOpType, HeaderType, EntryDhtStatus, DetailsType, getEntry, ChainStatus, now, elementToDHTOps } from '@holochain-open-dev/core-types';
+import { serializeHash, getSysMetaValHeaderHash, DHTOpType, HeaderType, EntryDhtStatus, DetailsType, getEntry, ChainStatus, elementToDHTOps } from '@holochain-open-dev/core-types';
 import { uniq, isEqual, cloneDeep } from 'lodash-es';
 import { uniqueNamesGenerator, names } from 'unique-names-generator';
 
@@ -876,6 +876,10 @@ function computeDhtStatus(allHeadersForEntry) {
         rejected_headers,
     };
 }
+function hasDhtOpBeenProcessed(state, dhtOp) {
+    const dhtOpHash = hash(dhtOp, HashType.DHTOP);
+    return (!!state.integrationLimbo[dhtOpHash] || !!state.integratedDHTOps[dhtOpHash]);
+}
 
 var ValidationStatus;
 (function (ValidationStatus) {
@@ -1366,6 +1370,12 @@ function isCapGrant(header) {
         content.entry_type === 'CapGrant');
 }
 
+function now() {
+    const nanos = (performance.now() + performance.timeOrigin) * 1000;
+    const seconds = Math.floor(nanos / 1000000);
+    const subsecondNanos = nanos % 1000000;
+    return [seconds, subsecondNanos];
+}
 function buildShh(header) {
     return {
         header: {
@@ -1769,6 +1779,10 @@ const app_validation = async (worskpace) => {
                     : ValidationStatus.Rejected,
             };
             putIntegrationLimboValue(dhtOpHash, value)(worskpace.state);
+            if (value.validation_status === ValidationStatus.Rejected) {
+                // Sound the alarm!
+                await worskpace.p2p.gossip_bad_agent(value.op);
+            }
         }
     }
     return {
@@ -2088,8 +2102,10 @@ function check_prev_header(header) {
         throw new Error(`Non-Dna Header doesn't contain a reference to the previous header`);
 }
 function check_prev_timestamp(header, prev_header) {
-    if (header.timestamp < prev_header.timestamp)
+    const tsToMillis = (t) => t[0] * 1000000 + t[1];
+    if (tsToMillis(header.timestamp) <= tsToMillis(prev_header.timestamp)) {
         throw new Error(`New header must have a greater timestamp than any previous one`);
+    }
 }
 function check_prev_seq(header, prev_header) {
     const prev_seq = prev_header.header_seq
@@ -2286,12 +2302,14 @@ const callZomeFn = (zomeName, fnName, payload, provenance, cap) => async (worksp
             elementsToAppValidate.push(element);
             i++;
         }
-        for (const element of elementsToAppValidate) {
-            const outcome = await run_app_validation(zome, element, contextState, workspace);
-            if (!outcome.resolved)
-                throw new Error('Error creating a new element: missing dependencies');
-            if (!outcome.valid)
-                throw new Error('Error creating a new element: invalid');
+        if (!workspace.state.badAgent) {
+            for (const element of elementsToAppValidate) {
+                const outcome = await run_app_validation(zome, element, contextState, workspace);
+                if (!outcome.resolved)
+                    throw new Error('Error creating a new element: missing dependencies');
+                if (!outcome.valid)
+                    throw new Error('Error creating a new element: invalid');
+            }
         }
         triggers.push(produce_dht_ops_task());
     }
@@ -2489,6 +2507,10 @@ class Cell {
     getSimulatedDna() {
         return this.conductor.registeredDnas[this.dnaHash];
     }
+    convertToBadAgent(injectDna) {
+        this._state.badAgent = true;
+        this._state.badAgentDna = injectDna;
+    }
     static async create(conductor, cellId, membrane_proof) {
         const newCellState = {
             dnaHash: cellId[0],
@@ -2504,6 +2526,8 @@ class Cell {
             integratedDHTOps: {},
             authoredDHTOps: {},
             sourceChain: [],
+            badAgent: false,
+            badAgentDna: undefined,
         };
         const p2p = conductor.network.createP2pCell(cellId);
         const cell = new Cell(newCellState, conductor, p2p);
@@ -2572,7 +2596,9 @@ class Cell {
         return {
             state: this._state,
             p2p: this.p2p,
-            dna: this.getSimulatedDna(),
+            dna: this._state.badAgent && this._state.badAgentDna
+                ? this._state.badAgentDna
+                : this.getSimulatedDna(),
         };
     }
 }
@@ -2583,6 +2609,7 @@ var NetworkRequestType;
     NetworkRequestType["ADD_NEIGHBOR"] = "Add Neighbor";
     NetworkRequestType["PUBLISH_REQUEST"] = "Publish Request";
     NetworkRequestType["GET_REQUEST"] = "Get Request";
+    NetworkRequestType["GOSSIP"] = "Gossip";
 })(NetworkRequestType || (NetworkRequestType = {}));
 
 // From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/lib.rs
@@ -2595,9 +2622,11 @@ class P2pCell {
         this.farKnownPeers = state.farKnownPeers;
         this.redundancyFactor = state.redundancyFactor;
         this.neighborNumber = state.neighborNumber;
+        this.badAgents = state.badAgents;
     }
     getState() {
         return {
+            badAgents: this.badAgents,
             neighbors: this.neighbors,
             farKnownPeers: this.farKnownPeers,
             redundancyFactor: this.redundancyFactor,
@@ -2625,6 +2654,20 @@ class P2pCell {
     async call_remote(agent, zome, fnName, cap, payload) {
         return this.network.kitsune.rpc_single(this.cellId[0], this.cellId[1], agent, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.CALL_REMOTE, {}, (cell) => cell.handle_call_remote(this.cellId[1], zome, fnName, cap, payload)));
     }
+    async gossip_bad_agent(dhtOp) {
+        const badAgent = dhtOp.header.header.content.author;
+        // We already gossiped this bad agent
+        if (this.badAgents.includes(badAgent))
+            return;
+        this.badAgents.push(badAgent);
+        this.neighbors = this.neighbors.filter(agent => badAgent !== agent);
+        this.farKnownPeers = this.farKnownPeers.filter(agent => badAgent !== agent);
+        const dhtOpHash = hash(dhtOp, HashType.DHTOP);
+        const promises = this.neighbors.map(neighborAgent => {
+            this.network.kitsune.rpc_single(this.cellId[0], this.cellId[1], neighborAgent, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.GOSSIP, {}, (cell) => cell.handle_publish(badAgent, dhtOpHash, { [dhtOpHash]: dhtOp })));
+        });
+        await Promise.all(promises);
+    }
     /** Neighbor handling */
     getNeighbors() {
         return this.neighbors;
@@ -2643,7 +2686,8 @@ class P2pCell {
             .map(p => p.agentPubKey);
         const neighbors = this.network.bootstrapService
             .getNeighborhood(dnaHash, agentPubKey, this.neighborNumber)
-            .filter(cell => cell.agentPubKey != agentPubKey);
+            .filter(cell => cell.agentPubKey != agentPubKey &&
+            !this.badAgents.includes(cell.agentPubKey));
         const newNeighbors = neighbors.filter(cell => !this.neighbors.includes(cell.agentPubKey));
         this.neighbors = neighbors.map(n => n.agentPubKey);
         const promises = newNeighbors.map(neighbor => this._executeNetworkRequest(neighbor, NetworkRequestType.ADD_NEIGHBOR, {}, (cell) => cell.handle_new_neighbor(agentPubKey)));
@@ -2660,7 +2704,13 @@ class P2pCell {
             type,
             details,
         };
-        return this.networkRequestsExecutor.execute(() => request(toCell), networkRequest);
+        return this.networkRequestsExecutor.execute(() => toCell.p2p.handle_network_request(this.cellId[1], request), networkRequest);
+    }
+    handle_network_request(fromAgent, request) {
+        if (this.badAgents.includes(fromAgent))
+            throw new Error('Network Request from Bad Agent!');
+        const cell = this.network.conductor.getCell(this.cellId[0], this.cellId[1]);
+        return request(cell);
     }
 }
 
@@ -2736,6 +2786,7 @@ class Network {
             farKnownPeers: [],
             redundancyFactor: 3,
             neighborNumber: 5,
+            badAgents: [],
         };
         const p2pCell = new P2pCell(state, cellId, this);
         if (!this.p2pCells[dnaHash])
@@ -2968,7 +3019,24 @@ const demoEntriesZome = {
             arguments: [{ name: 'deletes_address', type: 'HeaderHash' }],
         },
     },
-    validation_functions: {},
+    validation_functions: {
+        validate_update_entry_demo_entry: hdk => async (element) => {
+            const update = element.signed_header.header.content;
+            const updateAuthor = update.author;
+            const originalHeader = await hdk.get(update.original_header_address);
+            if (!originalHeader)
+                return {
+                    resolved: false,
+                    depsHashes: [update.original_header_address],
+                };
+            if (originalHeader.signed_header.header.content.author !== updateAuthor)
+                return {
+                    valid: false,
+                    resolved: true,
+                };
+            return { valid: true, resolved: true };
+        },
+    },
 };
 const demoLinksZome = {
     name: 'demo_links',
@@ -3083,5 +3151,5 @@ async function createConductors(conductorsToCreate, currentConductors, happ) {
     return allConductors;
 }
 
-export { AGENT_PREFIX, Authority, Cascade, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, GetStrategy, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDeleteLink, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, computeDhtStatus, counterfeit_check, createConductors, deleteValidationLimboValue, demoDna, demoEntriesZome, demoHapp, demoLinksZome, demoPathsZome, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAllHeldHeaders, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getCreateLinksForEntry, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getLiveLinks, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getRemovesOnLinkAdd, getTipOfChain, getValidationLimboDhtOps, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingElement, isHoldingEntry, location, locationDistance, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, run_create_link_validation_callback, run_delete_link_validation_callback, run_validation_callback_direct, sleep, store_element, store_entry, sys_validate_element, sys_validation, sys_validation_task, valid_cap_grant, workflowPriority, wrap };
+export { AGENT_PREFIX, Authority, Cascade, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, GetStrategy, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDeleteLink, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, computeDhtStatus, counterfeit_check, createConductors, deleteValidationLimboValue, demoDna, demoEntriesZome, demoHapp, demoLinksZome, demoPathsZome, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAllHeldHeaders, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getCreateLinksForEntry, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getLiveLinks, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getRemovesOnLinkAdd, getTipOfChain, getValidationLimboDhtOps, hasDhtOpBeenProcessed, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingElement, isHoldingEntry, location, locationDistance, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, run_create_link_validation_callback, run_delete_link_validation_callback, run_validation_callback_direct, sleep, store_element, store_entry, sys_validate_element, sys_validation, sys_validation_task, valid_cap_grant, workflowPriority, wrap };
 //# sourceMappingURL=index.js.map

@@ -16,8 +16,10 @@ import {
   HeaderType,
   Create,
   Metadata,
+  DHTOp,
 } from '@holochain-open-dev/core-types';
 import { isEqual, uniq } from 'lodash-es';
+import { hash, HashType } from '../../../processors/hash';
 import { GetLinksResponse, Link } from '../cascade/types';
 import {
   CellState,
@@ -342,4 +344,11 @@ export function computeDhtStatus(
     entry_dht_status,
     rejected_headers,
   };
+}
+
+export function hasDhtOpBeenProcessed(state: CellState, dhtOp: DHTOp): boolean {
+  const dhtOpHash = hash(dhtOp, HashType.DHTOP);
+  return (
+    !!state.integrationLimbo[dhtOpHash] || !!state.integratedDHTOps[dhtOpHash]
+  );
 }

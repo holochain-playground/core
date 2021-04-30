@@ -66,8 +66,12 @@ export const app_validation = async (
           ? ValidationStatus.Valid
           : ValidationStatus.Rejected,
       };
-
       putIntegrationLimboValue(dhtOpHash, value)(worskpace.state);
+
+      if (value.validation_status === ValidationStatus.Rejected) {
+        // Sound the alarm!
+        await worskpace.p2p.gossip_bad_agent(value.op);
+      }
     }
   }
 

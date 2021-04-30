@@ -4,10 +4,11 @@ import { GetLinksOptions, GetOptions } from '../../types';
 import { Cell } from '../cell';
 import { GetElementResponse, GetEntryResponse, GetLinksResponse } from '../cell/cascade/types';
 import { Network } from './network';
-import { NetworkRequestInfo } from './network-request';
+import { NetworkRequestInfo, NetworkRequest, NetworkRequestType } from './network-request';
 export declare type P2pCellState = {
     neighbors: AgentPubKey[];
     farKnownPeers: AgentPubKey[];
+    badAgents: AgentPubKey[];
     redundancyFactor: number;
     neighborNumber: number;
 };
@@ -15,6 +16,7 @@ export declare class P2pCell {
     protected cellId: CellId;
     protected network: Network;
     neighbors: AgentPubKey[];
+    badAgents: AgentPubKey[];
     farKnownPeers: AgentPubKey[];
     redundancyFactor: number;
     neighborNumber: number;
@@ -28,9 +30,11 @@ export declare class P2pCell {
     get(dht_hash: Hash, options: GetOptions): Promise<GetElementResponse | GetEntryResponse | undefined>;
     get_links(base_address: Hash, options: GetLinksOptions): Promise<GetLinksResponse[]>;
     call_remote(agent: AgentPubKey, zome: string, fnName: string, cap: CapSecret | undefined, payload: any): Promise<any>;
+    gossip_bad_agent(dhtOp: DHTOp): Promise<void>;
     /** Neighbor handling */
     getNeighbors(): Array<AgentPubKey>;
     addNeighbor(neighborPubKey: AgentPubKey): void;
     syncNeighbors(): Promise<void>;
     private _executeNetworkRequest;
+    handle_network_request<R, T extends NetworkRequestType, D>(fromAgent: AgentPubKey, request: NetworkRequest<R>): Promise<R>;
 }

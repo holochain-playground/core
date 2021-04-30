@@ -1,4 +1,4 @@
-import { Dictionary, Hash, LinkMetaVal, EntryDhtStatus, EntryDetails, SignedHeaderHashed, Update, Delete } from '@holochain-open-dev/core-types';
+import { Dictionary, Hash, LinkMetaVal, EntryDhtStatus, EntryDetails, SignedHeaderHashed, Update, Delete, DHTOp } from '@holochain-open-dev/core-types';
 import { GetLinksResponse, Link } from '../cascade/types';
 import { CellState, ValidationLimboStatus, ValidationLimboValue, IntegrationLimboValue } from '../state';
 export declare function getValidationLimboDhtOps(state: CellState, statuses: ValidationLimboStatus[]): Dictionary<ValidationLimboValue>;
@@ -28,3 +28,4 @@ export declare function computeDhtStatus(allHeadersForEntry: SignedHeaderHashed[
     entry_dht_status: EntryDhtStatus;
     rejected_headers: SignedHeaderHashed[];
 };
+export declare function hasDhtOpBeenProcessed(state: CellState, dhtOp: DHTOp): boolean;

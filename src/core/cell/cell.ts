@@ -22,6 +22,8 @@ import { Authority } from './cascade/authority';
 import { getHashType, HashType } from '../../processors/hash';
 import { GetLinksOptions, GetOptions } from '../../types';
 import { cloneDeep } from 'lodash-es';
+import { SimulatedDna } from '../../dnas/simulated-dna';
+import { hasDhtOpBeenProcessed } from './dht/get';
 
 export type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export type CellSignalListener = (payload: any) => void;
@@ -62,6 +64,11 @@ export class Cell {
     return this.conductor.registeredDnas[this.dnaHash];
   }
 
+  convertToBadAgent(injectDna?: SimulatedDna) {
+    this._state.badAgent = true;
+    this._state.badAgentDna = injectDna;
+  }
+
   static async create(
     conductor: Conductor,
     cellId: CellId,
@@ -81,6 +88,8 @@ export class Cell {
       integratedDHTOps: {},
       authoredDHTOps: {},
       sourceChain: [],
+      badAgent: false,
+      badAgentDna: undefined,
     };
 
     const p2p = conductor.network.createP2pCell(cellId);
@@ -210,7 +219,10 @@ export class Cell {
     return {
       state: this._state,
       p2p: this.p2p,
-      dna: this.getSimulatedDna(),
+      dna:
+        this._state.badAgent && this._state.badAgentDna
+          ? this._state.badAgentDna
+          : this.getSimulatedDna(),
     };
   }
 }

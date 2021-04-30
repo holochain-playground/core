@@ -6,6 +6,7 @@ import { Workflow } from './workflows/workflows';
 import { MiddlewareExecutor } from '../../executor/middleware-executor';
 import { GetLinksResponse, GetResult } from './cascade/types';
 import { GetLinksOptions, GetOptions } from '../../types';
+import { SimulatedDna } from '../../dnas/simulated-dna';
 export declare type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export declare type CellSignalListener = (payload: any) => void;
 export declare class Cell {
@@ -19,7 +20,8 @@ export declare class Cell {
     get agentPubKey(): AgentPubKey;
     get dnaHash(): Hash;
     getState(): CellState;
-    getSimulatedDna(): import("../..").SimulatedDna;
+    getSimulatedDna(): SimulatedDna;
+    convertToBadAgent(injectDna?: SimulatedDna): void;
     static create(conductor: Conductor, cellId: CellId, membrane_proof: any): Promise<Cell>;
     /** Workflows */
     callZomeFn(args: {

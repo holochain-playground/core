@@ -5,6 +5,7 @@ import {
   Hash,
   Metadata,
 } from '@holochain-open-dev/core-types';
+import { SimulatedDna } from '../../dnas/simulated-dna';
 
 export interface CellState {
   dnaHash: Hash;
@@ -16,6 +17,8 @@ export interface CellState {
   authoredDHTOps: Dictionary<AuthoredDhtOpsValue>; // Key is the hash of the DHT op
   integrationLimbo: Dictionary<IntegrationLimboValue>; // Key is the hash of the DHT op
   validationLimbo: Dictionary<ValidationLimboValue>; // Key is the hash of the DHT op
+  badAgent: boolean;
+  badAgentDna: SimulatedDna | undefined;
 }
 
 export interface IntegratedDhtOpsValue {

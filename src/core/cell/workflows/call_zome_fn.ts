@@ -98,17 +98,19 @@ export const callZomeFn = (
       i++;
     }
 
-    for (const element of elementsToAppValidate) {
-      const outcome = await run_app_validation(
-        zome,
-        element,
-        contextState,
-        workspace
-      );
-      if (!outcome.resolved)
-        throw new Error('Error creating a new element: missing dependencies');
-      if (!outcome.valid)
-        throw new Error('Error creating a new element: invalid');
+    if (!workspace.state.badAgent) {
+      for (const element of elementsToAppValidate) {
+        const outcome = await run_app_validation(
+          zome,
+          element,
+          contextState,
+          workspace
+        );
+        if (!outcome.resolved)
+          throw new Error('Error creating a new element: missing dependencies');
+        if (!outcome.valid)
+          throw new Error('Error creating a new element: invalid');
+      }
     }
 
     triggers.push(produce_dht_ops_task());

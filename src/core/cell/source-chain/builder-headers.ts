@@ -1,5 +1,4 @@
 import {
-  now,
   Hash,
   AgentPubKey,
   Dna,
@@ -14,11 +13,21 @@ import {
   CreateLink,
   Delete,
   DeleteLink,
+  Timestamp,
 } from '@holochain-open-dev/core-types';
 import { hash, HashType } from '../../../processors/hash';
 import { CellState } from '../state';
 import { hashEntry } from '../utils';
 import { getAuthor, getNextHeaderSeq, getTipOfChain } from './utils';
+
+function now(): Timestamp {
+  const nanos = (performance.now() + performance.timeOrigin) * 1000;
+
+  const seconds = Math.floor(nanos / 1000000);
+  const subsecondNanos = nanos % 1000000;
+
+  return [seconds, subsecondNanos];
+}
 
 export function buildShh(header: Header): SignedHeaderHashed {
   return {
