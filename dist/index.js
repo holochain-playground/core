@@ -2436,12 +2436,12 @@ function genesis_task(cellId, membrane_proof) {
 }
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/incoming_dht_ops_workflow.rs
-const incoming_dht_ops = (basis, dhtOps, from_agent, validation_receipts) => async (worskpace) => {
+const incoming_dht_ops = (basis, dhtOps, from_agent, validation_receipts) => async (workspace) => {
     let sysValidate = false;
     for (const dhtOpHash of Object.keys(dhtOps)) {
-        if (!worskpace.state.integratedDHTOps[dhtOpHash] &&
-            !worskpace.state.integrationLimbo[dhtOpHash] &&
-            !worskpace.state.validationLimbo[dhtOpHash]) {
+        if (!workspace.state.integratedDHTOps[dhtOpHash] &&
+            !workspace.state.integrationLimbo[dhtOpHash] &&
+            !workspace.state.validationLimbo[dhtOpHash]) {
             const dhtOp = dhtOps[dhtOpHash];
             const validationLimboValue = {
                 basis,
@@ -2452,13 +2452,27 @@ const incoming_dht_ops = (basis, dhtOps, from_agent, validation_receipts) => asy
                 status: ValidationLimboStatus.Pending,
                 time_added: Date.now(),
             };
-            putValidationLimboValue(dhtOpHash, validationLimboValue)(worskpace.state);
+            putValidationLimboValue(dhtOpHash, validationLimboValue)(workspace.state);
             sysValidate = true;
+        }
+        const existingReceipts = getValidationReceipts(dhtOpHash)(workspace.state);
+        const myReceipt = existingReceipts.find(r => r.validator === workspace.state.agentPubKey);
+        // If we are receiving a publish for an invalid dht op, regossip again
+        // TODO: fix this when gossip loop is implemented
+        if (myReceipt &&
+            myReceipt.validation_status === ValidationStatus$1.Rejected) {
+            const receiptsArrayToDict = (r) => r.reduce((acc, next) => ({ ...acc, [next.validator]: next }), {});
+            const existingReceiptsDict = receiptsArrayToDict(existingReceipts);
+            const receivedReceipts = receiptsArrayToDict(validation_receipts.filter(r => r.dht_op_hash === dhtOpHash));
+            if (!isEqual(new Set(Object.keys(existingReceiptsDict)), new Set(Object.keys(receivedReceipts)))) {
+                const allReceipts = { ...existingReceiptsDict, ...receivedReceipts };
+                await workspace.p2p.gossip_bad_agents(dhtOps[dhtOpHash], myReceipt, Object.values(allReceipts));
+            }
         }
     }
     // TODO: change this when alarm is implemented
     for (const receipt of validation_receipts) {
-        putValidationReceipt(receipt.dht_op_hash, receipt)(worskpace.state);
+        putValidationReceipt(receipt.dht_op_hash, receipt)(workspace.state);
     }
     return {
         result: undefined,

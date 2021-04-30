@@ -1,7 +1,7 @@
 import { Hash, Dictionary, DHTOp, AgentPubKey, ValidationReceipt } from '@holochain-open-dev/core-types';
 import { Workflow } from '../../cell';
 import { WorkflowReturn, Workspace } from './workflows';
-export declare const incoming_dht_ops: (basis: Hash, dhtOps: Dictionary<DHTOp>, from_agent: AgentPubKey | undefined, validation_receipts: ValidationReceipt[]) => (worskpace: Workspace) => Promise<WorkflowReturn<void>>;
+export declare const incoming_dht_ops: (basis: Hash, dhtOps: Dictionary<DHTOp>, from_agent: AgentPubKey | undefined, validation_receipts: ValidationReceipt[]) => (workspace: Workspace) => Promise<WorkflowReturn<void>>;
 export declare type IncomingDhtOpsWorkflow = Workflow<{
     from_agent: AgentPubKey;
     dht_hash: Hash;
