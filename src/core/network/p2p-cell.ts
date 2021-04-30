@@ -237,12 +237,13 @@ export class P2pCell {
       .map(p => p.agentPubKey);
 
     const neighbors = this.network.bootstrapService
-      .getNeighborhood(dnaHash, agentPubKey, this.neighborNumber)
-      .filter(
-        cell =>
-          cell.agentPubKey != agentPubKey &&
-          !this.badAgents.includes(cell.agentPubKey)
-      );
+      .getNeighborhood(
+        dnaHash,
+        agentPubKey,
+        this.neighborNumber,
+        this.badAgents
+      )
+      .filter(cell => cell.agentPubKey != agentPubKey);
 
     const newNeighbors = neighbors.filter(
       cell => !this.neighbors.includes(cell.agentPubKey)
