@@ -1767,6 +1767,7 @@ function buildZomeFunctionContext(workspace, zome_index) {
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/app_validation_workflow.rs
 const app_validation = async (workspace) => {
+    let integrateDhtOps = false;
     const pendingDhtOps = getValidationLimboDhtOps(workspace.state, [
         ValidationLimboStatus.SysValidated,
         ValidationLimboStatus.AwaitingAppDeps,
@@ -1807,11 +1808,12 @@ const app_validation = async (workspace) => {
                 await workspace.p2p.gossip_bad_agents(value.op, receipt, receipts);
                 putValidationReceipt(dhtOpHash, receipt)(workspace.state);
             }
+            integrateDhtOps = true;
         }
     }
     return {
         result: undefined,
-        triggers: [integrate_dht_ops_task()],
+        triggers: integrateDhtOps ? [integrate_dht_ops_task()] : [],
     };
 };
 function app_validation_task() {
@@ -2435,6 +2437,7 @@ function genesis_task(cellId, membrane_proof) {
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/incoming_dht_ops_workflow.rs
 const incoming_dht_ops = (basis, dhtOps, from_agent, validation_receipts) => async (worskpace) => {
+    let sysValidate = false;
     for (const dhtOpHash of Object.keys(dhtOps)) {
         if (!worskpace.state.integratedDHTOps[dhtOpHash] &&
             !worskpace.state.integrationLimbo[dhtOpHash] &&
@@ -2450,6 +2453,7 @@ const incoming_dht_ops = (basis, dhtOps, from_agent, validation_receipts) => asy
                 time_added: Date.now(),
             };
             putValidationLimboValue(dhtOpHash, validationLimboValue)(worskpace.state);
+            sysValidate = true;
         }
     }
     // TODO: change this when alarm is implemented
@@ -2458,7 +2462,7 @@ const incoming_dht_ops = (basis, dhtOps, from_agent, validation_receipts) => asy
     }
     return {
         result: undefined,
-        triggers: [sys_validation_task()],
+        triggers: sysValidate ? [sys_validation_task()] : [],
     };
 };
 function incoming_dht_ops_task(from_agent, dht_hash, // The basis for the DHTOps

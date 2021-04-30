@@ -22,6 +22,8 @@ export const incoming_dht_ops = (
   from_agent: AgentPubKey | undefined,
   validation_receipts: ValidationReceipt[]
 ) => async (worskpace: Workspace): Promise<WorkflowReturn<void>> => {
+  let sysValidate = false;
+
   for (const dhtOpHash of Object.keys(dhtOps)) {
     if (
       !worskpace.state.integratedDHTOps[dhtOpHash] &&
@@ -41,6 +43,8 @@ export const incoming_dht_ops = (
       };
 
       putValidationLimboValue(dhtOpHash, validationLimboValue)(worskpace.state);
+
+      sysValidate = true;
     }
   }
   // TODO: change this when alarm is implemented
@@ -50,7 +54,7 @@ export const incoming_dht_ops = (
 
   return {
     result: undefined,
-    triggers: [sys_validation_task()],
+    triggers: sysValidate ? [sys_validation_task()] : [],
   };
 };
 

@@ -51,6 +51,8 @@ import { BadAgentConfig } from '../../bad-agent';
 export const app_validation = async (
   workspace: Workspace
 ): Promise<WorkflowReturn<void>> => {
+  let integrateDhtOps = false;
+
   const pendingDhtOps = getValidationLimboDhtOps(workspace.state, [
     ValidationLimboStatus.SysValidated,
     ValidationLimboStatus.AwaitingAppDeps,
@@ -108,12 +110,14 @@ export const app_validation = async (
         await workspace.p2p.gossip_bad_agents(value.op, receipt, receipts);
         putValidationReceipt(dhtOpHash, receipt)(workspace.state);
       }
+
+      integrateDhtOps = true;
     }
   }
 
   return {
     result: undefined,
-    triggers: [integrate_dht_ops_task()],
+    triggers: integrateDhtOps ? [integrate_dht_ops_task()] : [],
   };
 };
 
