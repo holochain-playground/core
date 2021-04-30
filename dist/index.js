@@ -2465,6 +2465,10 @@ const incoming_dht_ops = (basis, dhtOps, from_agent, validation_receipts) => asy
             const existingReceiptsDict = receiptsArrayToDict(existingReceipts);
             const receivedReceipts = receiptsArrayToDict(validation_receipts.filter(r => r.dht_op_hash === dhtOpHash));
             if (!isEqual(new Set(Object.keys(existingReceiptsDict)), new Set(Object.keys(receivedReceipts)))) {
+                // TODO: change this when alarm is implemented
+                for (const receipt of Object.values(receivedReceipts)) {
+                    putValidationReceipt(receipt.dht_op_hash, receipt)(workspace.state);
+                }
                 const allReceipts = { ...existingReceiptsDict, ...receivedReceipts };
                 await workspace.p2p.gossip_bad_agents(dhtOps[dhtOpHash], myReceipt, Object.values(allReceipts));
             }
