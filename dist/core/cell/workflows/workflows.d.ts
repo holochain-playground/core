@@ -1,10 +1,14 @@
 import { SimulatedDna } from '../../../dnas/simulated-dna';
+import { BadAgentConfig } from '../../bad-agent';
 import { P2pCell } from '../../network/p2p-cell';
 import { CellState } from '../state';
 export interface Workspace {
     state: CellState;
     p2p: P2pCell;
     dna: SimulatedDna;
+    badAgentConfig?: BadAgentConfig & {
+        counterfeit_dna?: SimulatedDna;
+    };
 }
 export interface Workflow<D, R> {
     type: string;

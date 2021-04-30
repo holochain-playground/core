@@ -1,4 +1,4 @@
-import { CellId, AgentPubKey, Hash, Dictionary, DHTOp, CapSecret } from '@holochain-open-dev/core-types';
+import { CellId, AgentPubKey, Hash, Dictionary, DHTOp, CapSecret, ValidationReceipt } from '@holochain-open-dev/core-types';
 import { Conductor } from '../conductor';
 import { P2pCell } from '../network/p2p-cell';
 import { CellState } from './state';
@@ -21,7 +21,6 @@ export declare class Cell {
     get dnaHash(): Hash;
     getState(): CellState;
     getSimulatedDna(): SimulatedDna;
-    convertToBadAgent(injectDna?: SimulatedDna): void;
     static create(conductor: Conductor, cellId: CellId, membrane_proof: any): Promise<Cell>;
     /** Workflows */
     callZomeFn(args: {
@@ -34,7 +33,7 @@ export declare class Cell {
     /** Network handlers */
     handle_new_neighbor(neighborPubKey: AgentPubKey): Promise<void>;
     handle_publish(from_agent: AgentPubKey, dht_hash: Hash, // The basis for the DHTOps
-    ops: Dictionary<DHTOp>): Promise<void>;
+    ops: Dictionary<DHTOp>, validation_receipts: ValidationReceipt[]): Promise<void>;
     handle_get(dht_hash: Hash, options: GetOptions): Promise<GetResult | undefined>;
     handle_get_links(base_address: Hash, options: GetLinksOptions): Promise<GetLinksResponse>;
     handle_call_remote(from_agent: AgentPubKey, zome_name: string, fn_name: string, cap: CapSecret | undefined, payload: any): Promise<any>;

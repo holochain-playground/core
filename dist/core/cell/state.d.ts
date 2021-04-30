@@ -1,5 +1,4 @@
-import { AgentPubKey, DHTOp, Dictionary, Hash, Metadata } from '@holochain-open-dev/core-types';
-import { SimulatedDna } from '../../dnas/simulated-dna';
+import { AgentPubKey, DHTOp, Dictionary, Hash, Metadata, ValidationReceipt } from '@holochain-open-dev/core-types';
 export interface CellState {
     dnaHash: Hash;
     agentPubKey: AgentPubKey;
@@ -10,8 +9,7 @@ export interface CellState {
     authoredDHTOps: Dictionary<AuthoredDhtOpsValue>;
     integrationLimbo: Dictionary<IntegrationLimboValue>;
     validationLimbo: Dictionary<ValidationLimboValue>;
-    badAgent: boolean;
-    badAgentDna: SimulatedDna | undefined;
+    validationReceipts: Dictionary<Dictionary<ValidationReceipt>>;
 }
 export interface IntegratedDhtOpsValue {
     op: DHTOp;

@@ -12,13 +12,22 @@ describe('Bad Agent', () => {
 
     const aliceCell = conductors[0].getAllCells()[0];
     const bobCell = conductors[1].getAllCells()[0];
-    const badAgentCell = conductors[2].getAllCells()[0];
+
+    const badAgent = conductors[2];
+    badAgent.setBadAgent({
+      pretend_invalid_elements_are_valid: true,
+      disable_validation_before_publish: true,
+    });
+    const badAgentCell = badAgent.getAllCells()[0];
+    conductors[3].setBadAgent({
+      disable_validation_before_publish: true,
+      pretend_invalid_elements_are_valid: true,
+    });
+    const badAgent2Address = conductors[3].getAllCells()[0].agentPubKey;
 
     const aliceAddress = aliceCell.cellId[1];
     const bobAddress = bobCell.cellId[1];
     const badAgentAddress = badAgentCell.cellId[1];
-
-    badAgentCell.convertToBadAgent();
 
     let result = await conductors[0].callZomeFn({
       cellId: aliceCell.cellId,
@@ -54,13 +63,19 @@ describe('Bad Agent', () => {
     });
     expect(result).to.be.ok;
 
-    await sleep(1000);
+    await sleep(6000);
 
     const honestCells = conductors
       .map(c => c.getAllCells()[0])
-      .filter(cell => cell.agentPubKey !== badAgentAddress);
-    const honestCellsWithBadAgentAsNeighbor = honestCells.filter(cell =>
-      cell.p2p.neighbors.includes(badAgentAddress)
+      .filter(
+        cell =>
+          cell.agentPubKey !== badAgentAddress &&
+          cell.agentPubKey !== badAgent2Address
+      );
+    const honestCellsWithBadAgentAsNeighbor = honestCells.filter(
+      cell =>
+        cell.p2p.neighbors.includes(badAgentAddress) ||
+        cell.p2p.neighbors.includes(badAgent2Address)
     );
 
     expect(honestCellsWithBadAgentAsNeighbor.length).to.equal(0);

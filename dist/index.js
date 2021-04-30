@@ -1,4 +1,4 @@
-import { serializeHash, getSysMetaValHeaderHash, DHTOpType, HeaderType, EntryDhtStatus, DetailsType, getEntry, ChainStatus, elementToDHTOps } from '@holochain-open-dev/core-types';
+import { serializeHash, getSysMetaValHeaderHash, DHTOpType, HeaderType, EntryDhtStatus, DetailsType, getEntry, ChainStatus, now, elementToDHTOps, ValidationStatus as ValidationStatus$1 } from '@holochain-open-dev/core-types';
 import { uniq, isEqual, cloneDeep } from 'lodash-es';
 import { uniqueNamesGenerator, names } from 'unique-names-generator';
 
@@ -130,44 +130,44 @@ function B2B_GET32 (arr, i) {
 // G Mixing function
 // The ROTRs are inlined for speed
 function B2B_G (a, b, c, d, ix, iy) {
-  var x0 = m[ix];
-  var x1 = m[ix + 1];
-  var y0 = m[iy];
-  var y1 = m[iy + 1];
+  var x0 = m$1[ix];
+  var x1 = m$1[ix + 1];
+  var y0 = m$1[iy];
+  var y1 = m$1[iy + 1];
 
-  ADD64AA(v, a, b); // v[a,a+1] += v[b,b+1] ... in JS we must store a uint64 as two uint32s
-  ADD64AC(v, a, x0, x1); // v[a, a+1] += x ... x0 is the low 32 bits of x, x1 is the high 32 bits
+  ADD64AA(v$1, a, b); // v[a,a+1] += v[b,b+1] ... in JS we must store a uint64 as two uint32s
+  ADD64AC(v$1, a, x0, x1); // v[a, a+1] += x ... x0 is the low 32 bits of x, x1 is the high 32 bits
 
   // v[d,d+1] = (v[d,d+1] xor v[a,a+1]) rotated to the right by 32 bits
-  var xor0 = v[d] ^ v[a];
-  var xor1 = v[d + 1] ^ v[a + 1];
-  v[d] = xor1;
-  v[d + 1] = xor0;
+  var xor0 = v$1[d] ^ v$1[a];
+  var xor1 = v$1[d + 1] ^ v$1[a + 1];
+  v$1[d] = xor1;
+  v$1[d + 1] = xor0;
 
-  ADD64AA(v, c, d);
+  ADD64AA(v$1, c, d);
 
   // v[b,b+1] = (v[b,b+1] xor v[c,c+1]) rotated right by 24 bits
-  xor0 = v[b] ^ v[c];
-  xor1 = v[b + 1] ^ v[c + 1];
-  v[b] = (xor0 >>> 24) ^ (xor1 << 8);
-  v[b + 1] = (xor1 >>> 24) ^ (xor0 << 8);
+  xor0 = v$1[b] ^ v$1[c];
+  xor1 = v$1[b + 1] ^ v$1[c + 1];
+  v$1[b] = (xor0 >>> 24) ^ (xor1 << 8);
+  v$1[b + 1] = (xor1 >>> 24) ^ (xor0 << 8);
 
-  ADD64AA(v, a, b);
-  ADD64AC(v, a, y0, y1);
+  ADD64AA(v$1, a, b);
+  ADD64AC(v$1, a, y0, y1);
 
   // v[d,d+1] = (v[d,d+1] xor v[a,a+1]) rotated right by 16 bits
-  xor0 = v[d] ^ v[a];
-  xor1 = v[d + 1] ^ v[a + 1];
-  v[d] = (xor0 >>> 16) ^ (xor1 << 16);
-  v[d + 1] = (xor1 >>> 16) ^ (xor0 << 16);
+  xor0 = v$1[d] ^ v$1[a];
+  xor1 = v$1[d + 1] ^ v$1[a + 1];
+  v$1[d] = (xor0 >>> 16) ^ (xor1 << 16);
+  v$1[d + 1] = (xor1 >>> 16) ^ (xor0 << 16);
 
-  ADD64AA(v, c, d);
+  ADD64AA(v$1, c, d);
 
   // v[b,b+1] = (v[b,b+1] xor v[c,c+1]) rotated right by 63 bits
-  xor0 = v[b] ^ v[c];
-  xor1 = v[b + 1] ^ v[c + 1];
-  v[b] = (xor1 >>> 31) ^ (xor0 << 1);
-  v[b + 1] = (xor0 >>> 31) ^ (xor1 << 1);
+  xor0 = v$1[b] ^ v$1[c];
+  xor1 = v$1[b + 1] ^ v$1[c + 1];
+  v$1[b] = (xor1 >>> 31) ^ (xor0 << 1);
+  v$1[b + 1] = (xor0 >>> 31) ^ (xor1 << 1);
 }
 
 // Initialization Vector
@@ -200,31 +200,31 @@ var SIGMA82 = new Uint8Array(SIGMA8.map(function (x) { return x * 2 }));
 
 // Compression function. 'last' flag indicates last block.
 // Note we're representing 16 uint64s as 32 uint32s
-var v = new Uint32Array(32);
-var m = new Uint32Array(32);
+var v$1 = new Uint32Array(32);
+var m$1 = new Uint32Array(32);
 function blake2bCompress (ctx, last) {
   var i = 0;
 
   // init work variables
   for (i = 0; i < 16; i++) {
-    v[i] = ctx.h[i];
-    v[i + 16] = BLAKE2B_IV32[i];
+    v$1[i] = ctx.h[i];
+    v$1[i + 16] = BLAKE2B_IV32[i];
   }
 
   // low 64 bits of offset
-  v[24] = v[24] ^ ctx.t;
-  v[25] = v[25] ^ (ctx.t / 0x100000000);
+  v$1[24] = v$1[24] ^ ctx.t;
+  v$1[25] = v$1[25] ^ (ctx.t / 0x100000000);
   // high 64 bits not supported, offset may not be higher than 2**53-1
 
   // last block flag set ?
   if (last) {
-    v[28] = ~v[28];
-    v[29] = ~v[29];
+    v$1[28] = ~v$1[28];
+    v$1[29] = ~v$1[29];
   }
 
   // get little-endian words
   for (i = 0; i < 32; i++) {
-    m[i] = B2B_GET32(ctx.b, 4 * i);
+    m$1[i] = B2B_GET32(ctx.b, 4 * i);
   }
 
   // twelve rounds of mixing
@@ -245,7 +245,7 @@ function blake2bCompress (ctx, last) {
   // util.debugPrint('   (i=12) v[16]', v, 64)
 
   for (i = 0; i < 16; i++) {
-    ctx.h[i] = ctx.h[i] ^ v[i] ^ v[i + 16];
+    ctx.h[i] = ctx.h[i] ^ v$1[i] ^ v$1[i + 16];
   }
   // util.debugPrint('h[8]', ctx.h, 64)
 }
@@ -373,14 +373,14 @@ function B2S_GET32 (v, i) {
 
 // Mixing function G.
 function B2S_G (a, b, c, d, x, y) {
-  v$1[a] = v$1[a] + v$1[b] + x;
-  v$1[d] = ROTR32(v$1[d] ^ v$1[a], 16);
-  v$1[c] = v$1[c] + v$1[d];
-  v$1[b] = ROTR32(v$1[b] ^ v$1[c], 12);
-  v$1[a] = v$1[a] + v$1[b] + y;
-  v$1[d] = ROTR32(v$1[d] ^ v$1[a], 8);
-  v$1[c] = v$1[c] + v$1[d];
-  v$1[b] = ROTR32(v$1[b] ^ v$1[c], 7);
+  v[a] = v[a] + v[b] + x;
+  v[d] = ROTR32(v[d] ^ v[a], 16);
+  v[c] = v[c] + v[d];
+  v[b] = ROTR32(v[b] ^ v[c], 12);
+  v[a] = v[a] + v[b] + y;
+  v[d] = ROTR32(v[d] ^ v[a], 8);
+  v[c] = v[c] + v[d];
+  v[b] = ROTR32(v[b] ^ v[c], 7);
 }
 
 // 32-bit right rotation
@@ -408,23 +408,23 @@ var SIGMA = new Uint8Array([
   10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0]);
 
 // Compression function. "last" flag indicates last block
-var v$1 = new Uint32Array(16);
-var m$1 = new Uint32Array(16);
+var v = new Uint32Array(16);
+var m = new Uint32Array(16);
 function blake2sCompress (ctx, last) {
   var i = 0;
   for (i = 0; i < 8; i++) { // init work variables
-    v$1[i] = ctx.h[i];
-    v$1[i + 8] = BLAKE2S_IV[i];
+    v[i] = ctx.h[i];
+    v[i + 8] = BLAKE2S_IV[i];
   }
 
-  v$1[12] ^= ctx.t; // low 32 bits of offset
-  v$1[13] ^= (ctx.t / 0x100000000); // high 32 bits
+  v[12] ^= ctx.t; // low 32 bits of offset
+  v[13] ^= (ctx.t / 0x100000000); // high 32 bits
   if (last) { // last block flag set ?
-    v$1[14] = ~v$1[14];
+    v[14] = ~v[14];
   }
 
   for (i = 0; i < 16; i++) { // get little-endian words
-    m$1[i] = B2S_GET32(ctx.b, 4 * i);
+    m[i] = B2S_GET32(ctx.b, 4 * i);
   }
 
   // ten rounds of mixing
@@ -433,19 +433,19 @@ function blake2sCompress (ctx, last) {
   // util.debugPrint('          m[16]', m, 32)
   for (i = 0; i < 10; i++) {
     // util.debugPrint('   (i=' + i + ')  v[16]', v, 32)
-    B2S_G(0, 4, 8, 12, m$1[SIGMA[i * 16 + 0]], m$1[SIGMA[i * 16 + 1]]);
-    B2S_G(1, 5, 9, 13, m$1[SIGMA[i * 16 + 2]], m$1[SIGMA[i * 16 + 3]]);
-    B2S_G(2, 6, 10, 14, m$1[SIGMA[i * 16 + 4]], m$1[SIGMA[i * 16 + 5]]);
-    B2S_G(3, 7, 11, 15, m$1[SIGMA[i * 16 + 6]], m$1[SIGMA[i * 16 + 7]]);
-    B2S_G(0, 5, 10, 15, m$1[SIGMA[i * 16 + 8]], m$1[SIGMA[i * 16 + 9]]);
-    B2S_G(1, 6, 11, 12, m$1[SIGMA[i * 16 + 10]], m$1[SIGMA[i * 16 + 11]]);
-    B2S_G(2, 7, 8, 13, m$1[SIGMA[i * 16 + 12]], m$1[SIGMA[i * 16 + 13]]);
-    B2S_G(3, 4, 9, 14, m$1[SIGMA[i * 16 + 14]], m$1[SIGMA[i * 16 + 15]]);
+    B2S_G(0, 4, 8, 12, m[SIGMA[i * 16 + 0]], m[SIGMA[i * 16 + 1]]);
+    B2S_G(1, 5, 9, 13, m[SIGMA[i * 16 + 2]], m[SIGMA[i * 16 + 3]]);
+    B2S_G(2, 6, 10, 14, m[SIGMA[i * 16 + 4]], m[SIGMA[i * 16 + 5]]);
+    B2S_G(3, 7, 11, 15, m[SIGMA[i * 16 + 6]], m[SIGMA[i * 16 + 7]]);
+    B2S_G(0, 5, 10, 15, m[SIGMA[i * 16 + 8]], m[SIGMA[i * 16 + 9]]);
+    B2S_G(1, 6, 11, 12, m[SIGMA[i * 16 + 10]], m[SIGMA[i * 16 + 11]]);
+    B2S_G(2, 7, 8, 13, m[SIGMA[i * 16 + 12]], m[SIGMA[i * 16 + 13]]);
+    B2S_G(3, 4, 9, 14, m[SIGMA[i * 16 + 14]], m[SIGMA[i * 16 + 15]]);
   }
   // util.debugPrint('   (i=10) v[16]', v, 32)
 
   for (i = 0; i < 8; i++) {
-    ctx.h[i] ^= v$1[i] ^ v$1[i + 8];
+    ctx.h[i] ^= v[i] ^ v[i + 8];
   }
   // util.debugPrint('h[8]', ctx.h, 32)
 }
@@ -1105,13 +1105,23 @@ class Cascade {
 const putValidationLimboValue = (dhtOpHash, validationLimboValue) => (state) => {
     state.validationLimbo[dhtOpHash] = validationLimboValue;
 };
+const putValidationReceipt = (dhtOpHash, validationReceipt) => (state) => {
+    if (!state.validationReceipts[dhtOpHash])
+        state.validationReceipts[dhtOpHash] = {};
+    state.validationReceipts[dhtOpHash][validationReceipt.validator] = validationReceipt;
+};
+const getValidationReceipts = (dhtOpHash) => (state) => {
+    return state.validationReceipts[dhtOpHash]
+        ? Object.values(state.validationReceipts[dhtOpHash])
+        : [];
+};
 const deleteValidationLimboValue = (dhtOpHash) => (state) => {
     delete state.validationLimbo[dhtOpHash];
 };
 const putIntegrationLimboValue = (dhtOpHash, integrationLimboValue) => (state) => {
     state.integrationLimbo[dhtOpHash] = integrationLimboValue;
 };
-const putDhtOpData = (dhtOp) => async (state) => {
+const putDhtOpData = (dhtOp) => (state) => {
     const headerHash = dhtOp.header.header.hash;
     state.CAS[headerHash] = dhtOp.header;
     const entry = getEntry(dhtOp);
@@ -1370,12 +1380,6 @@ function isCapGrant(header) {
         content.entry_type === 'CapGrant');
 }
 
-function now() {
-    const nanos = (performance.now() + performance.timeOrigin) * 1000;
-    const seconds = Math.floor(nanos / 1000000);
-    const subsecondNanos = nanos % 1000000;
-    return [seconds, subsecondNanos];
-}
 function buildShh(header) {
     return {
         header: {
@@ -1496,8 +1500,11 @@ const integrate_dht_ops = async (worskpace) => {
         const integrationLimboValue = opsToIntegrate[dhtOpHash];
         const dhtOp = integrationLimboValue.op;
         if (integrationLimboValue.validation_status === ValidationStatus.Valid) {
-            await putDhtOpData(dhtOp)(worskpace.state);
+            putDhtOpData(dhtOp)(worskpace.state);
             putDhtOpMetadata(dhtOp)(worskpace.state);
+        }
+        else if (integrationLimboValue.validation_status === ValidationStatus.Rejected) {
+            putDhtOpData(dhtOp)(worskpace.state);
         }
         const value = {
             op: dhtOp,
@@ -1620,7 +1627,7 @@ async function common_update(worskpace, original_header_hash, entry, entry_type)
         strategy: GetStrategy.Contents,
     });
     if (!headerToUpdate)
-        throw new Error('Could not find element to be deleted');
+        throw new Error('Could not find element to be updated');
     const original_entry_hash = headerToUpdate.header.content
         .entry_hash;
     if (!original_entry_hash)
@@ -1759,15 +1766,19 @@ function buildZomeFunctionContext(workspace, zome_index) {
 }
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/app_validation_workflow.rs
-const app_validation = async (worskpace) => {
-    const pendingDhtOps = getValidationLimboDhtOps(worskpace.state, [
+const app_validation = async (workspace) => {
+    const pendingDhtOps = getValidationLimboDhtOps(workspace.state, [
         ValidationLimboStatus.SysValidated,
         ValidationLimboStatus.AwaitingAppDeps,
     ]);
     for (const dhtOpHash of Object.keys(pendingDhtOps)) {
-        deleteValidationLimboValue(dhtOpHash)(worskpace.state);
+        deleteValidationLimboValue(dhtOpHash)(workspace.state);
         const validationLimboValue = pendingDhtOps[dhtOpHash];
-        const outcome = await validate_op(validationLimboValue.op, validationLimboValue.from_agent, worskpace);
+        // If we are a bad agent, we don't validate our stuff
+        let outcome = { resolved: true, valid: true };
+        if (shouldValidate(workspace.state.agentPubKey, validationLimboValue.op, workspace.badAgentConfig)) {
+            outcome = await validate_op(validationLimboValue.op, validationLimboValue.from_agent, workspace);
+        }
         if (!outcome.resolved) {
             validationLimboValue.status = ValidationLimboStatus.AwaitingAppDeps;
         }
@@ -1778,10 +1789,23 @@ const app_validation = async (worskpace) => {
                     ? ValidationStatus.Valid
                     : ValidationStatus.Rejected,
             };
-            putIntegrationLimboValue(dhtOpHash, value)(worskpace.state);
+            putIntegrationLimboValue(dhtOpHash, value)(workspace.state);
+            // TODO: move this when alarm is implemented
+            const pretendIsValid = workspace.badAgentConfig &&
+                workspace.badAgentConfig.pretend_invalid_elements_are_valid;
             if (value.validation_status === ValidationStatus.Rejected) {
                 // Sound the alarm!
-                await worskpace.p2p.gossip_bad_agent(value.op);
+                const receipt = {
+                    dht_op_hash: dhtOpHash,
+                    validation_status: pretendIsValid
+                        ? ValidationStatus.Valid
+                        : value.validation_status,
+                    validator: workspace.state.agentPubKey,
+                    when_integrated: now(),
+                };
+                const receipts = getValidationReceipts(dhtOpHash)(workspace.state);
+                await workspace.p2p.gossip_bad_agents(value.op, receipt, receipts);
+                putValidationReceipt(dhtOpHash, receipt)(workspace.state);
             }
         }
     }
@@ -1796,6 +1820,11 @@ function app_validation_task() {
         details: undefined,
         task: worskpace => app_validation(worskpace),
     };
+}
+function shouldValidate(agentPubKey, dhtOp, badAgentConfig) {
+    if (!badAgentConfig)
+        return true;
+    return dhtOp.header.header.content.author !== agentPubKey;
 }
 async function validate_op(op, from_agent, workspace) {
     const element = dht_ops_to_element(op);
@@ -2302,7 +2331,7 @@ const callZomeFn = (zomeName, fnName, payload, provenance, cap) => async (worksp
             elementsToAppValidate.push(element);
             i++;
         }
-        if (!workspace.state.badAgent) {
+        if (shouldValidateBeforePublishing(workspace.badAgentConfig)) {
             for (const element of elementsToAppValidate) {
                 const outcome = await run_app_validation(zome, element, contextState, workspace);
                 if (!outcome.resolved)
@@ -2330,6 +2359,11 @@ function call_zome_fn_workflow(zome, fnName, payload, provenance) {
         },
         task: worskpace => callZomeFn(zome, fnName, payload, provenance, '')(worskpace),
     };
+}
+function shouldValidateBeforePublishing(badAgentConfig) {
+    if (!badAgentConfig)
+        return true;
+    return !badAgentConfig.disable_validation_before_publish;
 }
 async function run_app_validation(zome, element, contextState, workspace) {
     const header = element.signed_header.header.content;
@@ -2400,7 +2434,7 @@ function genesis_task(cellId, membrane_proof) {
 }
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/incoming_dht_ops_workflow.rs
-const incoming_dht_ops = (basis, dhtOps, from_agent) => async (worskpace) => {
+const incoming_dht_ops = (basis, dhtOps, from_agent, validation_receipts) => async (worskpace) => {
     for (const dhtOpHash of Object.keys(dhtOps)) {
         if (!worskpace.state.integratedDHTOps[dhtOpHash] &&
             !worskpace.state.integrationLimbo[dhtOpHash] &&
@@ -2418,13 +2452,17 @@ const incoming_dht_ops = (basis, dhtOps, from_agent) => async (worskpace) => {
             putValidationLimboValue(dhtOpHash, validationLimboValue)(worskpace.state);
         }
     }
+    // TODO: change this when alarm is implemented
+    for (const receipt of validation_receipts) {
+        putValidationReceipt(receipt.dht_op_hash, receipt)(worskpace.state);
+    }
     return {
         result: undefined,
         triggers: [sys_validation_task()],
     };
 };
 function incoming_dht_ops_task(from_agent, dht_hash, // The basis for the DHTOps
-ops) {
+ops, validation_receipts) {
     return {
         type: WorkflowType.INCOMING_DHT_OPS,
         details: {
@@ -2432,7 +2470,7 @@ ops) {
             dht_hash,
             ops,
         },
-        task: worskpace => incoming_dht_ops(dht_hash, ops, from_agent)(worskpace),
+        task: worskpace => incoming_dht_ops(dht_hash, ops, from_agent, validation_receipts)(worskpace),
     };
 }
 
@@ -2507,10 +2545,6 @@ class Cell {
     getSimulatedDna() {
         return this.conductor.registeredDnas[this.dnaHash];
     }
-    convertToBadAgent(injectDna) {
-        this._state.badAgent = true;
-        this._state.badAgentDna = injectDna;
-    }
     static async create(conductor, cellId, membrane_proof) {
         const newCellState = {
             dnaHash: cellId[0],
@@ -2525,9 +2559,8 @@ class Cell {
             validationLimbo: {},
             integratedDHTOps: {},
             authoredDHTOps: {},
+            validationReceipts: {},
             sourceChain: [],
-            badAgent: false,
-            badAgentDna: undefined,
         };
         const p2p = conductor.network.createP2pCell(cellId);
         const cell = new Cell(newCellState, conductor, p2p);
@@ -2544,8 +2577,8 @@ class Cell {
         this.p2p.addNeighbor(neighborPubKey);
     }
     handle_publish(from_agent, dht_hash, // The basis for the DHTOps
-    ops) {
-        return this._runWorkflow(incoming_dht_ops_task(from_agent, dht_hash, ops));
+    ops, validation_receipts) {
+        return this._runWorkflow(incoming_dht_ops_task(from_agent, dht_hash, ops, validation_receipts));
     }
     async handle_get(dht_hash, options) {
         const authority = new Authority(this._state, this.p2p);
@@ -2593,12 +2626,20 @@ class Cell {
     }
     /** Private helpers */
     buildWorkspace() {
+        let badAgentConfig = undefined;
+        let dna = this.getSimulatedDna();
+        if (this.conductor.badAgent) {
+            badAgentConfig = this.conductor.badAgent.config;
+            if (this.conductor.badAgent.counterfeitDnas[this.cellId[0]] &&
+                this.conductor.badAgent.counterfeitDnas[this.cellId[0]][this.cellId[1]]) {
+                dna = this.conductor.badAgent.counterfeitDnas[this.cellId[0]][this.cellId[1]];
+            }
+        }
         return {
             state: this._state,
             p2p: this.p2p,
-            dna: this._state.badAgent && this._state.badAgentDna
-                ? this._state.badAgentDna
-                : this.getSimulatedDna(),
+            dna,
+            badAgentConfig,
         };
     }
 }
@@ -2640,31 +2681,40 @@ class P2pCell {
     }
     async leave() { }
     async publish(dht_hash, ops) {
-        await this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], dht_hash, this.redundancyFactor, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.PUBLISH_REQUEST, { dhtOps: ops }, (cell) => cell.handle_publish(this.cellId[1], dht_hash, ops)));
+        await this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], dht_hash, this.redundancyFactor, this.badAgents, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.PUBLISH_REQUEST, { dhtOps: ops }, (cell) => cell.handle_publish(this.cellId[1], dht_hash, ops, [])));
     }
     async get(dht_hash, options) {
         const gets = await this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], dht_hash, 1, // TODO: what about this?
-        (cell) => this._executeNetworkRequest(cell, NetworkRequestType.GET_REQUEST, { hash: dht_hash, options }, (cell) => cell.handle_get(dht_hash, options)));
+        this.badAgents, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.GET_REQUEST, { hash: dht_hash, options }, (cell) => cell.handle_get(dht_hash, options)));
         return gets.find(get => !!get);
     }
     async get_links(base_address, options) {
         return this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], base_address, 1, // TODO: what about this?
-        (cell) => this._executeNetworkRequest(cell, NetworkRequestType.GET_REQUEST, { hash: base_address, options }, (cell) => cell.handle_get_links(base_address, options)));
+        this.badAgents, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.GET_REQUEST, { hash: base_address, options }, (cell) => cell.handle_get_links(base_address, options)));
     }
     async call_remote(agent, zome, fnName, cap, payload) {
         return this.network.kitsune.rpc_single(this.cellId[0], this.cellId[1], agent, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.CALL_REMOTE, {}, (cell) => cell.handle_call_remote(this.cellId[1], zome, fnName, cap, payload)));
     }
-    async gossip_bad_agent(dhtOp) {
-        const badAgent = dhtOp.header.header.content.author;
-        // We already gossiped this bad agent
-        if (this.badAgents.includes(badAgent))
-            return;
-        this.badAgents.push(badAgent);
-        this.neighbors = this.neighbors.filter(agent => badAgent !== agent);
-        this.farKnownPeers = this.farKnownPeers.filter(agent => badAgent !== agent);
+    async gossip_bad_agents(dhtOp, myReceipt, existingReceipts) {
+        const badAgents = [];
+        if (myReceipt.validation_status === ValidationStatus$1.Rejected)
+            badAgents.push(dhtOp.header.header.content.author);
+        for (const existingReceipt of existingReceipts) {
+            if (existingReceipt.validation_status !== myReceipt.validation_status) {
+                badAgents.push(existingReceipt.validator);
+            }
+        }
+        for (const badAgent of badAgents) {
+            if (!this.badAgents.includes(badAgent))
+                this.badAgents.push(badAgent);
+        }
+        this.neighbors = this.neighbors.filter(agent => !badAgents.includes(agent));
+        this.farKnownPeers = this.farKnownPeers.filter(agent => !badAgents.includes(agent));
         const dhtOpHash = hash(dhtOp, HashType.DHTOP);
         const promises = this.neighbors.map(neighborAgent => {
-            this.network.kitsune.rpc_single(this.cellId[0], this.cellId[1], neighborAgent, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.GOSSIP, {}, (cell) => cell.handle_publish(badAgent, dhtOpHash, { [dhtOpHash]: dhtOp })));
+            this.network.kitsune.rpc_single(this.cellId[0], this.cellId[1], neighborAgent, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.GOSSIP, {}, (cell) => cell.handle_publish(this.cellId[1], dhtOpHash, {
+                [dhtOpHash]: dhtOp,
+            }, [myReceipt, ...existingReceipts])));
         });
         await Promise.all(promises);
     }
@@ -2708,7 +2758,7 @@ class P2pCell {
     }
     handle_network_request(fromAgent, request) {
         if (this.badAgents.includes(fromAgent))
-            throw new Error('Network Request from Bad Agent!');
+            throw new Error('Bad Agent!');
         const cell = this.network.conductor.getCell(this.cellId[0], this.cellId[1]);
         return request(cell);
     }
@@ -2723,10 +2773,10 @@ class KitsuneP2p {
         const peer = await this.discover.peer_discover(dna_hash, from_agent, to_agent);
         return networkRequest(peer);
     }
-    async rpc_multi(dna_hash, from_agent, basis, remote_agent_count, networkRequest) {
+    async rpc_multi(dna_hash, from_agent, basis, remote_agent_count, filtered_agents, networkRequest) {
         // TODO Get all local agents and call them
         // Discover neighbors
-        return this.discover.message_neighborhood(dna_hash, from_agent, basis, remote_agent_count, networkRequest);
+        return this.discover.message_neighborhood(dna_hash, from_agent, basis, remote_agent_count, filtered_agents, networkRequest);
     }
 }
 // From https://github.com/holochain/holochain/blob/develop/crates/kitsune_p2p/kitsune_p2p/src/spawn/actor/discover.rs
@@ -2738,13 +2788,13 @@ class Discover {
     async peer_discover(dna_hash, from_agent, to_agent) {
         return this.network.bootstrapService.cells[dna_hash][to_agent];
     }
-    async message_neighborhood(dna_hash, from_agent, basis, remote_agent_count, networkRequest) {
-        const agents = await this.search_for_agents(dna_hash, basis, remote_agent_count);
+    async message_neighborhood(dna_hash, from_agent, basis, remote_agent_count, filtered_agents, networkRequest) {
+        const agents = await this.search_for_agents(dna_hash, basis, remote_agent_count, filtered_agents);
         const promises = agents.map(cell => networkRequest(cell));
         return Promise.all(promises);
     }
-    async search_for_agents(dna_hash, basis, remote_agent_count) {
-        return this.network.bootstrapService.getNeighborhood(dna_hash, basis, remote_agent_count);
+    async search_for_agents(dna_hash, basis, remote_agent_count, filtered_agents) {
+        return this.network.bootstrapService.getNeighborhood(dna_hash, basis, remote_agent_count, filtered_agents);
     }
 }
 
@@ -2850,6 +2900,7 @@ class Conductor {
             registeredDnas: {},
             installedHapps: {},
             name,
+            badAgent: undefined,
         };
         return new Conductor(state, bootstrapService);
     }
@@ -2866,6 +2917,7 @@ class Conductor {
             cellsState,
             registeredDnas: this.registeredDnas,
             installedHapps: this.installedHapps,
+            badAgent: this.badAgent,
         };
     }
     getAllCells() {
@@ -2878,6 +2930,19 @@ class Conductor {
     }
     getCell(dnaHash, agentPubKey) {
         return this.cells[dnaHash] ? this.cells[dnaHash][agentPubKey] : undefined;
+    }
+    /** Bad agents */
+    setBadAgent(badAgentConfig) {
+        if (!this.badAgent)
+            this.badAgent = { config: badAgentConfig, counterfeitDnas: {} };
+        this.badAgent.config = badAgentConfig;
+    }
+    setCounterfeitDna(cellId, dna) {
+        if (!this.badAgent)
+            throw new Error('This is not a bad agent');
+        if (!this.badAgent.counterfeitDnas[cellId[0]])
+            this.badAgent.counterfeitDnas[cellId[0]] = {};
+        this.badAgent.counterfeitDnas[cellId[0]][cellId[1]] = dna;
     }
     /** Admin API */
     /*
@@ -3120,8 +3185,8 @@ class BootstrapService {
             this.cells[dnaHash] = {};
         this.cells[dnaHash][agentPubKey] = cell;
     }
-    getNeighborhood(dnaHash, basis_dht_hash, numNeighbors) {
-        const cells = Object.keys(this.cells[dnaHash]);
+    getNeighborhood(dnaHash, basis_dht_hash, numNeighbors, filteredAgents = []) {
+        const cells = Object.keys(this.cells[dnaHash]).filter(cellPubKey => !filteredAgents.includes(cellPubKey));
         const neighborsKeys = getClosestNeighbors(cells, basis_dht_hash, numNeighbors);
         return neighborsKeys.map(pubKey => this.cells[dnaHash][pubKey]);
     }
@@ -3151,5 +3216,5 @@ async function createConductors(conductorsToCreate, currentConductors, happ) {
     return allConductors;
 }
 
-export { AGENT_PREFIX, Authority, Cascade, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, GetStrategy, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDeleteLink, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, computeDhtStatus, counterfeit_check, createConductors, deleteValidationLimboValue, demoDna, demoEntriesZome, demoHapp, demoLinksZome, demoPathsZome, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAllHeldHeaders, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getCreateLinksForEntry, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getLiveLinks, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getRemovesOnLinkAdd, getTipOfChain, getValidationLimboDhtOps, hasDhtOpBeenProcessed, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingElement, isHoldingEntry, location, locationDistance, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, register_header_on_basis, run_create_link_validation_callback, run_delete_link_validation_callback, run_validation_callback_direct, sleep, store_element, store_entry, sys_validate_element, sys_validation, sys_validation_task, valid_cap_grant, workflowPriority, wrap };
+export { AGENT_PREFIX, Authority, Cascade, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, GetStrategy, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDeleteLink, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, computeDhtStatus, counterfeit_check, createConductors, deleteValidationLimboValue, demoDna, demoEntriesZome, demoHapp, demoLinksZome, demoPathsZome, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAllHeldHeaders, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getCreateLinksForEntry, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getLiveLinks, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getRemovesOnLinkAdd, getTipOfChain, getValidationLimboDhtOps, getValidationReceipts, hasDhtOpBeenProcessed, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingElement, isHoldingEntry, location, locationDistance, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, putValidationReceipt, register_header_on_basis, run_create_link_validation_callback, run_delete_link_validation_callback, run_validation_callback_direct, sleep, store_element, store_entry, sys_validate_element, sys_validation, sys_validation_task, valid_cap_grant, validate_op, workflowPriority, wrap };
 //# sourceMappingURL=index.js.map

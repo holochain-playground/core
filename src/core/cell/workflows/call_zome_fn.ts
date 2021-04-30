@@ -8,6 +8,7 @@ import {
 import { cloneDeep } from 'lodash-es';
 import { SimulatedZome } from '../../../dnas/simulated-dna';
 import { GetStrategy } from '../../../types';
+import { BadAgentConfig } from '../../bad-agent';
 import { Cell, run_create_link_validation_callback } from '../../cell';
 import { buildZomeFunctionContext } from '../../hdk/context';
 import { HostFnWorkspace } from '../../hdk/host-fn';
@@ -98,7 +99,7 @@ export const callZomeFn = (
       i++;
     }
 
-    if (!workspace.state.badAgent) {
+    if (shouldValidateBeforePublishing(workspace.badAgentConfig)) {
       for (const element of elementsToAppValidate) {
         const outcome = await run_app_validation(
           zome,
@@ -146,6 +147,13 @@ export function call_zome_fn_workflow(
     task: worskpace =>
       callZomeFn(zome, fnName, payload, provenance, '')(worskpace),
   };
+}
+
+function shouldValidateBeforePublishing(
+  badAgentConfig?: BadAgentConfig
+): boolean {
+  if (!badAgentConfig) return true;
+  return !badAgentConfig.disable_validation_before_publish;
 }
 
 async function run_app_validation(

@@ -5,6 +5,7 @@ import {
   Dictionary,
   DHTOp,
   CapSecret,
+  ValidationReceipt,
 } from '@holochain-open-dev/core-types';
 import { Conductor } from '../conductor';
 import { genesis, genesis_task } from './workflows/genesis';
@@ -23,7 +24,6 @@ import { getHashType, HashType } from '../../processors/hash';
 import { GetLinksOptions, GetOptions } from '../../types';
 import { cloneDeep } from 'lodash-es';
 import { SimulatedDna } from '../../dnas/simulated-dna';
-import { hasDhtOpBeenProcessed } from './dht/get';
 
 export type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export type CellSignalListener = (payload: any) => void;
@@ -64,11 +64,6 @@ export class Cell {
     return this.conductor.registeredDnas[this.dnaHash];
   }
 
-  convertToBadAgent(injectDna?: SimulatedDna) {
-    this._state.badAgent = true;
-    this._state.badAgentDna = injectDna;
-  }
-
   static async create(
     conductor: Conductor,
     cellId: CellId,
@@ -87,9 +82,8 @@ export class Cell {
       validationLimbo: {},
       integratedDHTOps: {},
       authoredDHTOps: {},
+      validationReceipts: {},
       sourceChain: [],
-      badAgent: false,
-      badAgentDna: undefined,
     };
 
     const p2p = conductor.network.createP2pCell(cellId);
@@ -129,9 +123,12 @@ export class Cell {
   public handle_publish(
     from_agent: AgentPubKey,
     dht_hash: Hash, // The basis for the DHTOps
-    ops: Dictionary<DHTOp>
+    ops: Dictionary<DHTOp>,
+    validation_receipts: ValidationReceipt[]
   ): Promise<void> {
-    return this._runWorkflow(incoming_dht_ops_task(from_agent, dht_hash, ops));
+    return this._runWorkflow(
+      incoming_dht_ops_task(from_agent, dht_hash, ops, validation_receipts)
+    );
   }
 
   public async handle_get(
@@ -216,13 +213,25 @@ export class Cell {
   /** Private helpers */
 
   private buildWorkspace(): Workspace {
+    let badAgentConfig = undefined;
+    let dna = this.getSimulatedDna();
+    if (this.conductor.badAgent) {
+      badAgentConfig = this.conductor.badAgent.config;
+      if (
+        this.conductor.badAgent.counterfeitDnas[this.cellId[0]] &&
+        this.conductor.badAgent.counterfeitDnas[this.cellId[0]][this.cellId[1]]
+      ) {
+        dna = this.conductor.badAgent.counterfeitDnas[this.cellId[0]][
+          this.cellId[1]
+        ];
+      }
+    }
+
     return {
       state: this._state,
       p2p: this.p2p,
-      dna:
-        this._state.badAgent && this._state.badAgentDna
-          ? this._state.badAgentDna
-          : this.getSimulatedDna(),
+      dna,
+      badAgentConfig,
     };
   }
 }
