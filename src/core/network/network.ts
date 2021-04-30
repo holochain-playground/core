@@ -66,6 +66,7 @@ export class Network {
       farKnownPeers: [],
       redundancyFactor: 3,
       neighborNumber: 5,
+      badAgents: [],
     };
 
     const p2pCell = new P2pCell(state, cellId, this);

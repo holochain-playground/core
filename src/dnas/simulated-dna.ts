@@ -3,7 +3,7 @@ import {
   CellId,
   Dictionary,
   EntryVisibility,
-  Hash,
+  Element,
 } from '@holochain-open-dev/core-types';
 import { ValidationOutcome } from '../core/cell/sys_validate/types';
 import {
