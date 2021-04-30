@@ -2708,7 +2708,7 @@ class P2pCell {
             if (!this.badAgents.includes(badAgent))
                 this.badAgents.push(badAgent);
         }
-        this.neighbors = this.neighbors.filter(agent => !badAgents.includes(agent));
+        await this.syncNeighbors();
         this.farKnownPeers = this.farKnownPeers.filter(agent => !badAgents.includes(agent));
         const dhtOpHash = hash(dhtOp, HashType.DHTOP);
         const promises = this.neighbors.map(neighborAgent => {
