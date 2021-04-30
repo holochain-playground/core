@@ -2464,7 +2464,7 @@ const incoming_dht_ops = (basis, dhtOps, from_agent, validation_receipts) => asy
             const receiptsArrayToDict = (r) => r.reduce((acc, next) => ({ ...acc, [next.validator]: next }), {});
             const existingReceiptsDict = receiptsArrayToDict(existingReceipts);
             const receivedReceipts = receiptsArrayToDict(validation_receipts.filter(r => r.dht_op_hash === dhtOpHash));
-            if (!isEqual(new Set(Object.keys(existingReceiptsDict)), new Set(Object.keys(receivedReceipts)))) {
+            if (!isEqual(Object.keys(existingReceiptsDict).sort(), Object.keys(receivedReceipts).sort())) {
                 // TODO: change this when alarm is implemented
                 for (const receipt of Object.values(receivedReceipts)) {
                     putValidationReceipt(receipt.dht_op_hash, receipt)(workspace.state);

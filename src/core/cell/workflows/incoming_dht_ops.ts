@@ -74,8 +74,8 @@ export const incoming_dht_ops = (
 
       if (
         !isEqual(
-          new Set(Object.keys(existingReceiptsDict)),
-          new Set(Object.keys(receivedReceipts))
+          Object.keys(existingReceiptsDict).sort(),
+          Object.keys(receivedReceipts).sort()
         )
       ) {
         // TODO: change this when alarm is implemented
