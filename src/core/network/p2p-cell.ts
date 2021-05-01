@@ -9,7 +9,6 @@ import {
   ValidationReceipt,
   ValidationStatus,
 } from '@holochain-open-dev/core-types';
-import { isEqual } from 'lodash-es';
 import { MiddlewareExecutor } from '../../executor/middleware-executor';
 import { hash, HashType } from '../../processors/hash';
 import { GetLinksOptions, GetOptions } from '../../types';
@@ -182,8 +181,6 @@ export class P2pCell {
       }
     }
 
-    let alarm = false;
-
     if (
       !(
         this.network.conductor.badAgent &&
@@ -192,46 +189,40 @@ export class P2pCell {
       )
     ) {
       for (const badAgent of badAgents) {
-        if (!this.badAgents.includes(badAgent)) {
-          alarm = true;
-          this.badAgents.push(badAgent);
-        }
+        if (!this.badAgents.includes(badAgent)) this.badAgents.push(badAgent);
       }
     }
-
-    const neighbors = [...this.neighbors];
 
     await this.syncNeighbors();
     this.farKnownPeers = this.farKnownPeers.filter(
       agent => !badAgents.includes(agent)
     );
 
-    if (alarm || !isEqual(this.neighbors.sort(), neighbors.sort())) {
-      const dhtOpHash = hash(dhtOp, HashType.DHTOP);
-      const promises = this.neighbors.map(neighborAgent => {
-        this.network.kitsune.rpc_single(
-          this.cellId[0],
-          this.cellId[1],
-          neighborAgent,
-          (cell: Cell) =>
-            this._executeNetworkRequest(
-              cell,
-              NetworkRequestType.GOSSIP,
-              {},
-              (cell: Cell) =>
-                cell.handle_publish(
-                  this.cellId[1],
-                  dhtOpHash,
-                  {
-                    [dhtOpHash]: dhtOp,
-                  },
-                  [myReceipt, ...existingReceipts]
-                )
-            )
-        );
-      });
-      await Promise.all(promises);
-    }
+    const dhtOpHash = hash(dhtOp, HashType.DHTOP);
+    const promises = this.neighbors.map(neighborAgent => {
+      this.network.kitsune.rpc_single(
+        this.cellId[0],
+        this.cellId[1],
+        neighborAgent,
+        (cell: Cell) =>
+          this._executeNetworkRequest(
+            cell,
+            NetworkRequestType.GOSSIP,
+            {},
+            (cell: Cell) =>
+              cell.handle_publish(
+                this.cellId[1],
+                dhtOpHash,
+                {
+                  [dhtOpHash]: dhtOp,
+                },
+                [myReceipt, ...existingReceipts]
+              )
+          )
+      );
+    });
+
+    await Promise.all(promises);
   }
 
   /** Neighbor handling */
