@@ -2718,6 +2718,7 @@ class P2pCell {
         return this.network.kitsune.rpc_single(this.cellId[0], this.cellId[1], agent, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.CALL_REMOTE, {}, (cell) => cell.handle_call_remote(this.cellId[1], zome, fnName, cap, payload)));
     }
     async gossip_bad_agents(dhtOp, myReceipt, existingReceipts) {
+        existingReceipts = existingReceipts.filter(r => r.validator !== this.cellId[1]);
         const badAgents = [];
         if (myReceipt.validation_status === ValidationStatus$1.Rejected)
             badAgents.push(dhtOp.header.header.content.author);

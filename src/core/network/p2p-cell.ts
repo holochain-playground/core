@@ -166,6 +166,10 @@ export class P2pCell {
     myReceipt: ValidationReceipt,
     existingReceipts: ValidationReceipt[]
   ): Promise<void> {
+    existingReceipts = existingReceipts.filter(
+      r => r.validator !== this.cellId[1]
+    );
+
     const badAgents: AgentPubKey[] = [];
 
     if (myReceipt.validation_status === ValidationStatus.Rejected)
