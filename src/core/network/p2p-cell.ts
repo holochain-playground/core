@@ -166,6 +166,10 @@ export class P2pCell {
     myReceipt: ValidationReceipt,
     existingReceipts: ValidationReceipt[]
   ): Promise<void> {
+    existingReceipts = existingReceipts.filter(
+      r => r.validator !== this.cellId[1]
+    );
+
     const badAgents: AgentPubKey[] = [];
 
     if (myReceipt.validation_status === ValidationStatus.Rejected)
@@ -177,8 +181,16 @@ export class P2pCell {
       }
     }
 
-    for (const badAgent of badAgents) {
-      if (!this.badAgents.includes(badAgent)) this.badAgents.push(badAgent);
+    if (
+      !(
+        this.network.conductor.badAgent &&
+        this.network.conductor.badAgent.config
+          .pretend_invalid_elements_are_valid
+      )
+    ) {
+      for (const badAgent of badAgents) {
+        if (!this.badAgents.includes(badAgent)) this.badAgents.push(badAgent);
+      }
     }
 
     await this.syncNeighbors();

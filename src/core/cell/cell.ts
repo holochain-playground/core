@@ -16,20 +16,31 @@ import {
 import { P2pCell } from '../network/p2p-cell';
 import { incoming_dht_ops_task } from './workflows/incoming_dht_ops';
 import { CellState } from './state';
-import { Workflow, WorkflowType, Workspace } from './workflows/workflows';
+import {
+  triggeredWorkflowFromType,
+  Workflow,
+  workflowPriority,
+  WorkflowType,
+  Workspace,
+} from './workflows/workflows';
 import { MiddlewareExecutor } from '../../executor/middleware-executor';
 import { GetLinksResponse, GetResult } from './cascade/types';
 import { Authority } from './cascade/authority';
 import { getHashType, HashType } from '../../processors/hash';
 import { GetLinksOptions, GetOptions } from '../../types';
 import { cloneDeep } from 'lodash-es';
-import { SimulatedDna } from '../../dnas/simulated-dna';
 
 export type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export type CellSignalListener = (payload: any) => void;
 
 export class Cell {
-  _pendingWorkflows: Dictionary<Workflow<any, any>> = {};
+  _triggers: Dictionary<{ running: boolean; triggered: boolean }> = {
+    [WorkflowType.INTEGRATE_DHT_OPS]: { running: false, triggered: true },
+    [WorkflowType.PRODUCE_DHT_OPS]: { running: false, triggered: true },
+    [WorkflowType.PUBLISH_DHT_OPS]: { running: false, triggered: true },
+    [WorkflowType.SYS_VALIDATION]: { running: false, triggered: true },
+    [WorkflowType.APP_VALIDATION]: { running: false, triggered: true },
+  };
 
   workflowExecutor = new MiddlewareExecutor<Workflow<any, any>>();
 
@@ -173,32 +184,31 @@ export class Cell {
   /** Workflow internal execution */
 
   triggerWorkflow(workflow: Workflow<any, any>) {
-    this._pendingWorkflows[workflow.type] = workflow;
+    this._triggers[workflow.type].triggered = true;
 
     setTimeout(() => this._runPendingWorkflows());
   }
 
   async _runPendingWorkflows() {
-    const workflowsToRun = this._pendingWorkflows;
-    this._pendingWorkflows = {};
+    const pendingWorkflows: WorkflowType[] = Object.entries(this._triggers)
+      .filter(([type, t]) => t.triggered && !t.running)
+      .map(([type, t]) => type as WorkflowType);
 
-    const promises = Object.values(workflowsToRun).map(w =>
-      this._runWorkflow(w)
-    );
+    const workflowsToRun = pendingWorkflows.map(triggeredWorkflowFromType);
+
+    const promises = Object.values(workflowsToRun).map(async w => {
+      this._triggers[w.type].triggered = false;
+      this._triggers[w.type].running = true;
+      await this._runWorkflow(w);
+      this._triggers[w.type].running = false;
+
+      this._runPendingWorkflows();
+    });
 
     await Promise.all(promises);
   }
 
   async _runWorkflow(workflow: Workflow<any, any>): Promise<any> {
-    let zomeIndex: number | undefined = undefined;
-    if (workflow.type === WorkflowType.CALL_ZOME) {
-      const zomeName = (workflow as CallZomeFnWorkflow).details.zome;
-      const i = this.getSimulatedDna().zomes.findIndex(
-        zome => zome.name === zomeName
-      );
-      if (i >= 0) zomeIndex = i;
-    }
-
     const result = await this.workflowExecutor.execute(
       () => workflow.task(this.buildWorkspace()),
       workflow
