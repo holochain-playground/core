@@ -11,7 +11,7 @@ export interface Workspace {
     };
 }
 export interface Workflow<D, R> {
-    type: string;
+    type: WorkflowType;
     details: D;
     task: (worskpace: Workspace) => Promise<WorkflowReturn<R>>;
 }
@@ -30,3 +30,4 @@ export declare enum WorkflowType {
     INCOMING_DHT_OPS = "Incoming DHT Ops"
 }
 export declare function workflowPriority(workflowType: WorkflowType): number;
+export declare function triggeredWorkflowFromType(type: WorkflowType): Workflow<any, any>;
