@@ -2726,9 +2726,13 @@ class P2pCell {
                 badAgents.push(existingReceipt.validator);
             }
         }
-        for (const badAgent of badAgents) {
-            if (!this.badAgents.includes(badAgent))
-                this.badAgents.push(badAgent);
+        if (!(this.network.conductor.badAgent &&
+            this.network.conductor.badAgent.config
+                .pretend_invalid_elements_are_valid)) {
+            for (const badAgent of badAgents) {
+                if (!this.badAgents.includes(badAgent))
+                    this.badAgents.push(badAgent);
+            }
         }
         await this.syncNeighbors();
         this.farKnownPeers = this.farKnownPeers.filter(agent => !badAgents.includes(agent));

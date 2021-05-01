@@ -177,8 +177,16 @@ export class P2pCell {
       }
     }
 
-    for (const badAgent of badAgents) {
-      if (!this.badAgents.includes(badAgent)) this.badAgents.push(badAgent);
+    if (
+      !(
+        this.network.conductor.badAgent &&
+        this.network.conductor.badAgent.config
+          .pretend_invalid_elements_are_valid
+      )
+    ) {
+      for (const badAgent of badAgents) {
+        if (!this.badAgents.includes(badAgent)) this.badAgents.push(badAgent);
+      }
     }
 
     await this.syncNeighbors();
