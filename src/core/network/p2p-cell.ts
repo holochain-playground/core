@@ -85,7 +85,7 @@ export class P2pCell {
   }
 
   get badAgents() {
-    return getBadAgents(this.cell.getState());
+    return getBadAgents(this.cell._state);
   }
 
   /** P2p actions */

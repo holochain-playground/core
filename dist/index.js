@@ -2831,7 +2831,7 @@ class Cell {
     }
 }
 
-const GOSSIP_INTERVAL_MS = 50;
+const GOSSIP_INTERVAL_MS = 500;
 class SimpleBloomMod {
     constructor(p2pCell) {
         this.p2pCell = p2pCell;
@@ -2839,27 +2839,27 @@ class SimpleBloomMod {
         this.run_one_iteration();
     }
     async run_one_iteration() {
-        if (!this.gossip_on)
-            return;
-        const localDhtOpsHashes = this.p2pCell.cell.handle_fetch_op_hashes_for_constraints(this.p2pCell.storageArc, undefined, undefined);
-        const localDhtOps = this.p2pCell.cell.handle_fetch_op_hash_data(localDhtOpsHashes);
-        const state = this.p2pCell.cell.getState();
-        const dhtOpData = {};
-        for (const dhtOpHash of Object.keys(localDhtOps)) {
-            const receipts = getValidationReceipts(dhtOpHash)(state);
-            dhtOpData[dhtOpHash] = {
-                op: localDhtOps[dhtOpHash],
-                validation_receipts: receipts,
+        if (this.gossip_on) {
+            const localDhtOpsHashes = this.p2pCell.cell.handle_fetch_op_hashes_for_constraints(this.p2pCell.storageArc, undefined, undefined);
+            const localDhtOps = this.p2pCell.cell.handle_fetch_op_hash_data(localDhtOpsHashes);
+            const state = this.p2pCell.cell._state;
+            const dhtOpData = {};
+            for (const dhtOpHash of Object.keys(localDhtOps)) {
+                const receipts = getValidationReceipts(dhtOpHash)(state);
+                dhtOpData[dhtOpHash] = {
+                    op: localDhtOps[dhtOpHash],
+                    validation_receipts: receipts,
+                };
+            }
+            const badActions = getBadActions(state);
+            const gossips = {
+                badActions,
+                neighbors: [],
+                validated_dht_ops: dhtOpData,
             };
-        }
-        const badActions = getBadActions(state);
-        const gossips = {
-            badActions,
-            neighbors: [],
-            validated_dht_ops: dhtOpData,
-        };
-        for (const neighbor of this.p2pCell.neighbors) {
-            await this.p2pCell.outgoing_gossip(neighbor, gossips);
+            for (const neighbor of this.p2pCell.neighbors) {
+                await this.p2pCell.outgoing_gossip(neighbor, gossips);
+            }
         }
         setTimeout(() => this.run_one_iteration(), GOSSIP_INTERVAL_MS);
     }
@@ -2903,7 +2903,7 @@ class P2pCell {
         return this.network.conductor.getCell(this.cellId[0], this.cellId[1]);
     }
     get badAgents() {
-        return getBadAgents(this.cell.getState());
+        return getBadAgents(this.cell._state);
     }
     /** P2p actions */
     async join(containerCell) {

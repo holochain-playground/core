@@ -11,7 +11,7 @@ import { GossipData } from '../network/gossip/types';
 export declare type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export declare type CellSignalListener = (payload: any) => void;
 export declare class Cell {
-    private _state;
+    _state: CellState;
     conductor: Conductor;
     p2p: P2pCell;
     _triggers: Dictionary<{

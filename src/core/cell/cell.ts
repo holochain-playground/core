@@ -35,7 +35,7 @@ import { getDHTOpBasis } from './utils';
 import { GossipData } from '../network/gossip/types';
 import { hasDhtOpBeenProcessed } from './dht/get';
 import { putValidationReceipt } from './dht/put';
-import { BadAction, getBadAgents } from '../network/utils';
+import { BadAction, getBadActions, getBadAgents } from '../network/utils';
 
 export type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export type CellSignalListener = (payload: any) => void;
@@ -53,7 +53,7 @@ export class Cell {
   workflowExecutor = new MiddlewareExecutor<Workflow<any, any>>();
 
   constructor(
-    private _state: CellState,
+    public _state: CellState,
     public conductor: Conductor,
     public p2p: P2pCell
   ) {
