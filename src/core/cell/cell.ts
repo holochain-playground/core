@@ -243,11 +243,11 @@ export class Cell {
         for (const receipt of validatedOp.validation_receipts) {
           putValidationReceipt(dhtOpHash, receipt)(this._state);
         }
-      } else {
-        // TODO: fix for when sharding is implemented
-        if (this.p2p.shouldWeHold(dhtOpHash)) {
-          dhtOpsToProcess[dhtOpHash] = validatedOp.op;
-        }
+      }
+      
+      // TODO: fix for when sharding is implemented
+      if (this.p2p.shouldWeHold(dhtOpHash)) {
+        dhtOpsToProcess[dhtOpHash] = validatedOp.op;
       }
     }
 

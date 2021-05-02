@@ -2772,11 +2772,9 @@ class Cell {
                     putValidationReceipt(dhtOpHash, receipt)(this._state);
                 }
             }
-            else {
-                // TODO: fix for when sharding is implemented
-                if (this.p2p.shouldWeHold(dhtOpHash)) {
-                    dhtOpsToProcess[dhtOpHash] = validatedOp.op;
-                }
+            // TODO: fix for when sharding is implemented
+            if (this.p2p.shouldWeHold(dhtOpHash)) {
+                dhtOpsToProcess[dhtOpHash] = validatedOp.op;
             }
         }
         if (Object.keys(dhtOpsToProcess).length > 0) {
@@ -2868,13 +2866,18 @@ class SimpleBloomMod {
                 neighbors: [],
                 validated_dht_ops: dhtOpData,
             };
-            for (const neighbor of this.p2pCell.neighbors) {
-                await this.p2pCell.outgoing_gossip(neighbor, gossips);
+            let warrant = badActions.length > 0 && badActions.length !== this.lastBadActions;
+            this.lastBadActions = badActions.length;
+            if (warrant) {
+                const promises = [
+                    ...this.p2pCell.neighbors,
+                    ...this.p2pCell.farKnownPeers,
+                ].map(peer => this.p2pCell.outgoing_gossip(peer, gossips, warrant));
+                await Promise.all(promises);
             }
-            if (badActions.length > 0 && badActions.length !== this.lastBadActions) {
-                this.lastBadActions = badActions.length;
-                for (const farPeer of this.p2pCell.farKnownPeers) {
-                    await this.p2pCell.outgoing_gossip(farPeer, gossips);
+            else {
+                for (const neighbor of this.p2pCell.neighbors) {
+                    await this.p2pCell.outgoing_gossip(neighbor, gossips, warrant);
                 }
             }
         }
@@ -2887,6 +2890,7 @@ var NetworkRequestType;
     NetworkRequestType["ADD_NEIGHBOR"] = "Add Neighbor";
     NetworkRequestType["PUBLISH_REQUEST"] = "Publish Request";
     NetworkRequestType["GET_REQUEST"] = "Get Request";
+    NetworkRequestType["WARRANT"] = "Warrant";
     NetworkRequestType["GOSSIP"] = "Gossip";
 })(NetworkRequestType || (NetworkRequestType = {}));
 
@@ -2980,9 +2984,9 @@ class P2pCell {
         return index >= 0 && index < this.redundancyFactor;
     }
     /** Gossip */
-    async outgoing_gossip(to_agent, gossips) {
+    async outgoing_gossip(to_agent, gossips, warrant = false) {
         // TODO: remove peer discovery?
-        await this.network.kitsune.rpc_single(this.cellId[0], this.cellId[1], to_agent, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.GOSSIP, {}, (cell) => cell.handle_gossip(this.cellId[1], gossips)));
+        await this.network.kitsune.rpc_single(this.cellId[0], this.cellId[1], to_agent, (cell) => this._executeNetworkRequest(cell, warrant ? NetworkRequestType.WARRANT : NetworkRequestType.GOSSIP, {}, (cell) => cell.handle_gossip(this.cellId[1], gossips)));
     }
     /** Executors */
     _executeNetworkRequest(toCell, type, details, request) {

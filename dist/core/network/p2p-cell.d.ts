@@ -42,7 +42,7 @@ export declare class P2pCell {
     syncNeighbors(): Promise<void>;
     shouldWeHold(dhtOpHash: Hash): boolean;
     /** Gossip */
-    outgoing_gossip(to_agent: AgentPubKey, gossips: GossipData): Promise<void>;
+    outgoing_gossip(to_agent: AgentPubKey, gossips: GossipData, warrant?: boolean): Promise<void>;
     /** Executors */
     private _executeNetworkRequest;
     handle_network_request<R>(fromAgent: AgentPubKey, request: NetworkRequest<R>): Promise<R>;

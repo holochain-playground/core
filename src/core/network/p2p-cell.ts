@@ -257,7 +257,8 @@ export class P2pCell {
 
   public async outgoing_gossip(
     to_agent: AgentPubKey,
-    gossips: GossipData
+    gossips: GossipData,
+    warrant: boolean = false
   ): Promise<void> {
     // TODO: remove peer discovery?
     await this.network.kitsune.rpc_single(
@@ -267,7 +268,7 @@ export class P2pCell {
       (cell: Cell) =>
         this._executeNetworkRequest(
           cell,
-          NetworkRequestType.GOSSIP,
+          warrant ? NetworkRequestType.WARRANT : NetworkRequestType.GOSSIP,
           {},
           (cell: Cell) => cell.handle_gossip(this.cellId[1], gossips)
         )

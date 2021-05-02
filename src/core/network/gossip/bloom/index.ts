@@ -53,14 +53,20 @@ export class SimpleBloomMod {
         validated_dht_ops: dhtOpData,
       };
 
-      for (const neighbor of this.p2pCell.neighbors) {
-        await this.p2pCell.outgoing_gossip(neighbor, gossips);
-      }
+      let warrant =
+        badActions.length > 0 && badActions.length !== this.lastBadActions;
+      this.lastBadActions = badActions.length;
 
-      if (badActions.length > 0 && badActions.length !== this.lastBadActions) {
-        this.lastBadActions = badActions.length;
-        for (const farPeer of this.p2pCell.farKnownPeers) {
-          await this.p2pCell.outgoing_gossip(farPeer, gossips);
+      if (warrant) {
+        const promises = [
+          ...this.p2pCell.neighbors,
+          ...this.p2pCell.farKnownPeers,
+        ].map(peer => this.p2pCell.outgoing_gossip(peer, gossips, warrant));
+
+        await Promise.all(promises);
+      } else {
+        for (const neighbor of this.p2pCell.neighbors) {
+          await this.p2pCell.outgoing_gossip(neighbor, gossips, warrant);
         }
       }
     }
