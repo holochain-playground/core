@@ -63,7 +63,7 @@ export class P2pCell {
 
     this.storageArc = {
       center_loc: location(this.cellId[1]),
-      half_length: 2 ^ 255,
+      half_length: Math.pow(2, 33),
     };
   }
 
