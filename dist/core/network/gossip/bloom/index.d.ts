@@ -5,5 +5,6 @@ export declare class SimpleBloomMod {
     gossip_on: boolean;
     lastBadActions: number;
     constructor(p2pCell: P2pCell);
+    loop(): Promise<void>;
     run_one_iteration(): Promise<void>;
 }

@@ -2831,13 +2831,23 @@ class Cell {
     }
 }
 
+const sleep = (ms) => new Promise(resolve => setTimeout(() => resolve(), ms));
+const DelayMiddleware = (ms) => () => sleep(ms);
+
 const GOSSIP_INTERVAL_MS = 500;
 class SimpleBloomMod {
     constructor(p2pCell) {
         this.p2pCell = p2pCell;
         this.gossip_on = true;
         this.lastBadActions = 0;
-        this.run_one_iteration();
+        this.loop();
+    }
+    async loop() {
+        while (true) {
+            if (this.gossip_on)
+                await this.run_one_iteration();
+            await sleep(GOSSIP_INTERVAL_MS);
+        }
     }
     async run_one_iteration() {
         if (this.gossip_on) {
@@ -2868,7 +2878,6 @@ class SimpleBloomMod {
                 }
             }
         }
-        setTimeout(() => this.run_one_iteration(), GOSSIP_INTERVAL_MS);
     }
 }
 
@@ -2910,6 +2919,9 @@ class P2pCell {
         return this.network.conductor.getCell(this.cellId[0], this.cellId[1]);
     }
     get badAgents() {
+        if (this.cell.conductor.badAgent &&
+            this.cell.conductor.badAgent.config.pretend_invalid_elements_are_valid)
+            return [];
         return getBadAgents(this.cell._state);
     }
     /** P2p actions */
@@ -3372,9 +3384,6 @@ function demoHapp() {
         },
     };
 }
-
-const sleep = (ms) => new Promise(resolve => setTimeout(() => resolve(), ms));
-const DelayMiddleware = (ms) => () => sleep(ms);
 
 class BootstrapService {
     constructor() {

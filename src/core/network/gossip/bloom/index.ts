@@ -1,4 +1,5 @@
 import { Dictionary } from '@holochain-open-dev/core-types';
+import { sleep } from '../../../../executor/delay-middleware';
 import { getValidationReceipts } from '../../../cell';
 import { P2pCell } from '../../p2p-cell';
 import { getBadActions } from '../../utils';
@@ -12,7 +13,13 @@ export class SimpleBloomMod {
   lastBadActions = 0;
 
   constructor(protected p2pCell: P2pCell) {
-    this.run_one_iteration();
+    this.loop();
+  }
+  async loop() {
+    while (true) {
+      if (this.gossip_on) await this.run_one_iteration();
+      await sleep(GOSSIP_INTERVAL_MS);
+    }
   }
 
   async run_one_iteration(): Promise<void> {
@@ -57,7 +64,5 @@ export class SimpleBloomMod {
         }
       }
     }
-
-    setTimeout(() => this.run_one_iteration(), GOSSIP_INTERVAL_MS);
   }
 }

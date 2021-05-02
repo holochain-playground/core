@@ -85,6 +85,12 @@ export class P2pCell {
   }
 
   get badAgents() {
+    if (
+      this.cell.conductor.badAgent &&
+      this.cell.conductor.badAgent.config.pretend_invalid_elements_are_valid
+    )
+      return [];
+
     return getBadAgents(this.cell._state);
   }
 
