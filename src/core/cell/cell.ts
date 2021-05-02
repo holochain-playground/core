@@ -35,7 +35,7 @@ import { getDHTOpBasis } from './utils';
 import { GossipData } from '../network/gossip/types';
 import { hasDhtOpBeenProcessed } from './dht/get';
 import { putValidationReceipt } from './dht/put';
-import { BadAction, getBadAgents } from '../network/utils';
+import { BadAction, getBadActions, getBadAgents } from '../network/utils';
 
 export type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export type CellSignalListener = (payload: any) => void;
@@ -53,7 +53,7 @@ export class Cell {
   workflowExecutor = new MiddlewareExecutor<Workflow<any, any>>();
 
   constructor(
-    private _state: CellState,
+    public _state: CellState,
     public conductor: Conductor,
     public p2p: P2pCell
   ) {
@@ -236,10 +236,6 @@ export class Cell {
       }
     }
 
-    if (Object.keys(dhtOpsToProcess).length > 0) {
-      await this.handle_publish(from_agent, false, dhtOpsToProcess);
-    }
-
     for (const [dhtOpHash, validatedOp] of Object.entries(
       gossip.validated_dht_ops
     )) {
@@ -248,6 +244,15 @@ export class Cell {
           putValidationReceipt(dhtOpHash, receipt)(this._state);
         }
       }
+      
+      // TODO: fix for when sharding is implemented
+      if (this.p2p.shouldWeHold(dhtOpHash)) {
+        dhtOpsToProcess[dhtOpHash] = validatedOp.op;
+      }
+    }
+
+    if (Object.keys(dhtOpsToProcess).length > 0) {
+      await this.handle_publish(from_agent, false, dhtOpsToProcess);
     }
 
     if (getBadAgents(this._state).length > badAgents.length) {

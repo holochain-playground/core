@@ -11,7 +11,7 @@ import {
 import { MiddlewareExecutor } from '../../executor/middleware-executor';
 import { hash, HashType, location } from '../../processors/hash';
 import { GetLinksOptions, GetOptions } from '../../types';
-import { Cell } from '../cell';
+import { Cell, isHoldingDhtOp } from '../cell';
 import {
   GetElementResponse,
   GetEntryResponse,
@@ -63,7 +63,7 @@ export class P2pCell {
 
     this.storageArc = {
       center_loc: location(this.cellId[1]),
-      half_length: 2 ^ 255,
+      half_length: Math.pow(2, 33),
     };
   }
 
@@ -85,7 +85,13 @@ export class P2pCell {
   }
 
   get badAgents() {
-    return getBadAgents(this.cell.getState());
+    if (
+      this.cell.conductor.badAgent &&
+      this.cell.conductor.badAgent.config.pretend_invalid_elements_are_valid
+    )
+      return [];
+
+    return getBadAgents(this.cell._state);
   }
 
   /** P2p actions */
@@ -232,11 +238,27 @@ export class P2pCell {
     }
   }
 
+  // TODO: fix when sharding is implemented
+  shouldWeHold(dhtOpHash: Hash): boolean {
+    const neighbors = this.network.bootstrapService.getNeighborhood(
+      this.cellId[0],
+      dhtOpHash,
+      this.redundancyFactor + 1,
+      this.badAgents
+    );
+
+    const index = neighbors.findIndex(
+      cell => cell.agentPubKey === this.cellId[1]
+    );
+    return index >= 0 && index < this.redundancyFactor;
+  }
+
   /** Gossip */
 
   public async outgoing_gossip(
     to_agent: AgentPubKey,
-    gossips: GossipData
+    gossips: GossipData,
+    warrant: boolean = false
   ): Promise<void> {
     // TODO: remove peer discovery?
     await this.network.kitsune.rpc_single(
@@ -246,7 +268,7 @@ export class P2pCell {
       (cell: Cell) =>
         this._executeNetworkRequest(
           cell,
-          NetworkRequestType.GOSSIP,
+          warrant ? NetworkRequestType.WARRANT : NetworkRequestType.GOSSIP,
           {},
           (cell: Cell) => cell.handle_gossip(this.cellId[1], gossips)
         )
@@ -268,6 +290,8 @@ export class P2pCell {
       type,
       details,
     };
+    if (toCell.p2p.badAgents.includes(this.cellId[1]))
+      throw new Error('Connection closed!');
 
     return this.networkRequestsExecutor.execute(
       () => toCell.p2p.handle_network_request(this.cellId[1], request),
@@ -279,8 +303,6 @@ export class P2pCell {
     fromAgent: AgentPubKey,
     request: NetworkRequest<R>
   ) {
-    if (this.badAgents.includes(fromAgent)) throw new Error('Bad Agent!');
-
     return request(this.cell);
   }
 }

@@ -12,6 +12,7 @@ export enum NetworkRequestType {
   ADD_NEIGHBOR = 'Add Neighbor',
   PUBLISH_REQUEST = 'Publish Request',
   GET_REQUEST = 'Get Request',
+  WARRANT = 'Warrant',
   GOSSIP = 'Gossip',
 }
 

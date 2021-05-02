@@ -1,7 +1,6 @@
 import {
   AgentPubKey,
   DHTOp,
-  Dictionary,
   Hash,
   ValidationReceipt,
   ValidationStatus,

@@ -205,6 +205,10 @@ export function isHoldingElement(state: CellState, headerHash: Hash): boolean {
   return state.metadata.misc_meta[headerHash] === 'StoreElement';
 }
 
+export function isHoldingDhtOp(state: CellState, dhtOpHash: Hash): boolean {
+  return !!state.integratedDHTOps[dhtOpHash];
+}
+
 export interface EntryDHTInfo {
   details: EntryDetails;
   links: LinkMetaVal[];
@@ -372,7 +376,9 @@ export function getIntegratedDhtOpsWithoutReceipt(
 ): Dictionary<IntegratedDhtOpsValue> {
   const needReceipt: Dictionary<IntegratedDhtOpsValue> = {};
 
-  for (const [dhtOpHash, integratedValue] of Object.entries(state.integratedDHTOps)) {
+  for (const [dhtOpHash, integratedValue] of Object.entries(
+    state.integratedDHTOps
+  )) {
     if (integratedValue.send_receipt) {
       needReceipt[dhtOpHash] = integratedValue;
     }
