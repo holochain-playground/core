@@ -26,11 +26,15 @@ export interface IntegratedDhtOpsValue {
   op: DHTOp;
   validation_status: ValidationStatus;
   when_integrated: number;
+  /// Send a receipt to this author.
+  send_receipt: Boolean;
 }
 
 export interface IntegrationLimboValue {
   op: DHTOp;
   validation_status: ValidationStatus;
+  /// Send a receipt to this author.
+  send_receipt: Boolean;
 }
 
 export enum ValidationStatus {
@@ -62,6 +66,8 @@ export interface ValidationLimboValue {
   last_try: number | undefined;
   num_tries: number;
   from_agent: AgentPubKey | undefined;
+  /// Send a receipt to this author.
+  send_receipt: Boolean;
 }
 
 export function query_dht_ops(

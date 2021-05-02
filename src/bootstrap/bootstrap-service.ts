@@ -26,8 +26,8 @@ export class BootstrapService {
     numNeighbors: number,
     filteredAgents: Hash[] = []
   ): Cell[] {
-    const cells = Object.keys(this.cells[dnaHash]).filter(cellPubKey =>
-      !filteredAgents.includes(cellPubKey)
+    const cells = Object.keys(this.cells[dnaHash]).filter(
+      cellPubKey => !filteredAgents.includes(cellPubKey)
     );
 
     const neighborsKeys = getClosestNeighbors(
@@ -39,9 +39,14 @@ export class BootstrapService {
     return neighborsKeys.map(pubKey => this.cells[dnaHash][pubKey]);
   }
 
-  getFarKnownPeers(dnaHash: Hash, agentPubKey: string): Cell[] {
+  getFarKnownPeers(
+    dnaHash: Hash,
+    agentPubKey: string,
+    filteredAgents: Hash[] = []
+  ): Cell[] {
     const cells = Object.keys(this.cells[dnaHash]).filter(
-      peerPubKey => peerPubKey !== agentPubKey
+      peerPubKey =>
+        peerPubKey !== agentPubKey && !filteredAgents.includes(peerPubKey)
     );
 
     const farthestKeys = getFarthestNeighbors(cells, agentPubKey);

@@ -27,11 +27,15 @@ import {
 import { MiddlewareExecutor } from '../../executor/middleware-executor';
 import { GetLinksResponse, GetResult } from './cascade/types';
 import { Authority } from './cascade/authority';
-import { getHashType, HashType } from '../../processors/hash';
+import { getHashType, hash, HashType } from '../../processors/hash';
 import { GetLinksOptions, GetOptions } from '../../types';
 import { cloneDeep } from 'lodash-es';
 import { DhtArc } from '../network/dht_arc';
 import { getDHTOpBasis } from './utils';
+import { GossipData } from '../network/gossip/types';
+import { hasDhtOpBeenProcessed } from './dht/get';
+import { putValidationReceipt } from './dht/put';
+import { BadAction, getBadAgents } from '../network/utils';
 
 export type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export type CellSignalListener = (payload: any) => void;
@@ -43,6 +47,7 @@ export class Cell {
     [WorkflowType.PUBLISH_DHT_OPS]: { running: false, triggered: true },
     [WorkflowType.SYS_VALIDATION]: { running: false, triggered: true },
     [WorkflowType.APP_VALIDATION]: { running: false, triggered: true },
+    [WorkflowType.VALIDATION_RECEIPT]: { running: false, triggered: true },
   };
 
   workflowExecutor = new MiddlewareExecutor<Workflow<any, any>>();
@@ -139,7 +144,9 @@ export class Cell {
     request_validation_receipt: boolean,
     ops: Dictionary<DHTOp>
   ): Promise<void> {
-    return this._runWorkflow(incoming_dht_ops_task(from_agent, ops));
+    return this._runWorkflow(
+      incoming_dht_ops_task(from_agent, request_validation_receipt, ops)
+    );
   }
 
   public async handle_get(
@@ -211,6 +218,42 @@ export class Cell {
       }
     }
     return result;
+  }
+
+  async handle_gossip(from_agent: AgentPubKey, gossip: GossipData) {
+    const dhtOpsToProcess: Dictionary<DHTOp> = {};
+
+    const badAgents = getBadAgents(this._state);
+
+    for (const badAction of gossip.badActions) {
+      const dhtOpHash = hash(badAction.op, HashType.DHTOP);
+      if (!hasDhtOpBeenProcessed(this._state, dhtOpHash)) {
+        dhtOpsToProcess[dhtOpHash] = badAction.op;
+      }
+
+      for (const receipt of badAction.receipts) {
+        putValidationReceipt(dhtOpHash, receipt)(this._state);
+      }
+    }
+
+    if (Object.keys(dhtOpsToProcess).length > 0) {
+      await this.handle_publish(from_agent, false, dhtOpsToProcess);
+    }
+
+    for (const [dhtOpHash, validatedOp] of Object.entries(
+      gossip.validated_dht_ops
+    )) {
+      if (hasDhtOpBeenProcessed(this._state, dhtOpHash)) {
+        for (const receipt of validatedOp.validation_receipts) {
+          putValidationReceipt(dhtOpHash, receipt)(this._state);
+        }
+      }
+    }
+
+    if (getBadAgents(this._state).length > badAgents.length) {
+      // We may have added bad agents: resync the neighbors
+      await this.p2p.syncNeighbors();
+    }
   }
 
   /** Workflow internal execution */

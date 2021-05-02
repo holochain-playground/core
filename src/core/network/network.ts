@@ -2,7 +2,6 @@ import { CellId, Dictionary, Hash } from '@holochain-open-dev/core-types';
 import { BootstrapService } from '../../bootstrap/bootstrap-service';
 import { Conductor } from '../conductor';
 import { P2pCell, P2pCellState } from '../network/p2p-cell';
-import { SpaceActor } from './gossip/space_actor';
 import { KitsuneP2p } from './kitsune_p2p';
 import { NetworkRequest } from './network-request';
 
@@ -15,8 +14,6 @@ export class Network {
   // P2pCells contained in this conductor
   p2pCells: Dictionary<Dictionary<P2pCell>>;
   kitsune: KitsuneP2p;
-  // 
-  spaces: Dictionary<SpaceActor> = {};
 
   constructor(
     state: NetworkState,
