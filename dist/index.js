@@ -2849,7 +2849,7 @@ class SimpleBloomMod {
     }
     async run_one_iteration() {
         if (this.gossip_on) {
-            const localDhtOpsHashes = this.p2pCell.cell.handle_fetch_op_hashes_for_constraints(this.p2pCell.storageArc, undefined, undefined);
+            const localDhtOpsHashes = Object.keys(this.p2pCell.cell._state.integratedDHTOps);
             const localDhtOps = this.p2pCell.cell.handle_fetch_op_hash_data(localDhtOpsHashes);
             const state = this.p2pCell.cell._state;
             const dhtOpData = {};
