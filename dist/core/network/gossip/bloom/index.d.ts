@@ -3,6 +3,7 @@ export declare const GOSSIP_INTERVAL_MS = 500;
 export declare class SimpleBloomMod {
     protected p2pCell: P2pCell;
     gossip_on: boolean;
+    lastBadActions: number;
     constructor(p2pCell: P2pCell);
     run_one_iteration(): Promise<void>;
 }

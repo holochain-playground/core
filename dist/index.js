@@ -2836,6 +2836,7 @@ class SimpleBloomMod {
     constructor(p2pCell) {
         this.p2pCell = p2pCell;
         this.gossip_on = true;
+        this.lastBadActions = 0;
         this.run_one_iteration();
     }
     async run_one_iteration() {
@@ -2859,6 +2860,12 @@ class SimpleBloomMod {
             };
             for (const neighbor of this.p2pCell.neighbors) {
                 await this.p2pCell.outgoing_gossip(neighbor, gossips);
+            }
+            if (badActions.length > 0 && badActions.length !== this.lastBadActions) {
+                this.lastBadActions = badActions.length;
+                for (const farPeer of this.p2pCell.farKnownPeers) {
+                    await this.p2pCell.outgoing_gossip(farPeer, gossips);
+                }
             }
         }
         setTimeout(() => this.run_one_iteration(), GOSSIP_INTERVAL_MS);
@@ -3054,7 +3061,7 @@ class Network {
             neighbors: [],
             farKnownPeers: [],
             redundancyFactor: 3,
-            neighborNumber: 5,
+            neighborNumber: 4,
             badAgents: [],
         };
         const p2pCell = new P2pCell(state, cellId, this);

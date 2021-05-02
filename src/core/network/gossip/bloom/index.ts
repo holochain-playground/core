@@ -9,6 +9,8 @@ export const GOSSIP_INTERVAL_MS = 500;
 export class SimpleBloomMod {
   gossip_on: boolean = true;
 
+  lastBadActions = 0;
+
   constructor(protected p2pCell: P2pCell) {
     this.run_one_iteration();
   }
@@ -46,6 +48,13 @@ export class SimpleBloomMod {
 
       for (const neighbor of this.p2pCell.neighbors) {
         await this.p2pCell.outgoing_gossip(neighbor, gossips);
+      }
+
+      if (badActions.length > 0 && badActions.length !== this.lastBadActions) {
+        this.lastBadActions = badActions.length;
+        for (const farPeer of this.p2pCell.farKnownPeers) {
+          await this.p2pCell.outgoing_gossip(farPeer, gossips);
+        }
       }
     }
 
