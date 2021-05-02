@@ -1,15 +1,6 @@
-import {
-  Hash,
-  Dictionary,
-  DHTOp,
-  AgentPubKey,
-} from '@holochain-open-dev/core-types';
-import { Cell, Workflow } from '../../cell';
-import {
-  ValidationLimboValue,
-  ValidationLimboStatus,
-  CellState,
-} from '../state';
+import { Dictionary, DHTOp, AgentPubKey } from '@holochain-open-dev/core-types';
+import { Workflow } from '../../cell';
+import { ValidationLimboValue, ValidationLimboStatus } from '../state';
 import { putValidationLimboValue } from '../dht/put';
 import { sys_validation_task } from './sys_validation';
 import { WorkflowReturn, WorkflowType, Workspace } from './workflows';
@@ -19,12 +10,14 @@ import { getDHTOpBasis } from '../utils';
 export const incoming_dht_ops = (
   dhtOps: Dictionary<DHTOp>,
   from_agent: AgentPubKey | undefined
-) => async (worskpace: Workspace): Promise<WorkflowReturn<void>> => {
+) => async (workspace: Workspace): Promise<WorkflowReturn<void>> => {
+  let sysValidate = false;
+
   for (const dhtOpHash of Object.keys(dhtOps)) {
     if (
-      !worskpace.state.integratedDHTOps[dhtOpHash] &&
-      !worskpace.state.integrationLimbo[dhtOpHash] &&
-      !worskpace.state.validationLimbo[dhtOpHash]
+      !workspace.state.integratedDHTOps[dhtOpHash] &&
+      !workspace.state.integrationLimbo[dhtOpHash] &&
+      !workspace.state.validationLimbo[dhtOpHash]
     ) {
       const dhtOp = dhtOps[dhtOpHash];
 
@@ -40,13 +33,15 @@ export const incoming_dht_ops = (
         time_added: Date.now(),
       };
 
-      putValidationLimboValue(dhtOpHash, validationLimboValue)(worskpace.state);
+      putValidationLimboValue(dhtOpHash, validationLimboValue)(workspace.state);
+
+      sysValidate = true;
     }
   }
 
   return {
     result: undefined,
-    triggers: [sys_validation_task()],
+    triggers: sysValidate ? [sys_validation_task()] : [],
   };
 };
 

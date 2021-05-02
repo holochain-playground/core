@@ -23,9 +23,12 @@ export class BootstrapService {
   getNeighborhood(
     dnaHash: Hash,
     basis_dht_hash: Hash,
-    numNeighbors: number
+    numNeighbors: number,
+    filteredAgents: Hash[] = []
   ): Cell[] {
-    const cells = Object.keys(this.cells[dnaHash]);
+    const cells = Object.keys(this.cells[dnaHash]).filter(cellPubKey =>
+      !filteredAgents.includes(cellPubKey)
+    );
 
     const neighborsKeys = getClosestNeighbors(
       cells,

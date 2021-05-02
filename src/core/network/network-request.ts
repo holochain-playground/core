@@ -1,4 +1,9 @@
-import { AgentPubKey, DHTOp, Dictionary, Hash } from '@holochain-open-dev/core-types';
+import {
+  AgentPubKey,
+  DHTOp,
+  Dictionary,
+  Hash,
+} from '@holochain-open-dev/core-types';
 import { GetOptions } from '../../types';
 import { Cell } from '../cell/cell';
 

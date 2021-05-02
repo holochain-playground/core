@@ -4,7 +4,7 @@ import {
   Dictionary,
   Hash,
   Metadata,
-  Timestamp,
+  ValidationReceipt,
 } from '@holochain-open-dev/core-types';
 import { location } from '../../processors/hash';
 import { contains, DhtArc } from '../network/dht_arc';
@@ -19,6 +19,7 @@ export interface CellState {
   authoredDHTOps: Dictionary<AuthoredDhtOpsValue>; // Key is the hash of the DHT op
   integrationLimbo: Dictionary<IntegrationLimboValue>; // Key is the hash of the DHT op
   validationLimbo: Dictionary<ValidationLimboValue>; // Key is the hash of the DHT op
+  validationReceipts: Dictionary<Dictionary<ValidationReceipt>>; // Segmented by dhtOpHash/authorOfReceipt
 }
 
 export interface IntegratedDhtOpsValue {

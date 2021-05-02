@@ -4,10 +4,12 @@ import {
   CellId,
   DHTOp,
   Dictionary,
-  Element,
   Hash,
+  ValidationReceipt,
+  ValidationStatus,
 } from '@holochain-open-dev/core-types';
 import { MiddlewareExecutor } from '../../executor/middleware-executor';
+import { hash, HashType } from '../../processors/hash';
 import { GetLinksOptions, GetOptions } from '../../types';
 import { Cell } from '../cell';
 import {
@@ -20,7 +22,6 @@ import { SpaceActor } from './gossip/space_actor';
 import {
   GossipEvt,
   OpConsistency,
-  OpCount,
   OpDataAgentInfo,
   OpHashesAgentHashes,
   ReqOpDataEvt,
@@ -32,11 +33,11 @@ import {
   NetworkRequest,
   NetworkRequestType,
 } from './network-request';
-import { getClosestNeighbors } from './utils';
 
 export type P2pCellState = {
   neighbors: AgentPubKey[];
   farKnownPeers: AgentPubKey[];
+  badAgents: AgentPubKey[];
   redundancyFactor: number;
   neighborNumber: number;
 };
@@ -44,10 +45,13 @@ export type P2pCellState = {
 // From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/lib.rs
 export class P2pCell {
   neighbors: AgentPubKey[];
+  badAgents: AgentPubKey[];
   farKnownPeers: AgentPubKey[];
 
-  storageArc: DhtArc;
+  // storageArc: DhtArc;
   neighborNumber: number;
+
+  redundancyFactor = 3;
 
   networkRequestsExecutor = new MiddlewareExecutor<
     NetworkRequestInfo<any, any>
@@ -62,10 +66,12 @@ export class P2pCell {
     this.farKnownPeers = state.farKnownPeers;
     this.redundancyFactor = state.redundancyFactor;
     this.neighborNumber = state.neighborNumber;
+    this.badAgents = state.badAgents;
   }
 
   getState(): P2pCellState {
     return {
+      badAgents: this.badAgents,
       neighbors: this.neighbors,
       farKnownPeers: this.farKnownPeers,
       redundancyFactor: this.redundancyFactor,
@@ -102,6 +108,8 @@ export class P2pCell {
       this.cellId[1],
       dht_hash,
       this.redundancyFactor,
+      this.badAgents,
+
       (cell: Cell) =>
         this._executeNetworkRequest(
           cell,
@@ -121,6 +129,8 @@ export class P2pCell {
       this.cellId[1],
       dht_hash,
       1, // TODO: what about this?
+      this.badAgents,
+
       (cell: Cell) =>
         this._executeNetworkRequest(
           cell,
@@ -142,6 +152,7 @@ export class P2pCell {
       this.cellId[1],
       base_address,
       1, // TODO: what about this?
+      this.badAgents,
       (cell: Cell) =>
         this._executeNetworkRequest(
           cell,
@@ -174,6 +185,65 @@ export class P2pCell {
     );
   }
 
+  async gossip_bad_agents(
+    dhtOp: DHTOp,
+    myReceipt: ValidationReceipt,
+    existingReceipts: ValidationReceipt[]
+  ): Promise<void> {
+    existingReceipts = existingReceipts.filter(
+      r => r.validator !== this.cellId[1]
+    );
+
+    const badAgents: AgentPubKey[] = [];
+
+    if (myReceipt.validation_status === ValidationStatus.Rejected)
+      badAgents.push(dhtOp.header.header.content.author);
+
+    for (const existingReceipt of existingReceipts) {
+      if (existingReceipt.validation_status !== myReceipt.validation_status) {
+        badAgents.push(existingReceipt.validator);
+      }
+    }
+
+    if (
+      !(
+        this.network.conductor.badAgent &&
+        this.network.conductor.badAgent.config
+          .pretend_invalid_elements_are_valid
+      )
+    ) {
+      for (const badAgent of badAgents) {
+        if (!this.badAgents.includes(badAgent)) this.badAgents.push(badAgent);
+      }
+    }
+
+    await this.syncNeighbors();
+    this.farKnownPeers = this.farKnownPeers.filter(
+      agent => !badAgents.includes(agent)
+    );
+
+    const dhtOpHash = hash(dhtOp, HashType.DHTOP);
+    const promises = this.neighbors.map(neighborAgent => {
+      this.network.kitsune.rpc_single(
+        this.cellId[0],
+        this.cellId[1],
+        neighborAgent,
+        (cell: Cell) =>
+          this._executeNetworkRequest(
+            cell,
+            NetworkRequestType.GOSSIP,
+            {},
+            (cell: Cell) =>
+              cell.handle_publish(this.cellId[1], false, {
+                [dhtOpHash]: dhtOp,
+              })
+          )
+      );
+    });
+
+    await Promise.all(promises);
+  }
+
   /** Neighbor handling */
 
   public getNeighbors(): Array<AgentPubKey> {
@@ -198,7 +268,12 @@ export class P2pCell {
       .map(p => p.agentPubKey);
 
     const neighbors = this.network.bootstrapService
-      .getNeighborhood(dnaHash, agentPubKey, this.neighborNumber)
+      .getNeighborhood(
+        dnaHash,
+        agentPubKey,
+        this.neighborNumber,
+        this.badAgents
+      )
       .filter(cell => cell.agentPubKey != agentPubKey);
 
     const newNeighbors = neighbors.filter(
@@ -326,8 +401,22 @@ export class P2pCell {
     };
 
     return this.networkRequestsExecutor.execute(
-      () => request(toCell),
+      () => toCell.p2p.handle_network_request(this.cellId[1], request),
       networkRequest
     );
+  }
+
+  public handle_network_request<R, T extends NetworkRequestType, D>(
+    fromAgent: AgentPubKey,
+    request: NetworkRequest<R>
+  ) {
+    if (this.badAgents.includes(fromAgent)) throw new Error('Bad Agent!');
+
+    const cell = this.network.conductor.getCell(
+      this.cellId[0],
+      this.cellId[1]
+    ) as Cell;
+
+    return request(cell);
   }
 }
