@@ -2,7 +2,6 @@ import { Hash, DHTOp, SysMetaVal, SignedHeaderHashed, ValidationReceipt } from '
 import { ValidationLimboValue, CellState, IntegrationLimboValue, IntegratedDhtOpsValue } from '../state';
 export declare const putValidationLimboValue: (dhtOpHash: Hash, validationLimboValue: ValidationLimboValue) => (state: CellState) => void;
 export declare const putValidationReceipt: (dhtOpHash: Hash, validationReceipt: ValidationReceipt) => (state: CellState) => void;
-export declare const getValidationReceipts: (dhtOpHash: Hash) => (state: CellState) => ValidationReceipt[];
 export declare const deleteValidationLimboValue: (dhtOpHash: Hash) => (state: CellState) => void;
 export declare const putIntegrationLimboValue: (dhtOpHash: Hash, integrationLimboValue: IntegrationLimboValue) => (state: CellState) => void;
 export declare const putDhtOpData: (dhtOp: DHTOp) => (state: CellState) => void;

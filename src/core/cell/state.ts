@@ -6,7 +6,8 @@ import {
   Metadata,
   ValidationReceipt,
 } from '@holochain-open-dev/core-types';
-import { SimulatedDna } from '../../dnas/simulated-dna';
+import { location } from '../../processors/hash';
+import { contains, DhtArc } from '../network/dht_arc';
 
 export interface CellState {
   dnaHash: Hash;
@@ -25,11 +26,15 @@ export interface IntegratedDhtOpsValue {
   op: DHTOp;
   validation_status: ValidationStatus;
   when_integrated: number;
+  /// Send a receipt to this author.
+  send_receipt: Boolean;
 }
 
 export interface IntegrationLimboValue {
   op: DHTOp;
   validation_status: ValidationStatus;
+  /// Send a receipt to this author.
+  send_receipt: Boolean;
 }
 
 export enum ValidationStatus {
@@ -61,4 +66,25 @@ export interface ValidationLimboValue {
   last_try: number | undefined;
   num_tries: number;
   from_agent: AgentPubKey | undefined;
+  /// Send a receipt to this author.
+  send_receipt: Boolean;
+}
+
+export function query_dht_ops(
+  integratedDHTOps: Dictionary<IntegratedDhtOpsValue>,
+  from: number | undefined,
+  to: number | undefined,
+  dht_arc: DhtArc
+): Array<Hash> {
+  const isDhtOpsInFilter = ([dhtOpHash, dhtOpValue]: [
+    Hash,
+    IntegratedDhtOpsValue
+  ]) => {
+    if (from && dhtOpValue.when_integrated < from) return false;
+    if (to && dhtOpValue.when_integrated > to) return false;
+    if (dht_arc && !contains(dht_arc, location(dhtOpHash))) return false;
+  };
+
+  const ops = Object.entries(integratedDHTOps).filter(isDhtOpsInFilter);
+  return ops.map(op => op[0]);
 }

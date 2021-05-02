@@ -1,4 +1,5 @@
 import { AgentPubKey, DHTOp, Dictionary, Hash, Metadata, ValidationReceipt } from '@holochain-open-dev/core-types';
+import { DhtArc } from '../network/dht_arc';
 export interface CellState {
     dnaHash: Hash;
     agentPubKey: AgentPubKey;
@@ -15,10 +16,12 @@ export interface IntegratedDhtOpsValue {
     op: DHTOp;
     validation_status: ValidationStatus;
     when_integrated: number;
+    send_receipt: Boolean;
 }
 export interface IntegrationLimboValue {
     op: DHTOp;
     validation_status: ValidationStatus;
+    send_receipt: Boolean;
 }
 export declare enum ValidationStatus {
     Valid = 0,
@@ -44,4 +47,6 @@ export interface ValidationLimboValue {
     last_try: number | undefined;
     num_tries: number;
     from_agent: AgentPubKey | undefined;
+    send_receipt: Boolean;
 }
+export declare function query_dht_ops(integratedDHTOps: Dictionary<IntegratedDhtOpsValue>, from: number | undefined, to: number | undefined, dht_arc: DhtArc): Array<Hash>;

@@ -43,14 +43,6 @@ export const putValidationReceipt = (
   ] = validationReceipt;
 };
 
-export const getValidationReceipts = (dhtOpHash: Hash) => (
-  state: CellState
-): ValidationReceipt[] => {
-  return state.validationReceipts[dhtOpHash]
-    ? Object.values(state.validationReceipts[dhtOpHash])
-    : [];
-};
-
 export const deleteValidationLimboValue = (dhtOpHash: Hash) => (
   state: CellState
 ) => {

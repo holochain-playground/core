@@ -4,26 +4,29 @@ import {
   CellId,
   DHTOp,
   Dictionary,
-  Element,
   Hash,
   ValidationReceipt,
   ValidationStatus,
 } from '@holochain-open-dev/core-types';
 import { MiddlewareExecutor } from '../../executor/middleware-executor';
-import { hash, HashType } from '../../processors/hash';
+import { hash, HashType, location } from '../../processors/hash';
 import { GetLinksOptions, GetOptions } from '../../types';
-import { Cell } from '../cell';
+import { Cell, isHoldingDhtOp } from '../cell';
 import {
   GetElementResponse,
   GetEntryResponse,
   GetLinksResponse,
 } from '../cell/cascade/types';
+import { DhtArc } from './dht_arc';
+import { SimpleBloomMod } from './gossip/bloom';
+import { GossipData } from './gossip/types';
 import { Network } from './network';
 import {
   NetworkRequestInfo,
   NetworkRequest,
   NetworkRequestType,
 } from './network-request';
+import { getBadAgents } from './utils';
 
 export type P2pCellState = {
   neighbors: AgentPubKey[];
@@ -36,11 +39,13 @@ export type P2pCellState = {
 // From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/lib.rs
 export class P2pCell {
   neighbors: AgentPubKey[];
-  badAgents: AgentPubKey[];
   farKnownPeers: AgentPubKey[];
 
-  redundancyFactor: number;
+  storageArc: DhtArc;
   neighborNumber: number;
+  redundancyFactor = 3;
+
+  _gossipLoop!: SimpleBloomMod;
 
   networkRequestsExecutor = new MiddlewareExecutor<
     NetworkRequestInfo<any, any>
@@ -55,7 +60,11 @@ export class P2pCell {
     this.farKnownPeers = state.farKnownPeers;
     this.redundancyFactor = state.redundancyFactor;
     this.neighborNumber = state.neighborNumber;
-    this.badAgents = state.badAgents;
+
+    this.storageArc = {
+      center_loc: location(this.cellId[1]),
+      half_length: 2 ^ 255,
+    };
   }
 
   getState(): P2pCellState {
@@ -68,10 +77,22 @@ export class P2pCell {
     };
   }
 
+  get cell(): Cell {
+    return this.network.conductor.getCell(
+      this.cellId[0],
+      this.cellId[1]
+    ) as Cell;
+  }
+
+  get badAgents() {
+    return getBadAgents(this.cell.getState());
+  }
+
   /** P2p actions */
 
   async join(containerCell: Cell): Promise<void> {
     this.network.bootstrapService.announceCell(this.cellId, containerCell);
+    this._gossipLoop = new SimpleBloomMod(this);
 
     await this.syncNeighbors();
   }
@@ -85,13 +106,12 @@ export class P2pCell {
       dht_hash,
       this.redundancyFactor,
       this.badAgents,
-
       (cell: Cell) =>
         this._executeNetworkRequest(
           cell,
           NetworkRequestType.PUBLISH_REQUEST,
           { dhtOps: ops },
-          (cell: Cell) => cell.handle_publish(this.cellId[1], dht_hash, ops, [])
+          (cell: Cell) => cell.handle_publish(this.cellId[1], true, ops)
         )
     );
   }
@@ -106,7 +126,6 @@ export class P2pCell {
       dht_hash,
       1, // TODO: what about this?
       this.badAgents,
-
       (cell: Cell) =>
         this._executeNetworkRequest(
           cell,
@@ -161,70 +180,6 @@ export class P2pCell {
     );
   }
 
-  async gossip_bad_agents(
-    dhtOp: DHTOp,
-    myReceipt: ValidationReceipt,
-    existingReceipts: ValidationReceipt[]
-  ): Promise<void> {
-    existingReceipts = existingReceipts.filter(
-      r => r.validator !== this.cellId[1]
-    );
-
-    const badAgents: AgentPubKey[] = [];
-
-    if (myReceipt.validation_status === ValidationStatus.Rejected)
-      badAgents.push(dhtOp.header.header.content.author);
-
-    for (const existingReceipt of existingReceipts) {
-      if (existingReceipt.validation_status !== myReceipt.validation_status) {
-        badAgents.push(existingReceipt.validator);
-      }
-    }
-
-    if (
-      !(
-        this.network.conductor.badAgent &&
-        this.network.conductor.badAgent.config
-          .pretend_invalid_elements_are_valid
-      )
-    ) {
-      for (const badAgent of badAgents) {
-        if (!this.badAgents.includes(badAgent)) this.badAgents.push(badAgent);
-      }
-    }
-
-    await this.syncNeighbors();
-    this.farKnownPeers = this.farKnownPeers.filter(
-      agent => !badAgents.includes(agent)
-    );
-
-    const dhtOpHash = hash(dhtOp, HashType.DHTOP);
-    const promises = this.neighbors.map(neighborAgent => {
-      this.network.kitsune.rpc_single(
-        this.cellId[0],
-        this.cellId[1],
-        neighborAgent,
-        (cell: Cell) =>
-          this._executeNetworkRequest(
-            cell,
-            NetworkRequestType.GOSSIP,
-            {},
-            (cell: Cell) =>
-              cell.handle_publish(
-                this.cellId[1],
-                dhtOpHash,
-                {
-                  [dhtOpHash]: dhtOp,
-                },
-                [myReceipt, ...existingReceipts]
-              )
-          )
-      );
-    });
-
-    await Promise.all(promises);
-  }
-
   /** Neighbor handling */
 
   public getNeighbors(): Array<AgentPubKey> {
@@ -245,7 +200,7 @@ export class P2pCell {
     const agentPubKey = this.cellId[1];
 
     this.farKnownPeers = this.network.bootstrapService
-      .getFarKnownPeers(dnaHash, agentPubKey)
+      .getFarKnownPeers(dnaHash, agentPubKey, this.badAgents)
       .map(p => p.agentPubKey);
 
     const neighbors = this.network.bootstrapService
@@ -277,6 +232,44 @@ export class P2pCell {
     }
   }
 
+  // TODO: fix when sharding is implemented
+  shouldWeHold(dhtOpHash: Hash): boolean {
+    const neighbors = this.network.bootstrapService.getNeighborhood(
+      this.cellId[0],
+      dhtOpHash,
+      this.redundancyFactor + 1,
+      this.badAgents
+    );
+
+    const index = neighbors.findIndex(
+      cell => cell.agentPubKey === this.cellId[1]
+    );
+    return index >= 0 && index < this.redundancyFactor;
+  }
+
+  /** Gossip */
+
+  public async outgoing_gossip(
+    to_agent: AgentPubKey,
+    gossips: GossipData
+  ): Promise<void> {
+    // TODO: remove peer discovery?
+    await this.network.kitsune.rpc_single(
+      this.cellId[0],
+      this.cellId[1],
+      to_agent,
+      (cell: Cell) =>
+        this._executeNetworkRequest(
+          cell,
+          NetworkRequestType.GOSSIP,
+          {},
+          (cell: Cell) => cell.handle_gossip(this.cellId[1], gossips)
+        )
+    );
+  }
+
+  /** Executors */
+
   private _executeNetworkRequest<R, T extends NetworkRequestType, D>(
     toCell: Cell,
     type: T,
@@ -290,6 +283,8 @@ export class P2pCell {
       type,
       details,
     };
+    if (toCell.p2p.badAgents.includes(this.cellId[1]))
+      throw new Error('Connection closed!');
 
     return this.networkRequestsExecutor.execute(
       () => toCell.p2p.handle_network_request(this.cellId[1], request),
@@ -297,17 +292,10 @@ export class P2pCell {
     );
   }
 
-  public handle_network_request<R, T extends NetworkRequestType, D>(
+  public handle_network_request<R>(
     fromAgent: AgentPubKey,
     request: NetworkRequest<R>
   ) {
-    if (this.badAgents.includes(fromAgent)) throw new Error('Bad Agent!');
-
-    const cell = this.network.conductor.getCell(
-      this.cellId[0],
-      this.cellId[1]
-    ) as Cell;
-
-    return request(cell);
+    return request(this.cell);
   }
 }

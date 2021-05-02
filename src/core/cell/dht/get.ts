@@ -17,6 +17,7 @@ import {
   Create,
   Metadata,
   DHTOp,
+  ValidationReceipt,
 } from '@holochain-open-dev/core-types';
 import { isEqual, uniq } from 'lodash-es';
 import { hash, HashType } from '../../../processors/hash';
@@ -26,6 +27,7 @@ import {
   ValidationLimboStatus,
   ValidationLimboValue,
   IntegrationLimboValue,
+  IntegratedDhtOpsValue,
 } from '../state';
 
 export function getValidationLimboDhtOps(
@@ -44,6 +46,14 @@ export function getValidationLimboDhtOps(
 
   return pendingDhtOps;
 }
+
+export const getValidationReceipts = (dhtOpHash: Hash) => (
+  state: CellState
+): ValidationReceipt[] => {
+  return state.validationReceipts[dhtOpHash]
+    ? Object.values(state.validationReceipts[dhtOpHash])
+    : [];
+};
 
 export function pullAllIntegrationLimboDhtOps(
   state: CellState
@@ -193,6 +203,10 @@ export function isHoldingEntry(state: CellState, entryHash: Hash): boolean {
 
 export function isHoldingElement(state: CellState, headerHash: Hash): boolean {
   return state.metadata.misc_meta[headerHash] === 'StoreElement';
+}
+
+export function isHoldingDhtOp(state: CellState, dhtOpHash: Hash): boolean {
+  return !!state.integratedDHTOps[dhtOpHash];
 }
 
 export interface EntryDHTInfo {
@@ -346,9 +360,28 @@ export function computeDhtStatus(
   };
 }
 
-export function hasDhtOpBeenProcessed(state: CellState, dhtOp: DHTOp): boolean {
-  const dhtOpHash = hash(dhtOp, HashType.DHTOP);
+export function hasDhtOpBeenProcessed(
+  state: CellState,
+  dhtOpHash: Hash
+): boolean {
   return (
-    !!state.integrationLimbo[dhtOpHash] || !!state.integratedDHTOps[dhtOpHash]
+    !!state.integrationLimbo[dhtOpHash] ||
+    !!state.integratedDHTOps[dhtOpHash] ||
+    !!state.validationLimbo[dhtOpHash]
   );
+}
+
+export function getIntegratedDhtOpsWithoutReceipt(
+  state: CellState
+): Dictionary<IntegratedDhtOpsValue> {
+  const needReceipt: Dictionary<IntegratedDhtOpsValue> = {};
+
+  for (const [dhtOpHash, integratedValue] of Object.entries(
+    state.integratedDHTOps
+  )) {
+    if (integratedValue.send_receipt) {
+      needReceipt[dhtOpHash] = integratedValue;
+    }
+  }
+  return needReceipt;
 }

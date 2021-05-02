@@ -27,7 +27,8 @@ export declare enum WorkflowType {
     APP_VALIDATION = "App Validation",
     INTEGRATE_DHT_OPS = "Integrate DHT Ops",
     GENESIS = "Genesis",
-    INCOMING_DHT_OPS = "Incoming DHT Ops"
+    INCOMING_DHT_OPS = "Incoming DHT Ops",
+    VALIDATION_RECEIPT = "Validation Receipt"
 }
 export declare function workflowPriority(workflowType: WorkflowType): number;
 export declare function triggeredWorkflowFromType(type: WorkflowType): Workflow<any, any>;

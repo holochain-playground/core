@@ -4,5 +4,5 @@ export declare class BootstrapService {
     cells: Dictionary<Dictionary<Cell>>;
     announceCell(cellId: CellId, cell: Cell): void;
     getNeighborhood(dnaHash: Hash, basis_dht_hash: Hash, numNeighbors: number, filteredAgents?: Hash[]): Cell[];
-    getFarKnownPeers(dnaHash: Hash, agentPubKey: string): Cell[];
+    getFarKnownPeers(dnaHash: Hash, agentPubKey: string, filteredAgents?: Hash[]): Cell[];
 }

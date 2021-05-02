@@ -40,7 +40,7 @@ describe('Links', () => {
 
     expect(add_link_hash).to.be.ok;
 
-    await sleep(1000);
+    await sleep(2000);
 
     let links = await conductors[0].callZomeFn({
       cellId: cell.cellId,
@@ -63,7 +63,7 @@ describe('Links', () => {
       },
       zome: 'demo_links',
     });
-    await sleep(1000);
+    await sleep(2000);
 
     links = await conductors[0].callZomeFn({
       cellId: cell.cellId,

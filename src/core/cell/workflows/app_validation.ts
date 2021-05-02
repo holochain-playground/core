@@ -9,7 +9,6 @@ import {
 import { getValidationLimboDhtOps } from '../dht/get';
 import {
   deleteValidationLimboValue,
-  getValidationReceipts,
   putIntegrationLimboValue,
   putValidationLimboValue,
   putValidationReceipt,
@@ -87,29 +86,9 @@ export const app_validation = async (
         validation_status: outcome.valid
           ? ValidationStatus.Valid
           : ValidationStatus.Rejected,
+        send_receipt: outcome.valid ? validationLimboValue.send_receipt : true, // If value is invalid we always need to make a receipt
       };
       putIntegrationLimboValue(dhtOpHash, value)(workspace.state);
-
-      // TODO: move this when alarm is implemented
-      const pretendIsValid =
-        workspace.badAgentConfig &&
-        workspace.badAgentConfig.pretend_invalid_elements_are_valid;
-      if (value.validation_status === ValidationStatus.Rejected) {
-        // Sound the alarm!
-        const receipt: ValidationReceipt = {
-          dht_op_hash: dhtOpHash,
-          validation_status: pretendIsValid
-            ? ValidationStatus.Valid
-            : value.validation_status,
-          validator: workspace.state.agentPubKey,
-          when_integrated: now(),
-        };
-
-        const receipts = getValidationReceipts(dhtOpHash)(workspace.state);
-
-        await workspace.p2p.gossip_bad_agents(value.op, receipt, receipts);
-        putValidationReceipt(dhtOpHash, receipt)(workspace.state);
-      }
 
       integrateDhtOps = true;
     }

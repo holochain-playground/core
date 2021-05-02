@@ -85,7 +85,7 @@ describe('CRUD', () => {
 
     expect(deletehash).to.be.ok;
 
-    await sleep(2000);
+    await sleep(3000);
 
     let getresult = await conductors[0].callZomeFn({
       cellId: cell.cellId,

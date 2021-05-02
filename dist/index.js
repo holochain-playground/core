@@ -632,9 +632,9 @@ function location(hash) {
 function distance(hash1, hash2) {
     const location1 = location(hash1);
     const location2 = location(hash2);
-    return locationDistance(location1, location2) + 1;
+    return shortest_arc_distance(location1, location2) + 1;
 }
-function locationDistance(location1, location2) {
+function shortest_arc_distance(location1, location2) {
     const distance1 = wrap(location1 - location2);
     const distance2 = wrap(location2 - location1);
     return Math.min(distance1, distance2);
@@ -678,6 +678,11 @@ function getValidationLimboDhtOps(state, statuses) {
     }
     return pendingDhtOps;
 }
+const getValidationReceipts = (dhtOpHash) => (state) => {
+    return state.validationReceipts[dhtOpHash]
+        ? Object.values(state.validationReceipts[dhtOpHash])
+        : [];
+};
 function pullAllIntegrationLimboDhtOps(state) {
     const dhtOps = state.integrationLimbo;
     state.integrationLimbo = {};
@@ -775,6 +780,9 @@ function isHoldingEntry(state, entryHash) {
 }
 function isHoldingElement(state, headerHash) {
     return state.metadata.misc_meta[headerHash] === 'StoreElement';
+}
+function isHoldingDhtOp(state, dhtOpHash) {
+    return !!state.integratedDHTOps[dhtOpHash];
 }
 function getDhtShard(state) {
     const heldEntries = getAllHeldEntries(state);
@@ -876,9 +884,27 @@ function computeDhtStatus(allHeadersForEntry) {
         rejected_headers,
     };
 }
-function hasDhtOpBeenProcessed(state, dhtOp) {
-    const dhtOpHash = hash(dhtOp, HashType.DHTOP);
-    return (!!state.integrationLimbo[dhtOpHash] || !!state.integratedDHTOps[dhtOpHash]);
+function hasDhtOpBeenProcessed(state, dhtOpHash) {
+    return (!!state.integrationLimbo[dhtOpHash] ||
+        !!state.integratedDHTOps[dhtOpHash] ||
+        !!state.validationLimbo[dhtOpHash]);
+}
+function getIntegratedDhtOpsWithoutReceipt(state) {
+    const needReceipt = {};
+    for (const [dhtOpHash, integratedValue] of Object.entries(state.integratedDHTOps)) {
+        if (integratedValue.send_receipt) {
+            needReceipt[dhtOpHash] = integratedValue;
+        }
+    }
+    return needReceipt;
+}
+
+function contains(dht_arc, location) {
+    const do_hold_something = dht_arc.half_length !== 0;
+    const only_hold_self = dht_arc.half_length === 1 && dht_arc.half_length === location;
+    const dist_as_array_length = shortest_arc_distance(dht_arc.center_loc, location) + 1;
+    const within_range = dht_arc.half_length > 1 && dist_as_array_length <= dht_arc.half_length;
+    return do_hold_something && (only_hold_self || within_range);
 }
 
 var ValidationStatus;
@@ -894,6 +920,18 @@ var ValidationLimboStatus;
     ValidationLimboStatus[ValidationLimboStatus["SysValidated"] = 2] = "SysValidated";
     ValidationLimboStatus[ValidationLimboStatus["AwaitingAppDeps"] = 3] = "AwaitingAppDeps";
 })(ValidationLimboStatus || (ValidationLimboStatus = {}));
+function query_dht_ops(integratedDHTOps, from, to, dht_arc) {
+    const isDhtOpsInFilter = ([dhtOpHash, dhtOpValue]) => {
+        if (from && dhtOpValue.when_integrated < from)
+            return false;
+        if (to && dhtOpValue.when_integrated > to)
+            return false;
+        if (dht_arc && !contains(dht_arc, location(dhtOpHash)))
+            return false;
+    };
+    const ops = Object.entries(integratedDHTOps).filter(isDhtOpsInFilter);
+    return ops.map(op => op[0]);
+}
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain_cascade/src/authority.rs
 class Authority {
@@ -1109,11 +1147,6 @@ const putValidationReceipt = (dhtOpHash, validationReceipt) => (state) => {
     if (!state.validationReceipts[dhtOpHash])
         state.validationReceipts[dhtOpHash] = {};
     state.validationReceipts[dhtOpHash][validationReceipt.validator] = validationReceipt;
-};
-const getValidationReceipts = (dhtOpHash) => (state) => {
-    return state.validationReceipts[dhtOpHash]
-        ? Object.values(state.validationReceipts[dhtOpHash])
-        : [];
 };
 const deleteValidationLimboValue = (dhtOpHash) => (state) => {
     delete state.validationLimbo[dhtOpHash];
@@ -1708,6 +1741,36 @@ function update_check(entry_update, original_header) {
     check_update_reference(entry_update, original_header);
 }
 
+// From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/integrate_dht_ops_workflow.rs
+const validation_receipt = async (workspace) => {
+    const integratedOpsWithoutReceipt = getIntegratedDhtOpsWithoutReceipt(workspace.state);
+    const pretendIsValid = workspace.badAgentConfig &&
+        workspace.badAgentConfig.pretend_invalid_elements_are_valid;
+    for (const [dhtOpHash, integratedValue] of Object.entries(integratedOpsWithoutReceipt)) {
+        const receipt = {
+            dht_op_hash: dhtOpHash,
+            validation_status: pretendIsValid
+                ? ValidationStatus.Valid
+                : integratedValue.validation_status,
+            validator: workspace.state.agentPubKey,
+            when_integrated: now(),
+        };
+        putValidationReceipt(dhtOpHash, receipt)(workspace.state);
+        integratedValue.send_receipt = false;
+    }
+    return {
+        result: undefined,
+        triggers: [],
+    };
+};
+function validation_receipt_task() {
+    return {
+        type: WorkflowType.VALIDATION_RECEIPT,
+        details: undefined,
+        task: worskpace => validation_receipt(worskpace),
+    };
+}
+
 var WorkflowType;
 (function (WorkflowType) {
     WorkflowType["CALL_ZOME"] = "Call Zome Function";
@@ -1718,6 +1781,7 @@ var WorkflowType;
     WorkflowType["INTEGRATE_DHT_OPS"] = "Integrate DHT Ops";
     WorkflowType["GENESIS"] = "Genesis";
     WorkflowType["INCOMING_DHT_OPS"] = "Incoming DHT Ops";
+    WorkflowType["VALIDATION_RECEIPT"] = "Validation Receipt";
 })(WorkflowType || (WorkflowType = {}));
 function workflowPriority(workflowType) {
     switch (workflowType) {
@@ -1741,6 +1805,8 @@ function triggeredWorkflowFromType(type) {
             return publish_dht_ops_task();
         case WorkflowType.SYS_VALIDATION:
             return sys_validation_task();
+        case WorkflowType.VALIDATION_RECEIPT:
+            return validation_receipt_task();
         default:
             throw new Error('Trying to trigger a workflow that cannot be triggered');
     }
@@ -1763,12 +1829,13 @@ const integrate_dht_ops = async (worskpace) => {
             op: dhtOp,
             validation_status: integrationLimboValue.validation_status,
             when_integrated: Date.now(),
+            send_receipt: integrationLimboValue.send_receipt
         };
         putDhtOpToIntegrated(dhtOpHash, value)(worskpace.state);
     }
     return {
         result: undefined,
-        triggers: [],
+        triggers: [validation_receipt_task()],
     };
 };
 function integrate_dht_ops_task() {
@@ -2042,25 +2109,9 @@ const app_validation = async (workspace) => {
                 validation_status: outcome.valid
                     ? ValidationStatus.Valid
                     : ValidationStatus.Rejected,
+                send_receipt: outcome.valid ? validationLimboValue.send_receipt : true, // If value is invalid we always need to make a receipt
             };
             putIntegrationLimboValue(dhtOpHash, value)(workspace.state);
-            // TODO: move this when alarm is implemented
-            const pretendIsValid = workspace.badAgentConfig &&
-                workspace.badAgentConfig.pretend_invalid_elements_are_valid;
-            if (value.validation_status === ValidationStatus.Rejected) {
-                // Sound the alarm!
-                const receipt = {
-                    dht_op_hash: dhtOpHash,
-                    validation_status: pretendIsValid
-                        ? ValidationStatus.Valid
-                        : value.validation_status,
-                    validator: workspace.state.agentPubKey,
-                    when_integrated: now(),
-                };
-                const receipts = getValidationReceipts(dhtOpHash)(workspace.state);
-                await workspace.p2p.gossip_bad_agents(value.op, receipt, receipts);
-                putValidationReceipt(dhtOpHash, receipt)(workspace.state);
-            }
             integrateDhtOps = true;
         }
     }
@@ -2452,13 +2503,12 @@ function genesis_task(cellId, membrane_proof) {
 }
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/incoming_dht_ops_workflow.rs
-const incoming_dht_ops = (basis, dhtOps, from_agent, validation_receipts) => async (workspace) => {
+const incoming_dht_ops = (dhtOps, request_validation_receipt, from_agent) => async (workspace) => {
     let sysValidate = false;
     for (const dhtOpHash of Object.keys(dhtOps)) {
-        if (!workspace.state.integratedDHTOps[dhtOpHash] &&
-            !workspace.state.integrationLimbo[dhtOpHash] &&
-            !workspace.state.validationLimbo[dhtOpHash]) {
+        if (!hasDhtOpBeenProcessed(workspace.state, dhtOpHash)) {
             const dhtOp = dhtOps[dhtOpHash];
+            const basis = getDHTOpBasis(dhtOp);
             const validationLimboValue = {
                 basis,
                 from_agent,
@@ -2467,48 +2517,25 @@ const incoming_dht_ops = (basis, dhtOps, from_agent, validation_receipts) => asy
                 op: dhtOp,
                 status: ValidationLimboStatus.Pending,
                 time_added: Date.now(),
+                send_receipt: request_validation_receipt,
             };
             putValidationLimboValue(dhtOpHash, validationLimboValue)(workspace.state);
             sysValidate = true;
         }
-        const existingReceipts = getValidationReceipts(dhtOpHash)(workspace.state);
-        const myReceipt = existingReceipts.find(r => r.validator === workspace.state.agentPubKey);
-        // If we are receiving a publish for an invalid dht op, regossip again
-        // TODO: fix this when gossip loop is implemented
-        if (myReceipt &&
-            myReceipt.validation_status === ValidationStatus$1.Rejected) {
-            const receiptsArrayToDict = (r) => r.reduce((acc, next) => ({ ...acc, [next.validator]: next }), {});
-            const existingReceiptsDict = receiptsArrayToDict(existingReceipts);
-            const receivedReceipts = receiptsArrayToDict(validation_receipts.filter(r => r.dht_op_hash === dhtOpHash));
-            if (!isEqual(Object.keys(existingReceiptsDict).sort(), Object.keys(receivedReceipts).sort())) {
-                // TODO: change this when alarm is implemented
-                for (const receipt of Object.values(receivedReceipts)) {
-                    putValidationReceipt(receipt.dht_op_hash, receipt)(workspace.state);
-                }
-                const allReceipts = { ...existingReceiptsDict, ...receivedReceipts };
-                await workspace.p2p.gossip_bad_agents(dhtOps[dhtOpHash], myReceipt, Object.values(allReceipts));
-            }
-        }
-    }
-    // TODO: change this when alarm is implemented
-    for (const receipt of validation_receipts) {
-        putValidationReceipt(receipt.dht_op_hash, receipt)(workspace.state);
     }
     return {
         result: undefined,
         triggers: sysValidate ? [sys_validation_task()] : [],
     };
 };
-function incoming_dht_ops_task(from_agent, dht_hash, // The basis for the DHTOps
-ops, validation_receipts) {
+function incoming_dht_ops_task(from_agent, request_validation_receipt, ops) {
     return {
         type: WorkflowType.INCOMING_DHT_OPS,
         details: {
             from_agent,
-            dht_hash,
             ops,
         },
-        task: worskpace => incoming_dht_ops(dht_hash, ops, from_agent, validation_receipts)(worskpace),
+        task: worskpace => incoming_dht_ops(ops, request_validation_receipt, from_agent)(worskpace),
     };
 }
 
@@ -2556,6 +2583,61 @@ class MiddlewareExecutor {
     }
 }
 
+function getClosestNeighbors(peers, targetHash, numNeighbors) {
+    const sortedPeers = peers.sort((agentA, agentB) => {
+        const distanceA = distance(agentA, targetHash);
+        const distanceB = distance(agentB, targetHash);
+        return distanceA - distanceB;
+    });
+    return sortedPeers.slice(0, numNeighbors);
+}
+function getFarthestNeighbors(peers, targetHash) {
+    const sortedPeers = peers.sort((agentA, agentB) => {
+        return (wrap(location(agentA) - location(targetHash)) -
+            wrap(location(agentB) - location(targetHash)));
+    });
+    const index35 = Math.floor(sortedPeers.length * 0.35);
+    const index50 = Math.floor(sortedPeers.length / 2);
+    const index65 = Math.floor(sortedPeers.length * 0.65);
+    const neighbors = [
+        sortedPeers[index35],
+        sortedPeers[index50],
+        sortedPeers[index65],
+    ].filter(n => !!n);
+    return uniq(neighbors);
+}
+function getBadActions(state) {
+    const badActions = [];
+    for (const [dhtOpHash, receipts] of Object.entries(state.validationReceipts)) {
+        const myReceipt = receipts[state.agentPubKey];
+        if (myReceipt) {
+            const dhtOp = state.integratedDHTOps[dhtOpHash].op;
+            const badAction = {
+                badAgents: [],
+                op: dhtOp,
+                receipts: Object.values(receipts),
+            };
+            if (myReceipt.validation_status === ValidationStatus$1.Rejected) {
+                badAction.badAgents.push(dhtOp.header.header.content.author);
+            }
+            for (const [validatorAgent, receipt] of Object.entries(receipts)) {
+                if (receipt.validation_status !== myReceipt.validation_status) {
+                    badAction.badAgents.push(receipt.validator);
+                }
+            }
+            if (badAction.badAgents.length > 0) {
+                badActions.push(badAction);
+            }
+        }
+    }
+    return badActions;
+}
+function getBadAgents(state) {
+    const actions = getBadActions(state);
+    const badAgents = actions.reduce((acc, next) => [...acc, ...next.badAgents], []);
+    return uniq(badAgents);
+}
+
 class Cell {
     constructor(_state, conductor, p2p) {
         this._state = _state;
@@ -2567,6 +2649,7 @@ class Cell {
             [WorkflowType.PUBLISH_DHT_OPS]: { running: false, triggered: true },
             [WorkflowType.SYS_VALIDATION]: { running: false, triggered: true },
             [WorkflowType.APP_VALIDATION]: { running: false, triggered: true },
+            [WorkflowType.VALIDATION_RECEIPT]: { running: false, triggered: true },
         };
         this.workflowExecutor = new MiddlewareExecutor();
         // Let genesis be run before actually joining
@@ -2620,9 +2703,8 @@ class Cell {
     async handle_new_neighbor(neighborPubKey) {
         this.p2p.addNeighbor(neighborPubKey);
     }
-    handle_publish(from_agent, dht_hash, // The basis for the DHTOps
-    ops, validation_receipts) {
-        return this._runWorkflow(incoming_dht_ops_task(from_agent, dht_hash, ops, validation_receipts));
+    handle_publish(from_agent, request_validation_receipt, ops) {
+        return this._runWorkflow(incoming_dht_ops_task(from_agent, request_validation_receipt, ops));
     }
     async handle_get(dht_hash, options) {
         const authority = new Authority(this._state, this.p2p);
@@ -2647,6 +2729,63 @@ class Cell {
             payload,
             provenance: from_agent,
         });
+    }
+    /** Gossips */
+    handle_fetch_op_hashes_for_constraints(dht_arc, since, until) {
+        return query_dht_ops(this._state.integratedDHTOps, since, until, dht_arc);
+    }
+    handle_fetch_op_hash_data(op_hashes) {
+        const result = {};
+        for (const opHash of op_hashes) {
+            const value = this._state.integratedDHTOps[opHash];
+            if (value) {
+                result[opHash] = value.op;
+            }
+        }
+        return result;
+    }
+    handle_gossip_ops(op_hashes) {
+        const result = {};
+        for (const opHash of op_hashes) {
+            const value = this._state.integratedDHTOps[opHash];
+            if (value) {
+                result[opHash] = value.op;
+            }
+        }
+        return result;
+    }
+    async handle_gossip(from_agent, gossip) {
+        const dhtOpsToProcess = {};
+        const badAgents = getBadAgents(this._state);
+        for (const badAction of gossip.badActions) {
+            const dhtOpHash = hash(badAction.op, HashType.DHTOP);
+            if (!hasDhtOpBeenProcessed(this._state, dhtOpHash)) {
+                dhtOpsToProcess[dhtOpHash] = badAction.op;
+            }
+            for (const receipt of badAction.receipts) {
+                putValidationReceipt(dhtOpHash, receipt)(this._state);
+            }
+        }
+        for (const [dhtOpHash, validatedOp] of Object.entries(gossip.validated_dht_ops)) {
+            if (hasDhtOpBeenProcessed(this._state, dhtOpHash)) {
+                for (const receipt of validatedOp.validation_receipts) {
+                    putValidationReceipt(dhtOpHash, receipt)(this._state);
+                }
+            }
+            else {
+                // TODO: fix for when sharding is implemented
+                if (this.p2p.shouldWeHold(dhtOpHash)) {
+                    dhtOpsToProcess[dhtOpHash] = validatedOp.op;
+                }
+            }
+        }
+        if (Object.keys(dhtOpsToProcess).length > 0) {
+            await this.handle_publish(from_agent, false, dhtOpsToProcess);
+        }
+        if (getBadAgents(this._state).length > badAgents.length) {
+            // We may have added bad agents: resync the neighbors
+            await this.p2p.syncNeighbors();
+        }
     }
     /** Workflow internal execution */
     triggerWorkflow(workflow) {
@@ -2692,6 +2831,40 @@ class Cell {
     }
 }
 
+const GOSSIP_INTERVAL_MS = 50;
+class SimpleBloomMod {
+    constructor(p2pCell) {
+        this.p2pCell = p2pCell;
+        this.gossip_on = true;
+        this.run_one_iteration();
+    }
+    async run_one_iteration() {
+        if (!this.gossip_on)
+            return;
+        const localDhtOpsHashes = this.p2pCell.cell.handle_fetch_op_hashes_for_constraints(this.p2pCell.storageArc, undefined, undefined);
+        const localDhtOps = this.p2pCell.cell.handle_fetch_op_hash_data(localDhtOpsHashes);
+        const state = this.p2pCell.cell.getState();
+        const dhtOpData = {};
+        for (const dhtOpHash of Object.keys(localDhtOps)) {
+            const receipts = getValidationReceipts(dhtOpHash)(state);
+            dhtOpData[dhtOpHash] = {
+                op: localDhtOps[dhtOpHash],
+                validation_receipts: receipts,
+            };
+        }
+        const badActions = getBadActions(state);
+        const gossips = {
+            badActions,
+            neighbors: [],
+            validated_dht_ops: dhtOpData,
+        };
+        for (const neighbor of this.p2pCell.neighbors) {
+            await this.p2pCell.outgoing_gossip(neighbor, gossips);
+        }
+        setTimeout(() => this.run_one_iteration(), GOSSIP_INTERVAL_MS);
+    }
+}
+
 var NetworkRequestType;
 (function (NetworkRequestType) {
     NetworkRequestType["CALL_REMOTE"] = "Call Remote";
@@ -2706,12 +2879,16 @@ class P2pCell {
     constructor(state, cellId, network) {
         this.cellId = cellId;
         this.network = network;
+        this.redundancyFactor = 3;
         this.networkRequestsExecutor = new MiddlewareExecutor();
         this.neighbors = state.neighbors;
         this.farKnownPeers = state.farKnownPeers;
         this.redundancyFactor = state.redundancyFactor;
         this.neighborNumber = state.neighborNumber;
-        this.badAgents = state.badAgents;
+        this.storageArc = {
+            center_loc: location(this.cellId[1]),
+            half_length: 2 ^ 255,
+        };
     }
     getState() {
         return {
@@ -2722,14 +2899,21 @@ class P2pCell {
             neighborNumber: this.neighborNumber,
         };
     }
+    get cell() {
+        return this.network.conductor.getCell(this.cellId[0], this.cellId[1]);
+    }
+    get badAgents() {
+        return getBadAgents(this.cell.getState());
+    }
     /** P2p actions */
     async join(containerCell) {
         this.network.bootstrapService.announceCell(this.cellId, containerCell);
+        this._gossipLoop = new SimpleBloomMod(this);
         await this.syncNeighbors();
     }
     async leave() { }
     async publish(dht_hash, ops) {
-        await this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], dht_hash, this.redundancyFactor, this.badAgents, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.PUBLISH_REQUEST, { dhtOps: ops }, (cell) => cell.handle_publish(this.cellId[1], dht_hash, ops, [])));
+        await this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], dht_hash, this.redundancyFactor, this.badAgents, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.PUBLISH_REQUEST, { dhtOps: ops }, (cell) => cell.handle_publish(this.cellId[1], true, ops)));
     }
     async get(dht_hash, options) {
         const gets = await this.network.kitsune.rpc_multi(this.cellId[0], this.cellId[1], dht_hash, 1, // TODO: what about this?
@@ -2742,34 +2926,6 @@ class P2pCell {
     }
     async call_remote(agent, zome, fnName, cap, payload) {
         return this.network.kitsune.rpc_single(this.cellId[0], this.cellId[1], agent, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.CALL_REMOTE, {}, (cell) => cell.handle_call_remote(this.cellId[1], zome, fnName, cap, payload)));
-    }
-    async gossip_bad_agents(dhtOp, myReceipt, existingReceipts) {
-        existingReceipts = existingReceipts.filter(r => r.validator !== this.cellId[1]);
-        const badAgents = [];
-        if (myReceipt.validation_status === ValidationStatus$1.Rejected)
-            badAgents.push(dhtOp.header.header.content.author);
-        for (const existingReceipt of existingReceipts) {
-            if (existingReceipt.validation_status !== myReceipt.validation_status) {
-                badAgents.push(existingReceipt.validator);
-            }
-        }
-        if (!(this.network.conductor.badAgent &&
-            this.network.conductor.badAgent.config
-                .pretend_invalid_elements_are_valid)) {
-            for (const badAgent of badAgents) {
-                if (!this.badAgents.includes(badAgent))
-                    this.badAgents.push(badAgent);
-            }
-        }
-        await this.syncNeighbors();
-        this.farKnownPeers = this.farKnownPeers.filter(agent => !badAgents.includes(agent));
-        const dhtOpHash = hash(dhtOp, HashType.DHTOP);
-        const promises = this.neighbors.map(neighborAgent => {
-            this.network.kitsune.rpc_single(this.cellId[0], this.cellId[1], neighborAgent, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.GOSSIP, {}, (cell) => cell.handle_publish(this.cellId[1], dhtOpHash, {
-                [dhtOpHash]: dhtOp,
-            }, [myReceipt, ...existingReceipts])));
-        });
-        await Promise.all(promises);
     }
     /** Neighbor handling */
     getNeighbors() {
@@ -2785,7 +2941,7 @@ class P2pCell {
         const dnaHash = this.cellId[0];
         const agentPubKey = this.cellId[1];
         this.farKnownPeers = this.network.bootstrapService
-            .getFarKnownPeers(dnaHash, agentPubKey)
+            .getFarKnownPeers(dnaHash, agentPubKey, this.badAgents)
             .map(p => p.agentPubKey);
         const neighbors = this.network.bootstrapService
             .getNeighborhood(dnaHash, agentPubKey, this.neighborNumber, this.badAgents)
@@ -2798,6 +2954,18 @@ class P2pCell {
             setTimeout(() => this.syncNeighbors(), 400);
         }
     }
+    // TODO: fix when sharding is implemented
+    shouldWeHold(dhtOpHash) {
+        const neighbors = this.network.bootstrapService.getNeighborhood(this.cellId[0], dhtOpHash, this.redundancyFactor + 1, this.badAgents);
+        const index = neighbors.findIndex(cell => cell.agentPubKey === this.cellId[1]);
+        return index >= 0 && index < this.redundancyFactor;
+    }
+    /** Gossip */
+    async outgoing_gossip(to_agent, gossips) {
+        // TODO: remove peer discovery?
+        await this.network.kitsune.rpc_single(this.cellId[0], this.cellId[1], to_agent, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.GOSSIP, {}, (cell) => cell.handle_gossip(this.cellId[1], gossips)));
+    }
+    /** Executors */
     _executeNetworkRequest(toCell, type, details, request) {
         const networkRequest = {
             fromAgent: this.cellId[1],
@@ -2806,13 +2974,12 @@ class P2pCell {
             type,
             details,
         };
+        if (toCell.p2p.badAgents.includes(this.cellId[1]))
+            throw new Error('Connection closed!');
         return this.networkRequestsExecutor.execute(() => toCell.p2p.handle_network_request(this.cellId[1], request), networkRequest);
     }
     handle_network_request(fromAgent, request) {
-        if (this.badAgents.includes(fromAgent))
-            throw new Error('Bad Agent!');
-        const cell = this.network.conductor.getCell(this.cellId[0], this.cellId[1]);
-        return request(cell);
+        return request(this.cell);
     }
 }
 
@@ -2902,30 +3069,6 @@ class Network {
             return request(localCell);
         return request(this.bootstrapService.cells[dna][toAgent]);
     }
-}
-
-function getClosestNeighbors(peers, targetHash, numNeighbors) {
-    const sortedPeers = peers.sort((agentA, agentB) => {
-        const distanceA = distance(agentA, targetHash);
-        const distanceB = distance(agentB, targetHash);
-        return distanceA - distanceB;
-    });
-    return sortedPeers.slice(0, numNeighbors);
-}
-function getFarthestNeighbors(peers, targetHash) {
-    const sortedPeers = peers.sort((agentA, agentB) => {
-        return (wrap(location(agentA) - location(targetHash)) -
-            wrap(location(agentB) - location(targetHash)));
-    });
-    const index35 = Math.floor(sortedPeers.length * 0.35);
-    const index50 = Math.floor(sortedPeers.length / 2);
-    const index65 = Math.floor(sortedPeers.length * 0.65);
-    const neighbors = [
-        sortedPeers[index35],
-        sortedPeers[index50],
-        sortedPeers[index65],
-    ].filter(n => !!n);
-    return uniq(neighbors);
 }
 
 class Conductor {
@@ -3242,8 +3385,8 @@ class BootstrapService {
         const neighborsKeys = getClosestNeighbors(cells, basis_dht_hash, numNeighbors);
         return neighborsKeys.map(pubKey => this.cells[dnaHash][pubKey]);
     }
-    getFarKnownPeers(dnaHash, agentPubKey) {
-        const cells = Object.keys(this.cells[dnaHash]).filter(peerPubKey => peerPubKey !== agentPubKey);
+    getFarKnownPeers(dnaHash, agentPubKey, filteredAgents = []) {
+        const cells = Object.keys(this.cells[dnaHash]).filter(peerPubKey => peerPubKey !== agentPubKey && !filteredAgents.includes(peerPubKey));
         const farthestKeys = getFarthestNeighbors(cells, agentPubKey);
         return farthestKeys.map(pubKey => this.cells[dnaHash][pubKey]);
     }
@@ -3268,5 +3411,5 @@ async function createConductors(conductorsToCreate, currentConductors, happ) {
     return allConductors;
 }
 
-export { AGENT_PREFIX, Authority, Cascade, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, GetStrategy, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDeleteLink, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, computeDhtStatus, counterfeit_check, createConductors, deleteValidationLimboValue, demoDna, demoEntriesZome, demoHapp, demoLinksZome, demoPathsZome, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAllHeldHeaders, getAppEntryType, getAuthor, getCellId, getClosestNeighbors, getCreateLinksForEntry, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getLinksForEntry, getLiveLinks, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getRemovesOnLinkAdd, getTipOfChain, getValidationLimboDhtOps, getValidationReceipts, hasDhtOpBeenProcessed, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingElement, isHoldingEntry, location, locationDistance, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, putValidationReceipt, register_header_on_basis, run_create_link_validation_callback, run_delete_link_validation_callback, run_validation_callback_direct, sleep, store_element, store_entry, sys_validate_element, sys_validation, sys_validation_task, triggeredWorkflowFromType, valid_cap_grant, validate_op, workflowPriority, wrap };
+export { AGENT_PREFIX, Authority, Cascade, Cell, Conductor, DHTOP_PREFIX, DNA_PREFIX, DelayMiddleware, Discover, ENTRY_PREFIX, GetStrategy, HEADER_PREFIX, HashType, index as Hdk, KitsuneP2p, MiddlewareExecutor, Network, NetworkRequestType, P2pCell, ValidationLimboStatus, ValidationStatus, WorkflowType, app_validation, app_validation_task, buildAgentValidationPkg, buildCreate, buildCreateLink, buildDelete, buildDeleteLink, buildDna, buildShh, buildUpdate, callZomeFn, call_zome_fn_workflow, computeDhtStatus, counterfeit_check, createConductors, deleteValidationLimboValue, demoDna, demoEntriesZome, demoHapp, demoLinksZome, demoPathsZome, distance, genesis, genesis_task, getAllAuthoredEntries, getAllAuthoredHeaders, getAllHeldEntries, getAllHeldHeaders, getAppEntryType, getAuthor, getBadActions, getBadAgents, getCellId, getClosestNeighbors, getCreateLinksForEntry, getDHTOpBasis, getDhtShard, getDnaHash, getElement, getEntryDetails, getEntryDhtStatus, getEntryTypeString, getFarthestNeighbors, getHashType, getHeaderAt, getHeaderModifiers, getHeadersForEntry, getIntegratedDhtOpsWithoutReceipt, getLinksForEntry, getLiveLinks, getNewHeaders, getNextHeaderSeq, getNonPublishedDhtOps, getRemovesOnLinkAdd, getTipOfChain, getValidationLimboDhtOps, getValidationReceipts, hasDhtOpBeenProcessed, hash, hashEntry, incoming_dht_ops, incoming_dht_ops_task, integrate_dht_ops, integrate_dht_ops_task, isHoldingDhtOp, isHoldingElement, isHoldingEntry, location, produce_dht_ops, produce_dht_ops_task, publish_dht_ops, publish_dht_ops_task, pullAllIntegrationLimboDhtOps, putDhtOpData, putDhtOpMetadata, putDhtOpToIntegrated, putElement, putIntegrationLimboValue, putSystemMetadata, putValidationLimboValue, putValidationReceipt, query_dht_ops, register_header_on_basis, run_create_link_validation_callback, run_delete_link_validation_callback, run_validation_callback_direct, shortest_arc_distance, sleep, store_element, store_entry, sys_validate_element, sys_validation, sys_validation_task, triggeredWorkflowFromType, valid_cap_grant, validate_op, workflowPriority, wrap };
 //# sourceMappingURL=index.js.map
