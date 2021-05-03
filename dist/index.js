@@ -2700,9 +2700,6 @@ class Cell {
     }
     /** Network handlers */
     // https://github.com/holochain/holochain/blob/develop/crates/holochain/src/conductor/cell.rs#L429
-    async handle_new_neighbor(neighborPubKey) {
-        this.p2p.addNeighbor(neighborPubKey);
-    }
     handle_publish(from_agent, request_validation_receipt, ops) {
         return this._runWorkflow(incoming_dht_ops_task(from_agent, request_validation_receipt, ops));
     }
@@ -2781,7 +2778,7 @@ class Cell {
             await this.handle_publish(from_agent, false, dhtOpsToProcess);
         }
         if (getBadAgents(this._state).length > badAgents.length) {
-            // We may have added bad agents: resync the neighbors
+            // We have added bad agents: resync the neighbors
             await this.p2p.syncNeighbors();
         }
     }
@@ -2826,6 +2823,40 @@ class Cell {
             dna,
             badAgentConfig,
         };
+    }
+}
+
+class Connection {
+    constructor(opener, receiver) {
+        this.opener = opener;
+        this.receiver = receiver;
+        this._closed = false;
+        if (opener.p2p.badAgents.includes(receiver.agentPubKey) ||
+            receiver.p2p.badAgents.includes(opener.agentPubKey)) {
+            throw new Error('Connection closed!');
+        }
+    }
+    get closed() {
+        return this._closed;
+    }
+    close() {
+        this._closed = false;
+    }
+    sendRequest(fromAgent, networkRequest) {
+        if (this.closed)
+            throw new Error('Connection closed!');
+        if (this.opener.agentPubKey === fromAgent) {
+            return networkRequest(this.receiver);
+        }
+        else if (this.receiver.agentPubKey === fromAgent) {
+            return networkRequest(this.opener);
+        }
+        throw new Error('Bad request');
+    }
+    getPeer(myAgentPubKey) {
+        if (this.opener.agentPubKey === myAgentPubKey)
+            return this.receiver;
+        return this.opener;
     }
 }
 
@@ -2890,7 +2921,6 @@ class SimpleBloomMod {
 var NetworkRequestType;
 (function (NetworkRequestType) {
     NetworkRequestType["CALL_REMOTE"] = "Call Remote";
-    NetworkRequestType["ADD_NEIGHBOR"] = "Add Neighbor";
     NetworkRequestType["PUBLISH_REQUEST"] = "Publish Request";
     NetworkRequestType["GET_REQUEST"] = "Get Request";
     NetworkRequestType["WARRANT"] = "Warrant";
@@ -2904,10 +2934,11 @@ class P2pCell {
         this.network = network;
         this.redundancyFactor = 3;
         this.networkRequestsExecutor = new MiddlewareExecutor();
-        this.neighbors = state.neighbors;
+        this.neighborConnections = {};
         this.farKnownPeers = state.farKnownPeers;
         this.redundancyFactor = state.redundancyFactor;
         this.neighborNumber = state.neighborNumber;
+        // TODO: try to connect with already known neighbors
         this.storageArc = {
             center_loc: location(this.cellId[1]),
             half_length: Math.pow(2, 33),
@@ -2954,29 +2985,59 @@ class P2pCell {
         return this.network.kitsune.rpc_single(this.cellId[0], this.cellId[1], agent, (cell) => this._executeNetworkRequest(cell, NetworkRequestType.CALL_REMOTE, {}, (cell) => cell.handle_call_remote(this.cellId[1], zome, fnName, cap, payload)));
     }
     /** Neighbor handling */
-    getNeighbors() {
-        return this.neighbors;
+    get neighbors() {
+        return Object.keys(this.neighborConnections);
     }
-    addNeighbor(neighborPubKey) {
-        if (neighborPubKey !== this.cellId[1] &&
-            !this.neighbors.includes(neighborPubKey)) {
-            this.syncNeighbors();
+    connectWith(peer) {
+        if (this.neighborConnections[peer.agentPubKey])
+            return this.neighborConnections[peer.agentPubKey];
+        return new Connection(this.cell, peer);
+    }
+    handleOpenNeighborConnection(from, connection) {
+        this.neighborConnections[from.agentPubKey] = connection;
+    }
+    handleCloseNeighborConnection(from) {
+        delete this.neighborConnections[from.agentPubKey];
+        this.syncNeighbors();
+    }
+    openNeighborConnection(withPeer) {
+        if (!this.neighborConnections[withPeer.agentPubKey]) {
+            const connection = this.connectWith(withPeer);
+            this.neighborConnections[withPeer.agentPubKey] = connection;
+            withPeer.p2p.handleOpenNeighborConnection(this.cell, connection);
+        }
+        return this.neighborConnections[withPeer.agentPubKey];
+    }
+    closeNeighborConnection(withPeer) {
+        if (this.neighborConnections[withPeer]) {
+            const connection = this.neighborConnections[withPeer];
+            connection.close();
+            delete this.neighborConnections[withPeer];
+            connection
+                .getPeer(this.cellId[1])
+                .p2p.handleCloseNeighborConnection(this.cell);
         }
     }
     async syncNeighbors() {
         const dnaHash = this.cellId[0];
         const agentPubKey = this.cellId[1];
+        const badAgents = this.badAgents;
+        for (const badAgent of badAgents) {
+            if (this.neighborConnections[badAgent]) {
+                this.closeNeighborConnection(badAgent);
+            }
+        }
         this.farKnownPeers = this.network.bootstrapService
-            .getFarKnownPeers(dnaHash, agentPubKey, this.badAgents)
+            .getFarKnownPeers(dnaHash, agentPubKey, badAgents)
             .map(p => p.agentPubKey);
         const neighbors = this.network.bootstrapService
-            .getNeighborhood(dnaHash, agentPubKey, this.neighborNumber, this.badAgents)
+            .getNeighborhood(dnaHash, agentPubKey, this.neighborNumber, badAgents)
             .filter(cell => cell.agentPubKey != agentPubKey);
         const newNeighbors = neighbors.filter(cell => !this.neighbors.includes(cell.agentPubKey));
-        this.neighbors = neighbors.map(n => n.agentPubKey);
-        const promises = newNeighbors.map(neighbor => this._executeNetworkRequest(neighbor, NetworkRequestType.ADD_NEIGHBOR, {}, (cell) => cell.handle_new_neighbor(agentPubKey)));
-        await Promise.all(promises);
-        if (this.neighbors.length < this.neighborNumber) {
+        const neighborsToForget = this.neighbors.filter(n => !neighbors.find(c => c.agentPubKey === n));
+        neighborsToForget.forEach(n => this.closeNeighborConnection(n));
+        newNeighbors.forEach(neighbor => this.openNeighborConnection(neighbor));
+        if (Object.keys(this.neighborConnections).length < this.neighborNumber) {
             setTimeout(() => this.syncNeighbors(), 400);
         }
     }
@@ -2992,7 +3053,7 @@ class P2pCell {
         await this.network.kitsune.rpc_single(this.cellId[0], this.cellId[1], to_agent, (cell) => this._executeNetworkRequest(cell, warrant ? NetworkRequestType.WARRANT : NetworkRequestType.GOSSIP, {}, (cell) => cell.handle_gossip(this.cellId[1], gossips)));
     }
     /** Executors */
-    _executeNetworkRequest(toCell, type, details, request) {
+    async _executeNetworkRequest(toCell, type, details, request) {
         const networkRequest = {
             fromAgent: this.cellId[1],
             toAgent: toCell.agentPubKey,
@@ -3000,12 +3061,9 @@ class P2pCell {
             type,
             details,
         };
-        if (toCell.p2p.badAgents.includes(this.cellId[1]))
-            throw new Error('Connection closed!');
-        return this.networkRequestsExecutor.execute(() => toCell.p2p.handle_network_request(this.cellId[1], request), networkRequest);
-    }
-    handle_network_request(fromAgent, request) {
-        return request(this.cell);
+        const connection = this.connectWith(toCell);
+        const result = await this.networkRequestsExecutor.execute(() => connection.sendRequest(this.cellId[1], request), networkRequest);
+        return result;
     }
 }
 

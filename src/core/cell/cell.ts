@@ -135,9 +135,6 @@ export class Cell {
 
   /** Network handlers */
   // https://github.com/holochain/holochain/blob/develop/crates/holochain/src/conductor/cell.rs#L429
-  public async handle_new_neighbor(neighborPubKey: AgentPubKey): Promise<void> {
-    this.p2p.addNeighbor(neighborPubKey);
-  }
 
   public handle_publish(
     from_agent: AgentPubKey,
@@ -256,7 +253,7 @@ export class Cell {
     }
 
     if (getBadAgents(this._state).length > badAgents.length) {
-      // We may have added bad agents: resync the neighbors
+      // We have added bad agents: resync the neighbors
       await this.p2p.syncNeighbors();
     }
   }
