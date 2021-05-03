@@ -2873,46 +2873,50 @@ class SimpleBloomMod {
     }
     async loop() {
         while (true) {
-            if (this.gossip_on)
-                await this.run_one_iteration();
+            if (this.gossip_on) {
+                try {
+                    await this.run_one_iteration();
+                }
+                catch (e) {
+                    console.warn('Connection closed');
+                }
+            }
             await sleep(GOSSIP_INTERVAL_MS);
         }
     }
     async run_one_iteration() {
-        if (this.gossip_on) {
-            const localDhtOpsHashes = Object.keys(this.p2pCell.cell._state.integratedDHTOps);
-            const localDhtOps = this.p2pCell.cell.handle_fetch_op_hash_data(localDhtOpsHashes);
-            const state = this.p2pCell.cell._state;
-            const dhtOpData = {};
-            for (const dhtOpHash of Object.keys(localDhtOps)) {
-                const receipts = getValidationReceipts(dhtOpHash)(state);
-                dhtOpData[dhtOpHash] = {
-                    op: localDhtOps[dhtOpHash],
-                    validation_receipts: receipts,
-                };
-            }
-            const pretendValid = this.p2pCell.cell.conductor.badAgent &&
-                this.p2pCell.cell.conductor.badAgent.config
-                    .pretend_invalid_elements_are_valid;
-            const badActions = pretendValid ? [] : getBadActions(state);
-            const gossips = {
-                badActions,
-                neighbors: [],
-                validated_dht_ops: dhtOpData,
+        const localDhtOpsHashes = Object.keys(this.p2pCell.cell._state.integratedDHTOps);
+        const localDhtOps = this.p2pCell.cell.handle_fetch_op_hash_data(localDhtOpsHashes);
+        const state = this.p2pCell.cell._state;
+        const dhtOpData = {};
+        for (const dhtOpHash of Object.keys(localDhtOps)) {
+            const receipts = getValidationReceipts(dhtOpHash)(state);
+            dhtOpData[dhtOpHash] = {
+                op: localDhtOps[dhtOpHash],
+                validation_receipts: receipts,
             };
-            let warrant = badActions.length > 0 && badActions.length !== this.lastBadActions;
-            this.lastBadActions = badActions.length;
-            if (warrant) {
-                const promises = [
-                    ...this.p2pCell.neighbors,
-                    ...this.p2pCell.farKnownPeers,
-                ].map(peer => this.p2pCell.outgoing_gossip(peer, gossips, warrant));
-                await Promise.all(promises);
-            }
-            else {
-                for (const neighbor of this.p2pCell.neighbors) {
-                    await this.p2pCell.outgoing_gossip(neighbor, gossips, warrant);
-                }
+        }
+        const pretendValid = this.p2pCell.cell.conductor.badAgent &&
+            this.p2pCell.cell.conductor.badAgent.config
+                .pretend_invalid_elements_are_valid;
+        const badActions = pretendValid ? [] : getBadActions(state);
+        const gossips = {
+            badActions,
+            neighbors: [],
+            validated_dht_ops: dhtOpData,
+        };
+        let warrant = badActions.length > 0 && badActions.length !== this.lastBadActions;
+        this.lastBadActions = badActions.length;
+        if (warrant) {
+            const promises = [
+                ...this.p2pCell.neighbors,
+                ...this.p2pCell.farKnownPeers,
+            ].map(peer => this.p2pCell.outgoing_gossip(peer, gossips, warrant));
+            await Promise.all(promises);
+        }
+        else {
+            for (const neighbor of this.p2pCell.neighbors) {
+                await this.p2pCell.outgoing_gossip(neighbor, gossips, warrant);
             }
         }
     }
@@ -3036,7 +3040,14 @@ class P2pCell {
         const newNeighbors = neighbors.filter(cell => !this.neighbors.includes(cell.agentPubKey));
         const neighborsToForget = this.neighbors.filter(n => !neighbors.find(c => c.agentPubKey === n));
         neighborsToForget.forEach(n => this.closeNeighborConnection(n));
-        newNeighbors.forEach(neighbor => this.openNeighborConnection(neighbor));
+        newNeighbors.forEach(neighbor => {
+            try {
+                this.openNeighborConnection(neighbor);
+            }
+            catch (e) {
+                // Couldn't open connection
+            }
+        });
         if (Object.keys(this.neighborConnections).length < this.neighborNumber) {
             setTimeout(() => this.syncNeighbors(), 400);
         }

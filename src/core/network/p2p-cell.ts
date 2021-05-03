@@ -256,13 +256,19 @@ export class P2pCell {
       cell => !this.neighbors.includes(cell.agentPubKey)
     );
 
-    const neighborsToForget = this.neighbors.filter(n =>
-      !neighbors.find(c => c.agentPubKey === n)
+    const neighborsToForget = this.neighbors.filter(
+      n => !neighbors.find(c => c.agentPubKey === n)
     );
 
     neighborsToForget.forEach(n => this.closeNeighborConnection(n));
 
-    newNeighbors.forEach(neighbor => this.openNeighborConnection(neighbor));
+    newNeighbors.forEach(neighbor => {
+      try {
+        this.openNeighborConnection(neighbor);
+      } catch (e) {
+        // Couldn't open connection
+      }
+    });
 
     if (Object.keys(this.neighborConnections).length < this.neighborNumber) {
       setTimeout(() => this.syncNeighbors(), 400);
