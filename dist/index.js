@@ -2764,10 +2764,8 @@ class Cell {
             }
         }
         for (const [dhtOpHash, validatedOp] of Object.entries(gossip.validated_dht_ops)) {
-            if (hasDhtOpBeenProcessed(this._state, dhtOpHash)) {
-                for (const receipt of validatedOp.validation_receipts) {
-                    putValidationReceipt(dhtOpHash, receipt)(this._state);
-                }
+            for (const receipt of validatedOp.validation_receipts) {
+                putValidationReceipt(dhtOpHash, receipt)(this._state);
             }
             // TODO: fix for when sharding is implemented
             if (this.p2p.shouldWeHold(dhtOpHash)) {
