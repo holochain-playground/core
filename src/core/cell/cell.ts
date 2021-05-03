@@ -103,6 +103,7 @@ export class Cell {
       authoredDHTOps: {},
       validationReceipts: {},
       sourceChain: [],
+      badAgents: [],
     };
 
     const p2p = conductor.network.createP2pCell(cellId);
@@ -220,8 +221,6 @@ export class Cell {
   async handle_gossip(from_agent: AgentPubKey, gossip: GossipData) {
     const dhtOpsToProcess: Dictionary<DHTOp> = {};
 
-    const badAgents = getBadAgents(this._state);
-
     for (const badAction of gossip.badActions) {
       const dhtOpHash = hash(badAction.op, HashType.DHTOP);
       if (!hasDhtOpBeenProcessed(this._state, dhtOpHash)) {
@@ -241,7 +240,7 @@ export class Cell {
       }
 
       // TODO: fix for when sharding is implemented
-      if (this.p2p.shouldWeHold(dhtOpHash)) {
+      if (this.p2p.shouldWeHold(getDHTOpBasis(validatedOp.op))) {
         dhtOpsToProcess[dhtOpHash] = validatedOp.op;
       }
     }
@@ -250,10 +249,13 @@ export class Cell {
       await this.handle_publish(from_agent, false, dhtOpsToProcess);
     }
 
-    if (getBadAgents(this._state).length > badAgents.length) {
+    const badAgents = getBadAgents(this._state);
+    if (badAgents.length > this._state.badAgents.length) {
       // We have added bad agents: resync the neighbors
       await this.p2p.syncNeighbors();
     }
+
+    this._state.badAgents = badAgents;
   }
 
   /** Workflow internal execution */

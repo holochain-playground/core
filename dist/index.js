@@ -1741,6 +1741,61 @@ function update_check(entry_update, original_header) {
     check_update_reference(entry_update, original_header);
 }
 
+function getClosestNeighbors(peers, targetHash, numNeighbors) {
+    const sortedPeers = peers.sort((agentA, agentB) => {
+        const distanceA = distance(agentA, targetHash);
+        const distanceB = distance(agentB, targetHash);
+        return distanceA - distanceB;
+    });
+    return sortedPeers.slice(0, numNeighbors);
+}
+function getFarthestNeighbors(peers, targetHash) {
+    const sortedPeers = peers.sort((agentA, agentB) => {
+        return (wrap(location(agentA) - location(targetHash)) -
+            wrap(location(agentB) - location(targetHash)));
+    });
+    const index35 = Math.floor(sortedPeers.length * 0.35);
+    const index50 = Math.floor(sortedPeers.length / 2);
+    const index65 = Math.floor(sortedPeers.length * 0.65);
+    const neighbors = [
+        sortedPeers[index35],
+        sortedPeers[index50],
+        sortedPeers[index65],
+    ].filter(n => !!n);
+    return uniq(neighbors);
+}
+function getBadActions(state) {
+    const badActions = [];
+    for (const [dhtOpHash, receipts] of Object.entries(state.validationReceipts)) {
+        const myReceipt = receipts[state.agentPubKey];
+        if (myReceipt) {
+            const dhtOp = state.integratedDHTOps[dhtOpHash].op;
+            const badAction = {
+                badAgents: [],
+                op: dhtOp,
+                receipts: Object.values(receipts),
+            };
+            if (myReceipt.validation_status === ValidationStatus$1.Rejected) {
+                badAction.badAgents.push(dhtOp.header.header.content.author);
+            }
+            for (const [validatorAgent, receipt] of Object.entries(receipts)) {
+                if (receipt.validation_status !== myReceipt.validation_status) {
+                    badAction.badAgents.push(receipt.validator);
+                }
+            }
+            if (badAction.badAgents.length > 0) {
+                badActions.push(badAction);
+            }
+        }
+    }
+    return badActions;
+}
+function getBadAgents(state) {
+    const actions = getBadActions(state);
+    const badAgents = actions.reduce((acc, next) => [...acc, ...next.badAgents], []);
+    return uniq(badAgents);
+}
+
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/integrate_dht_ops_workflow.rs
 const validation_receipt = async (workspace) => {
     const integratedOpsWithoutReceipt = getIntegratedDhtOpsWithoutReceipt(workspace.state);
@@ -1756,6 +1811,12 @@ const validation_receipt = async (workspace) => {
             when_integrated: now(),
         };
         putValidationReceipt(dhtOpHash, receipt)(workspace.state);
+        const badAgents = getBadAgents(workspace.state);
+        const beforeCount = workspace.state.badAgents.length;
+        workspace.state.badAgents = badAgents;
+        if (beforeCount !== badAgents.length) {
+            workspace.p2p.syncNeighbors();
+        }
         integratedValue.send_receipt = false;
     }
     return {
@@ -2583,61 +2644,6 @@ class MiddlewareExecutor {
     }
 }
 
-function getClosestNeighbors(peers, targetHash, numNeighbors) {
-    const sortedPeers = peers.sort((agentA, agentB) => {
-        const distanceA = distance(agentA, targetHash);
-        const distanceB = distance(agentB, targetHash);
-        return distanceA - distanceB;
-    });
-    return sortedPeers.slice(0, numNeighbors);
-}
-function getFarthestNeighbors(peers, targetHash) {
-    const sortedPeers = peers.sort((agentA, agentB) => {
-        return (wrap(location(agentA) - location(targetHash)) -
-            wrap(location(agentB) - location(targetHash)));
-    });
-    const index35 = Math.floor(sortedPeers.length * 0.35);
-    const index50 = Math.floor(sortedPeers.length / 2);
-    const index65 = Math.floor(sortedPeers.length * 0.65);
-    const neighbors = [
-        sortedPeers[index35],
-        sortedPeers[index50],
-        sortedPeers[index65],
-    ].filter(n => !!n);
-    return uniq(neighbors);
-}
-function getBadActions(state) {
-    const badActions = [];
-    for (const [dhtOpHash, receipts] of Object.entries(state.validationReceipts)) {
-        const myReceipt = receipts[state.agentPubKey];
-        if (myReceipt) {
-            const dhtOp = state.integratedDHTOps[dhtOpHash].op;
-            const badAction = {
-                badAgents: [],
-                op: dhtOp,
-                receipts: Object.values(receipts),
-            };
-            if (myReceipt.validation_status === ValidationStatus$1.Rejected) {
-                badAction.badAgents.push(dhtOp.header.header.content.author);
-            }
-            for (const [validatorAgent, receipt] of Object.entries(receipts)) {
-                if (receipt.validation_status !== myReceipt.validation_status) {
-                    badAction.badAgents.push(receipt.validator);
-                }
-            }
-            if (badAction.badAgents.length > 0) {
-                badActions.push(badAction);
-            }
-        }
-    }
-    return badActions;
-}
-function getBadAgents(state) {
-    const actions = getBadActions(state);
-    const badAgents = actions.reduce((acc, next) => [...acc, ...next.badAgents], []);
-    return uniq(badAgents);
-}
-
 class Cell {
     constructor(_state, conductor, p2p) {
         this._state = _state;
@@ -2688,6 +2694,7 @@ class Cell {
             authoredDHTOps: {},
             validationReceipts: {},
             sourceChain: [],
+            badAgents: [],
         };
         const p2p = conductor.network.createP2pCell(cellId);
         const cell = new Cell(newCellState, conductor, p2p);
@@ -2753,7 +2760,6 @@ class Cell {
     }
     async handle_gossip(from_agent, gossip) {
         const dhtOpsToProcess = {};
-        const badAgents = getBadAgents(this._state);
         for (const badAction of gossip.badActions) {
             const dhtOpHash = hash(badAction.op, HashType.DHTOP);
             if (!hasDhtOpBeenProcessed(this._state, dhtOpHash)) {
@@ -2768,17 +2774,19 @@ class Cell {
                 putValidationReceipt(dhtOpHash, receipt)(this._state);
             }
             // TODO: fix for when sharding is implemented
-            if (this.p2p.shouldWeHold(dhtOpHash)) {
+            if (this.p2p.shouldWeHold(getDHTOpBasis(validatedOp.op))) {
                 dhtOpsToProcess[dhtOpHash] = validatedOp.op;
             }
         }
         if (Object.keys(dhtOpsToProcess).length > 0) {
             await this.handle_publish(from_agent, false, dhtOpsToProcess);
         }
-        if (getBadAgents(this._state).length > badAgents.length) {
+        const badAgents = getBadAgents(this._state);
+        if (badAgents.length > this._state.badAgents.length) {
             // We have added bad agents: resync the neighbors
             await this.p2p.syncNeighbors();
         }
+        this._state.badAgents = badAgents;
     }
     /** Workflow internal execution */
     triggerWorkflow(workflow) {
@@ -2962,7 +2970,7 @@ class P2pCell {
         if (this.cell.conductor.badAgent &&
             this.cell.conductor.badAgent.config.pretend_invalid_elements_are_valid)
             return [];
-        return getBadAgents(this.cell._state);
+        return this.cell._state.badAgents;
     }
     /** P2p actions */
     async join(containerCell) {
