@@ -1,4 +1,4 @@
-import { AgentPubKey, CellId, Dictionary, EntryVisibility, Element } from '@holochain-open-dev/core-types';
+import { AgentPubKey, CellId, Dictionary, EntryVisibility, Element, Hash } from '@holochain-open-dev/core-types';
 import { ValidationOutcome } from '../core/cell/sys_validate/types';
 import { SimulatedValidateFunctionContext, SimulatedZomeFunctionContext } from '../core/hdk';
 export interface SimulatedZomeFunctionArgument {
@@ -29,7 +29,7 @@ export interface SimulatedDna {
     uid: string;
 }
 export interface SimulatedDnaSlot {
-    dna: SimulatedDna;
+    dna: SimulatedDna | Hash;
     deferred: boolean;
 }
 export interface AppSlot {

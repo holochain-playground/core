@@ -3369,15 +3369,26 @@ class Conductor {
             slots: {},
         };
         for (const [cellNick, dnaSlot] of Object.entries(happ.slots)) {
-            const dnaHash = hash(dnaSlot.dna, HashType.DNA);
-            this.registeredDnas[dnaHash] = dnaSlot.dna;
+            let dnaHash = undefined;
+            if (typeof dnaSlot.dna === 'string') {
+                dnaHash = dnaSlot.dna;
+                if (!this.registeredDnas[dnaHash])
+                    throw new Error(`Trying to reference a Dna that this conductor doesn't have registered`);
+            }
+            else if (typeof dnaSlot.dna === 'object') {
+                dnaHash = hash(dnaSlot.dna, HashType.DNA);
+                this.registeredDnas[dnaHash] = dnaSlot.dna;
+            }
+            else {
+                throw new Error('Bad DNA Slot: you must pass in the hash of the dna or the simulated Dna object');
+            }
             this.installedHapps[happ.name].slots[cellNick] = {
                 base_cell_id: [dnaHash, agentId],
                 is_provisioned: !dnaSlot.deferred,
                 clones: [],
             };
             if (!dnaSlot.deferred) {
-                await this.createCell(dnaSlot.dna, agentId, membrane_proofs[cellNick]);
+                await this.createCell(this.registeredDnas[dnaHash], agentId, membrane_proofs[cellNick]);
             }
         }
     }
