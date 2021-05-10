@@ -6,10 +6,10 @@ import {
   SignedHeaderHashed,
 } from '@holochain-open-dev/core-types';
 import { cloneDeep } from 'lodash-es';
+
 import { SimulatedZome } from '../../../dnas/simulated-dna';
 import { GetStrategy } from '../../../types';
 import { BadAgentConfig } from '../../bad-agent';
-import { Cell, run_create_link_validation_callback } from '../../cell';
 import { buildZomeFunctionContext } from '../../hdk/context';
 import { HostFnWorkspace } from '../../hdk/host-fn';
 import { Cascade } from '../cascade/cascade';
@@ -17,6 +17,7 @@ import { getTipOfChain, valid_cap_grant } from '../source-chain/utils';
 import { CellState } from '../state';
 import { ValidationOutcome } from '../sys_validate/types';
 import {
+  run_create_link_validation_callback,
   run_delete_link_validation_callback,
   run_validation_callback_direct,
 } from './app_validation';

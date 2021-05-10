@@ -4,6 +4,7 @@ import {
   Dictionary,
   EntryVisibility,
   Element,
+  Hash,
 } from '@holochain-open-dev/core-types';
 import { ValidationOutcome } from '../core/cell/sys_validate/types';
 import {
@@ -50,7 +51,7 @@ export interface SimulatedDna {
 }
 
 export interface SimulatedDnaSlot {
-  dna: SimulatedDna;
+  dna: SimulatedDna | Hash;
   deferred: boolean;
 }
 
