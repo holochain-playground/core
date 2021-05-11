@@ -1,4 +1,3 @@
-import { Cascade, Cell, Workflow } from '../../cell';
 import {
   ValidationLimboStatus,
   IntegrationLimboValue,
@@ -15,6 +14,7 @@ import {
 } from '../dht/put';
 import { integrate_dht_ops_task } from './integrate_dht_ops';
 import {
+  Workflow,
   workflowPriority,
   WorkflowReturn,
   WorkflowType,
@@ -47,6 +47,7 @@ import { HostFnWorkspace } from '../../hdk/host-fn';
 import { buildValidationFunctionContext } from '../../hdk/context';
 import { ValidationReceipt } from '@holochain-open-dev/core-types/dist/validation';
 import { BadAgentConfig } from '../../bad-agent';
+import { Cascade } from '../cascade/cascade';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/app_validation_workflow.rs
 export const app_validation = async (

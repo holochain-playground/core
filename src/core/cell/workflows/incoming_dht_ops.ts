@@ -1,10 +1,10 @@
 import { Dictionary, DHTOp, AgentPubKey } from '@holochain-open-dev/core-types';
-import { hasDhtOpBeenProcessed, Workflow } from '../../cell';
 import { ValidationLimboValue, ValidationLimboStatus } from '../state';
 import { putValidationLimboValue } from '../dht/put';
 import { sys_validation_task } from './sys_validation';
-import { WorkflowReturn, WorkflowType, Workspace } from './workflows';
+import { Workflow, WorkflowReturn, WorkflowType, Workspace } from './workflows';
 import { getDHTOpBasis } from '../utils';
+import { hasDhtOpBeenProcessed } from '../dht/get';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/incoming_dht_ops_workflow.rs
 export const incoming_dht_ops = (

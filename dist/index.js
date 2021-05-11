@@ -2829,12 +2829,13 @@ class Cell {
         if (Object.keys(dhtOpsToProcess).length > 0) {
             await this.handle_publish(from_agent, false, dhtOpsToProcess);
         }
+        const previousCount = this._state.badAgents.length;
         const badAgents = getBadAgents(this._state);
-        if (badAgents.length > this._state.badAgents.length) {
+        this._state.badAgents = uniq([...this._state.badAgents, ...badAgents]);
+        if (badAgents.length > previousCount) {
             // We have added bad agents: resync the neighbors
             await this.p2p.syncNeighbors();
         }
-        this._state.badAgents = uniq([...this._state.badAgents, ...badAgents]);
     }
     // Check if the agent we are trying to connect with passes the membrane rules for this Dna
     async handle_check_agent(firstElements) {

@@ -54,6 +54,11 @@ export interface SimulatedDnaSlot {
   dna: SimulatedDna | Hash;
   deferred: boolean;
 }
+export interface SimulatedHappBundle {
+  name: string;
+  description: string;
+  slots: Dictionary<SimulatedDnaSlot>;
+}
 
 export interface AppSlot {
   base_cell_id: CellId;
@@ -67,11 +72,6 @@ export interface InstalledHapps {
   slots: Dictionary<AppSlot>;
 }
 
-export interface SimulatedHappBundle {
-  name: string;
-  description: string;
-  slots: Dictionary<SimulatedDnaSlot>;
-}
 
 export interface EntryDef {
   id: string;

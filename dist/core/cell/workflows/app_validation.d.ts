@@ -1,5 +1,4 @@
-import { Workflow } from '../../cell';
-import { WorkflowReturn, Workspace } from './workflows';
+import { Workflow, WorkflowReturn, Workspace } from './workflows';
 import { SimulatedDna, SimulatedZome } from '../../../dnas/simulated-dna';
 import { AgentPubKey, CreateLink, DeleteLink, DHTOp, Element, Entry } from '@holochain-open-dev/core-types';
 import { ValidationOutcome } from '../sys_validate/types';

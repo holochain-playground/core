@@ -4,7 +4,6 @@ import {
   Entry,
   CellId,
 } from '@holochain-open-dev/core-types';
-import { Cell, run_agent_validation_callback, Workflow } from '../../cell';
 import {
   buildAgentValidationPkg,
   buildCreate,
@@ -17,8 +16,9 @@ import {
 } from '../source-chain/get';
 import { putElement } from '../source-chain/put';
 import { CellState } from '../state';
+import { run_agent_validation_callback } from './app_validation';
 import { produce_dht_ops_task } from './produce_dht_ops';
-import { WorkflowReturn, WorkflowType, Workspace } from './workflows';
+import { Workflow, WorkflowReturn, WorkflowType, Workspace } from './workflows';
 
 export const genesis = (
   agentId: AgentPubKey,
