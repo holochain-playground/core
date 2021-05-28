@@ -1,10 +1,10 @@
 import {
-  AgentPubKey,
+  AgentPubKeyB64,
   CellId,
   Dictionary,
   EntryVisibility,
   Element,
-  Hash,
+  DnaHashB64,
 } from '@holochain-open-dev/core-types';
 import { ValidationOutcome } from '../core/cell/sys_validate/types';
 import {
@@ -37,7 +37,7 @@ export interface SimulatedZome {
       context: SimulatedValidateFunctionContext
     ) => (args: {
       element: Element;
-      agent_pub_key: AgentPubKey;
+      agent_pub_key: AgentPubKeyB64;
       membrane_proof: any;
     }) => Promise<ValidationOutcome>;
   } & Dictionary<SimulatedValidateFunction>;
@@ -51,7 +51,7 @@ export interface SimulatedDna {
 }
 
 export interface SimulatedDnaSlot {
-  dna: SimulatedDna | Hash;
+  dna: SimulatedDna | DnaHashB64;
   deferred: boolean;
 }
 export interface SimulatedHappBundle {
@@ -68,7 +68,7 @@ export interface AppSlot {
 
 export interface InstalledHapps {
   app_id: string;
-  agent_pub_key: AgentPubKey;
+  agent_pub_key: AgentPubKeyB64;
   slots: Dictionary<AppSlot>;
 }
 

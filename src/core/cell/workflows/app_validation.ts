@@ -26,7 +26,7 @@ import {
   SimulatedZome,
 } from '../../../dnas/simulated-dna';
 import {
-  AgentPubKey,
+  AgentPubKeyB64,
   AgentValidationPkg,
   AppEntryType,
   Create,
@@ -116,7 +116,7 @@ export function app_validation_task(
 }
 
 function shouldValidate(
-  agentPubKey: AgentPubKey,
+  agentPubKey: AgentPubKeyB64,
   dhtOp: DHTOp,
   badAgentConfig?: BadAgentConfig
 ): boolean {
@@ -126,7 +126,7 @@ function shouldValidate(
 
 export async function validate_op(
   op: DHTOp,
-  from_agent: AgentPubKey | undefined,
+  from_agent: AgentPubKeyB64 | undefined,
   workspace: Workspace
 ): Promise<ValidationOutcome> {
   const element = dht_ops_to_element(op);

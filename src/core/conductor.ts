@@ -1,8 +1,8 @@
 import {
-  AgentPubKey,
+  AgentPubKeyB64,
   CellId,
   Dictionary,
-  Hash,
+  DnaHashB64,
 } from '@holochain-open-dev/core-types';
 import { Cell, getCellId } from '../core/cell';
 import { hash, HashType } from '../processors/hash';
@@ -18,7 +18,7 @@ import { BootstrapService } from '../bootstrap/bootstrap-service';
 import { BadAgent, BadAgentConfig } from './bad-agent';
 
 export interface ConductorState {
-  // DnaHash / AgentPubKey
+  // DnaHash / AgentPubKeyB64
   cellsState: Dictionary<Dictionary<CellState>>;
   networkState: NetworkState;
   registeredDnas: Dictionary<SimulatedDna>;
@@ -100,12 +100,12 @@ export class Conductor {
     return ([] as Cell[]).concat(...nestedCells);
   }
 
-  getCells(dnaHash: Hash): Cell[] {
+  getCells(dnaHash: DnaHashB64): Cell[] {
     const dnaCells = this.cells[dnaHash];
     return dnaCells ? Object.values(dnaCells) : [];
   }
 
-  getCell(dnaHash: Hash, agentPubKey: AgentPubKey): Cell | undefined {
+  getCell(dnaHash: DnaHashB64, agentPubKey: AgentPubKeyB64): Cell | undefined {
     return this.cells[dnaHash] ? this.cells[dnaHash][agentPubKey] : undefined;
   }
 

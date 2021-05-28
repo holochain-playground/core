@@ -1,13 +1,17 @@
 import {
   CellId,
-  AgentPubKey,
-  Hash,
+  AgentPubKeyB64,
+
   Dictionary,
   DHTOp,
   CapSecret,
   Timestamp,
   ValidationReceipt,
   Element,
+  DnaHashB64,
+  AnyDhtHashB64,
+  EntryHashB64,
+  DhtOpHashB64,
 } from '@holochain-open-dev/core-types';
 import { Conductor } from '../conductor';
 import { genesis, genesis_task } from './workflows/genesis';
@@ -58,11 +62,11 @@ export class Cell {
     return [this._state.dnaHash, this._state.agentPubKey];
   }
 
-  get agentPubKey(): AgentPubKey {
+  get agentPubKey(): AgentPubKeyB64 {
     return this.cellId[1];
   }
 
-  get dnaHash(): Hash {
+  get dnaHash(): DnaHashB64 {
     return this.cellId[0];
   }
 
@@ -119,7 +123,7 @@ export class Cell {
     fnName: string;
     payload: any;
     cap: string;
-    provenance: AgentPubKey;
+    provenance: AgentPubKeyB64;
   }): Promise<any> {
     return this._runWorkflow(
       call_zome_fn_workflow(
@@ -135,7 +139,7 @@ export class Cell {
   // https://github.com/holochain/holochain/blob/develop/crates/holochain/src/conductor/cell.rs#L429
 
   public handle_publish(
-    from_agent: AgentPubKey,
+    from_agent: AgentPubKeyB64,
     request_validation_receipt: boolean,
     ops: Dictionary<DHTOp>
   ): Promise<void> {
@@ -145,7 +149,7 @@ export class Cell {
   }
 
   public async handle_get(
-    dht_hash: Hash,
+    dht_hash: AnyDhtHashB64,
     options: GetOptions
   ): Promise<GetResult | undefined> {
     const authority = new Authority(this._state, this.p2p);
@@ -160,7 +164,7 @@ export class Cell {
   }
 
   public async handle_get_links(
-    base_address: Hash,
+    base_address: EntryHashB64,
     options: GetLinksOptions
   ): Promise<GetLinksResponse> {
     const authority = new Authority(this._state, this.p2p);
@@ -168,7 +172,7 @@ export class Cell {
   }
 
   public async handle_call_remote(
-    from_agent: AgentPubKey,
+    from_agent: AgentPubKeyB64,
     zome_name: string,
     fn_name: string,
     cap: CapSecret | undefined,
@@ -189,11 +193,11 @@ export class Cell {
     dht_arc: DhtArc,
     since: number | undefined,
     until: number | undefined
-  ): Array<Hash> {
+  ): Array<DhtOpHashB64> {
     return query_dht_ops(this._state.integratedDHTOps, since, until, dht_arc);
   }
 
-  public handle_fetch_op_hash_data(op_hashes: Array<Hash>): Dictionary<DHTOp> {
+  public handle_fetch_op_hash_data(op_hashes: Array<DhtOpHashB64>): Dictionary<DHTOp> {
     const result: Dictionary<DHTOp> = {};
     for (const opHash of op_hashes) {
       const value = this._state.integratedDHTOps[opHash];
@@ -204,7 +208,7 @@ export class Cell {
     return result;
   }
 
-  public handle_gossip_ops(op_hashes: Array<Hash>): Dictionary<DHTOp> {
+  public handle_gossip_ops(op_hashes: Array<DhtOpHashB64>): Dictionary<DHTOp> {
     const result: Dictionary<DHTOp> = {};
     for (const opHash of op_hashes) {
       const value = this._state.integratedDHTOps[opHash];
@@ -215,7 +219,7 @@ export class Cell {
     return result;
   }
 
-  async handle_gossip(from_agent: AgentPubKey, gossip: GossipData) {
+  async handle_gossip(from_agent: AgentPubKeyB64, gossip: GossipData) {
     const dhtOpsToProcess: Dictionary<DHTOp> = {};
 
     for (const badAction of gossip.badActions) {

@@ -1,8 +1,8 @@
 import {
-  AgentPubKey,
-  Hash,
+  AgentPubKeyB64,
   Entry,
   CellId,
+  DnaHashB64,
 } from '@holochain-open-dev/core-types';
 import {
   buildAgentValidationPkg,
@@ -21,8 +21,8 @@ import { produce_dht_ops_task } from './produce_dht_ops';
 import { Workflow, WorkflowReturn, WorkflowType, Workspace } from './workflows';
 
 export const genesis = (
-  agentId: AgentPubKey,
-  dnaHash: Hash,
+  agentId: AgentPubKeyB64,
+  dnaHash: DnaHashB64,
   membrane_proof: any
 ) => async (worskpace: Workspace): Promise<WorkflowReturn<void>> => {
   const dna = buildDna(dnaHash, agentId);

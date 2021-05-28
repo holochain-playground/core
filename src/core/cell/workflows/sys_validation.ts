@@ -4,11 +4,11 @@ import { putValidationLimboValue } from '../dht/put';
 import { app_validation_task } from './app_validation';
 import { Workflow, WorkflowReturn, WorkflowType, Workspace } from './workflows';
 import {
+  AnyDhtHashB64,
   AppEntryType,
   Create,
   Element,
   Entry,
-  Hash,
   Header,
   HeaderType,
   NewEntryHeader,
@@ -129,7 +129,7 @@ export async function counterfeit_check(
 }
 
 export interface DepsMissing {
-  depsHashes: Array<Hash>;
+  depsHashes: Array<AnyDhtHashB64>;
 }
 
 export async function store_element(
