@@ -11,20 +11,12 @@ import {
 } from '@holochain-open-dev/core-types';
 import { Conductor } from '../conductor';
 import { genesis, genesis_task } from './workflows/genesis';
-import {
-  CallZomeFnWorkflow,
-  call_zome_fn_workflow,
-} from './workflows/call_zome_fn';
+import { call_zome_fn_workflow } from './workflows/call_zome_fn';
 import { P2pCell } from '../network/p2p-cell';
 import { incoming_dht_ops_task } from './workflows/incoming_dht_ops';
 import { CellState, query_dht_ops } from './state';
-import {
-  triggeredWorkflowFromType,
-  Workflow,
-  workflowPriority,
-  WorkflowType,
-  Workspace,
-} from './workflows/workflows';
+import { Workflow, WorkflowType, Workspace } from './workflows/workflows';
+import { triggeredWorkflowFromType } from './workflows/trigger';
 import { MiddlewareExecutor } from '../../executor/middleware-executor';
 import { GetLinksResponse, GetResult } from './cascade/types';
 import { Authority } from './cascade/authority';
@@ -259,7 +251,7 @@ export class Cell {
     const badAgents = getBadAgents(this._state);
     this._state.badAgents = uniq([...this._state.badAgents, ...badAgents]);
 
-    if (badAgents.length > previousCount) {
+    if (this._state.badAgents.length > previousCount) {
       // We have added bad agents: resync the neighbors
       await this.p2p.syncNeighbors();
     }

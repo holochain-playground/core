@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for src/core/hdk/host-fn/call_remote.ts</title>
+    <title>Code coverage report for src/core/cell/workflows/trigger.ts</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../../../../prettify.css" />
     <link rel="stylesheet" href="../../../../base.css" />
@@ -19,20 +19,20 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../../../../index.html">All files</a> / <a href="index.html">src/core/hdk/host-fn</a> call_remote.ts</h1>
+        <h1><a href="../../../../index.html">All files</a> / <a href="index.html">src/core/cell/workflows</a> trigger.ts</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">96.43% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>23/23</span>
+                <span class='fraction'>27/28</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">87.5% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>2/2</span>
+                <span class='fraction'>7/8</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">96.43% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>23/23</span>
+                <span class='fraction'>27/28</span>
             </div>
         
             
@@ -80,7 +80,12 @@
 <a name='L21'></a><a href='#L21'>21</a>
 <a name='L22'></a><a href='#L22'>22</a>
 <a name='L23'></a><a href='#L23'>23</a>
-<a name='L24'></a><a href='#L24'>24</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">7x</span>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">7x</span>
@@ -89,43 +94,53 @@
 <span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">7x</span>
-<span class="cline-any cline-yes">45x</span>
-<span class="cline-any cline-yes">45x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { AgentPubKey, CapSecret } from '@holochain-open-dev/core-types';
-import { HostFn, HostFnWorkspace } from '../host-fn';
+<span class="cline-any cline-yes">2841x</span>
+<span class="cline-any cline-yes">2841x</span>
+<span class="cline-any cline-yes">2841x</span>
+<span class="cline-any cline-yes">2841x</span>
+<span class="cline-any cline-yes">560x</span>
+<span class="cline-any cline-yes">2841x</span>
+<span class="cline-any cline-yes">635x</span>
+<span class="cline-any cline-yes">2841x</span>
+<span class="cline-any cline-yes">127x</span>
+<span class="cline-any cline-yes">2841x</span>
+<span class="cline-any cline-yes">232x</span>
+<span class="cline-any cline-yes">2841x</span>
+<span class="cline-any cline-yes">547x</span>
+<span class="cline-any cline-yes">2841x</span>
+<span class="cline-any cline-yes">740x</span>
+<span class="cline-any cline-yes">2841x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2841x</span>
+<span class="cline-any cline-yes">2841x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { app_validation_task } from './app_validation';
+import { integrate_dht_ops_task } from './integrate_dht_ops';
+import { produce_dht_ops_task } from './produce_dht_ops';
+import { publish_dht_ops_task } from './publish_dht_ops';
+import { sys_validation_task } from './sys_validation';
+import { validation_receipt_task } from './validation_receipt';
+import { Workflow, WorkflowType } from './workflows';
 &nbsp;
-export type CallRemoteFn = (args: {
-  agent: AgentPubKey;
-  zome: string;
-  fn_name: string;
-  cap_secret: CapSecret | undefined;
-  payload: any;
-}) =&gt; Promise&lt;any&gt;;
-&nbsp;
-// Creates a new Create header and its entry in the source chain
-export const call_remote: HostFn&lt;CallRemoteFn&gt; = (
-  workspace: HostFnWorkspace
-): CallRemoteFn =&gt; async (args): Promise&lt;any&gt; =&gt; {
-  return workspace.p2p.call_remote(
-    args.agent,
-    args.zome,
-    args.fn_name,
-    args.cap_secret,
-    args.payload
-  );
-};
+export function triggeredWorkflowFromType(
+  type: WorkflowType
+): Workflow&lt;any, any&gt; {
+  switch (type) {
+    case WorkflowType.APP_VALIDATION:
+      return app_validation_task();
+    case WorkflowType.INTEGRATE_DHT_OPS:
+      return integrate_dht_ops_task();
+    case WorkflowType.PRODUCE_DHT_OPS:
+      return produce_dht_ops_task();
+    case WorkflowType.PUBLISH_DHT_OPS:
+      return publish_dht_ops_task();
+    case WorkflowType.SYS_VALIDATION:
+      return sys_validation_task();
+    case WorkflowType.VALIDATION_RECEIPT:
+      return validation_receipt_task();
+<span class="branch-0 cbranch-no" title="branch not covered" >    default:</span>
+<span class="cstat-no" title="statement not covered" >      throw new Error('Trying to trigger a workflow that cannot be triggered');</span>
+  }
+}
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
