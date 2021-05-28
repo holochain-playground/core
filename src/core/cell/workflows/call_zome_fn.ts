@@ -1,5 +1,5 @@
 import {
-  AgentPubKey,
+  AgentPubKeyB64,
   Element,
   HeaderType,
   NewEntryHeader,
@@ -33,7 +33,7 @@ export const callZomeFn = (
   zomeName: string,
   fnName: string,
   payload: any,
-  provenance: AgentPubKey,
+  provenance: AgentPubKeyB64,
   cap: string
 ) => async (
   workspace: Workspace
@@ -136,7 +136,7 @@ export function call_zome_fn_workflow(
   zome: string,
   fnName: string,
   payload: any,
-  provenance: AgentPubKey
+  provenance: AgentPubKeyB64
 ): CallZomeFnWorkflow {
   return {
     type: WorkflowType.CALL_ZOME,

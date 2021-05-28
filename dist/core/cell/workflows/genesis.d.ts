@@ -1,6 +1,6 @@
-import { AgentPubKey, Hash, CellId } from '@holochain-open-dev/core-types';
+import { AgentPubKeyB64, CellId, DnaHashB64 } from '@holochain-open-dev/core-types';
 import { Workflow, WorkflowReturn, Workspace } from './workflows';
-export declare const genesis: (agentId: AgentPubKey, dnaHash: Hash, membrane_proof: any) => (worskpace: Workspace) => Promise<WorkflowReturn<void>>;
+export declare const genesis: (agentId: AgentPubKeyB64, dnaHash: DnaHashB64, membrane_proof: any) => (worskpace: Workspace) => Promise<WorkflowReturn<void>>;
 export declare type GenesisWorkflow = Workflow<{
     cellId: CellId;
     membrane_proof: any;

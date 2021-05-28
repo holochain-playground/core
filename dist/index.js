@@ -935,6 +935,8 @@ function query_dht_ops(integratedDHTOps, from, to, dht_arc) {
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain_cascade/src/authority.rs
 class Authority {
+    state;
+    p2p;
     constructor(state, p2p) {
         this.state = state;
         this.p2p = p2p;
@@ -991,6 +993,8 @@ class Authority {
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain_cascade/src/lib.rs#L1523
 // TODO: refactor Cascade when sqlite gets merged
 class Cascade {
+    state;
+    p2p;
     constructor(state, p2p) {
         this.state = state;
         this.p2p = p2p;
@@ -1120,8 +1124,8 @@ class Cascade {
             entry_dht_status,
         };
     }
-    async getHeaderDetails(entryHash, options) {
-        const result = await this.p2p.get(entryHash, options);
+    async getHeaderDetails(headerHash, options) {
+        const result = await this.p2p.get(headerHash, options);
         if (!result)
             return undefined;
         if (result.validation_status === undefined)
@@ -2650,11 +2654,9 @@ function triggeredWorkflowFromType(type) {
 }
 
 class MiddlewareExecutor {
-    constructor() {
-        this._beforeMiddlewares = [];
-        this._successMiddlewares = [];
-        this._errorMiddlewares = [];
-    }
+    _beforeMiddlewares = [];
+    _successMiddlewares = [];
+    _errorMiddlewares = [];
     async execute(task, payload) {
         for (const middleware of this._beforeMiddlewares) {
             await middleware(payload);
@@ -2694,18 +2696,20 @@ class MiddlewareExecutor {
 }
 
 class Cell {
+    _state;
+    conductor;
+    _triggers = {
+        [WorkflowType.INTEGRATE_DHT_OPS]: { running: false, triggered: true },
+        [WorkflowType.PRODUCE_DHT_OPS]: { running: false, triggered: true },
+        [WorkflowType.PUBLISH_DHT_OPS]: { running: false, triggered: true },
+        [WorkflowType.SYS_VALIDATION]: { running: false, triggered: true },
+        [WorkflowType.APP_VALIDATION]: { running: false, triggered: true },
+        [WorkflowType.VALIDATION_RECEIPT]: { running: false, triggered: true },
+    };
+    workflowExecutor = new MiddlewareExecutor();
     constructor(_state, conductor) {
         this._state = _state;
         this.conductor = conductor;
-        this._triggers = {
-            [WorkflowType.INTEGRATE_DHT_OPS]: { running: false, triggered: true },
-            [WorkflowType.PRODUCE_DHT_OPS]: { running: false, triggered: true },
-            [WorkflowType.PUBLISH_DHT_OPS]: { running: false, triggered: true },
-            [WorkflowType.SYS_VALIDATION]: { running: false, triggered: true },
-            [WorkflowType.APP_VALIDATION]: { running: false, triggered: true },
-            [WorkflowType.VALIDATION_RECEIPT]: { running: false, triggered: true },
-        };
-        this.workflowExecutor = new MiddlewareExecutor();
         // Let genesis be run before actually joining
     }
     get cellId() {
@@ -2893,20 +2897,22 @@ class Cell {
 }
 
 class Connection {
-    constructor(opener, receiver) {
-        this.opener = opener;
-        this.receiver = receiver;
-        this._closed = false;
-        if (opener.p2p.badAgents.includes(receiver.agentPubKey) ||
-            receiver.p2p.badAgents.includes(opener.agentPubKey)) {
-            throw new Error('Connection closed!');
-        }
-    }
+    opener;
+    receiver;
+    _closed = false;
     get closed() {
         return this._closed;
     }
     close() {
         this._closed = false;
+    }
+    constructor(opener, receiver) {
+        this.opener = opener;
+        this.receiver = receiver;
+        if (opener.p2p.badAgents.includes(receiver.agentPubKey) ||
+            receiver.p2p.badAgents.includes(opener.agentPubKey)) {
+            throw new Error('Connection closed!');
+        }
     }
     sendRequest(fromAgent, networkRequest) {
         if (this.closed)
@@ -2919,8 +2925,8 @@ class Connection {
         }
         throw new Error('Bad request');
     }
-    getPeer(myAgentPubKey) {
-        if (this.opener.agentPubKey === myAgentPubKey)
+    getPeer(myAgentPubKeyB64) {
+        if (this.opener.agentPubKey === myAgentPubKeyB64)
             return this.receiver;
         return this.opener;
     }
@@ -2931,10 +2937,11 @@ const DelayMiddleware = (ms) => () => sleep(ms);
 
 const GOSSIP_INTERVAL_MS = 500;
 class SimpleBloomMod {
+    p2pCell;
+    gossip_on = true;
+    lastBadActions = 0;
     constructor(p2pCell) {
         this.p2pCell = p2pCell;
-        this.gossip_on = true;
-        this.lastBadActions = 0;
         this.loop();
     }
     async loop() {
@@ -3000,12 +3007,18 @@ var NetworkRequestType;
 
 // From: https://github.com/holochain/holochain/blob/develop/crates/holochain_p2p/src/lib.rs
 class P2pCell {
+    cell;
+    network;
+    farKnownPeers;
+    storageArc;
+    neighborNumber;
+    redundancyFactor = 3;
+    _gossipLoop;
+    networkRequestsExecutor = new MiddlewareExecutor();
+    neighborConnections = {};
     constructor(state, cell, network) {
         this.cell = cell;
         this.network = network;
-        this.redundancyFactor = 3;
-        this.networkRequestsExecutor = new MiddlewareExecutor();
-        this.neighborConnections = {};
         this.farKnownPeers = state.farKnownPeers;
         this.redundancyFactor = state.redundancyFactor;
         this.neighborNumber = state.neighborNumber;
@@ -3147,8 +3160,8 @@ class P2pCell {
         }
     }
     // TODO: fix when sharding is implemented
-    shouldWeHold(dhtOpHash) {
-        const neighbors = this.network.bootstrapService.getNeighborhood(this.cellId[0], dhtOpHash, this.redundancyFactor + 1, this.badAgents);
+    shouldWeHold(dhtOpBasis) {
+        const neighbors = this.network.bootstrapService.getNeighborhood(this.cellId[0], dhtOpBasis, this.redundancyFactor + 1, this.badAgents);
         const index = neighbors.findIndex(cell => cell.agentPubKey === this.cellId[1]);
         return index >= 0 && index < this.redundancyFactor;
     }
@@ -3173,6 +3186,8 @@ class P2pCell {
 }
 
 class KitsuneP2p {
+    network;
+    discover;
     constructor(network) {
         this.network = network;
         this.discover = new Discover(network);
@@ -3188,6 +3203,7 @@ class KitsuneP2p {
 }
 // From https://github.com/holochain/holochain/blob/develop/crates/kitsune_p2p/kitsune_p2p/src/spawn/actor/discover.rs
 class Discover {
+    network;
     constructor(network) {
         this.network = network;
     }
@@ -3206,6 +3222,11 @@ class Discover {
 }
 
 class Network {
+    conductor;
+    bootstrapService;
+    // P2pCells contained in this conductor
+    p2pCells;
+    kitsune;
     constructor(state, conductor, bootstrapService) {
         this.conductor = conductor;
         this.bootstrapService = bootstrapService;
@@ -3261,6 +3282,12 @@ class Network {
 }
 
 class Conductor {
+    cells;
+    registeredDnas;
+    installedHapps;
+    network;
+    name;
+    badAgent; // If undefined, this is an honest agent
     constructor(state, bootstrapService) {
         this.network = new Network(state.networkState, this, bootstrapService);
         this.registeredDnas = state.registeredDnas;
@@ -3291,6 +3318,8 @@ class Conductor {
     getState() {
         const cellsState = {};
         for (const [dnaHash, dnaCells] of Object.entries(this.cells)) {
+            if (!cellsState[dnaHash])
+                cellsState[dnaHash];
             for (const [agentPubKey, cell] of Object.entries(dnaCells)) {
                 cellsState[dnaHash][agentPubKey] = cell.getState();
             }
@@ -3567,9 +3596,7 @@ function demoHapp() {
 }
 
 class BootstrapService {
-    constructor() {
-        this.cells = {};
-    }
+    cells = {};
     announceCell(cellId, cell) {
         const dnaHash = cellId[0];
         const agentPubKey = cellId[1];
