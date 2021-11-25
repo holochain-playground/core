@@ -1,4 +1,17 @@
 import {
+  AgentPubKey,
+  AgentValidationPkg,
+  AppEntryType,
+  CreateLink,
+  DeleteLink,
+  DhtOp,
+  Entry,
+  HeaderType,
+  NewEntryHeader,
+} from '@holochain/conductor-api';
+import { Element } from '@holochain-open-dev/core-types';
+
+import {
   ValidationLimboStatus,
   IntegrationLimboValue,
   ValidationStatus,
@@ -25,29 +38,16 @@ import {
   SimulatedDna,
   SimulatedZome,
 } from '../../../dnas/simulated-dna';
-import {
-  AgentPubKeyB64,
-  AgentValidationPkg,
-  AppEntryType,
-  Create,
-  CreateLink,
-  DeleteLink,
-  DHTOp,
-  Element,
-  Entry,
-  getEntry,
-  HeaderType,
-  NewEntryHeader,
-  now,
-} from '@holochain-open-dev/core-types';
+
 import { ValidationOutcome } from '../sys_validate/types';
 import { GetStrategy } from '../../../types';
 import { DepsMissing } from './sys_validation';
 import { HostFnWorkspace } from '../../hdk/host-fn';
 import { buildValidationFunctionContext } from '../../hdk/context';
-import { ValidationReceipt } from '@holochain-open-dev/core-types/dist/validation';
 import { BadAgentConfig } from '../../bad-agent';
 import { Cascade } from '../cascade/cascade';
+import { getEntry } from '../utils';
+import isEqual from 'lodash-es/isEqual';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/app_validation_workflow.rs
 export const app_validation = async (
@@ -60,10 +60,10 @@ export const app_validation = async (
     ValidationLimboStatus.AwaitingAppDeps,
   ]);
 
-  for (const dhtOpHash of Object.keys(pendingDhtOps)) {
+  for (const dhtOpHash of pendingDhtOps.keys()) {
     deleteValidationLimboValue(dhtOpHash)(workspace.state);
 
-    const validationLimboValue = pendingDhtOps[dhtOpHash];
+    const validationLimboValue = pendingDhtOps.get(dhtOpHash);
 
     // If we are a bad agent, we don't validate our stuff
     let outcome: ValidationOutcome = { resolved: true, valid: true };
@@ -120,17 +120,17 @@ export function app_validation_task(
 }
 
 function shouldValidate(
-  agentPubKey: AgentPubKeyB64,
-  dhtOp: DHTOp,
+  agentPubKey: AgentPubKey,
+  dhtOp: DhtOp,
   badAgentConfig?: BadAgentConfig
 ): boolean {
   if (!badAgentConfig) return true;
-  return dhtOp.header.header.content.author !== agentPubKey;
+  return !isEqual(dhtOp.header.header.content.author, agentPubKey);
 }
 
 export async function validate_op(
-  op: DHTOp,
-  from_agent: AgentPubKeyB64 | undefined,
+  op: DhtOp,
+  from_agent: AgentPubKey | undefined,
   workspace: Workspace
 ): Promise<ValidationOutcome> {
   const element = dht_ops_to_element(op);
@@ -208,7 +208,7 @@ export async function validate_op(
   }
 }
 
-function dht_ops_to_element(op: DHTOp): Element {
+function dht_ops_to_element(op: DhtOp): Element {
   const header = op.header;
   let entry = undefined;
   if ((header.header.content as NewEntryHeader).entry_hash) {

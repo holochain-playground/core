@@ -1,7 +1,8 @@
-import { DHTOp, Dictionary } from '@holochain-open-dev/core-types';
+import { DhtOp } from '@holochain/conductor-api';
+import { HoloHashMap } from '../../../processors/holo-hash-map';
 
 import { getNonPublishedDhtOps } from '../source-chain/utils';
-import { getDHTOpBasis } from '../utils';
+import { getDhtOpBasis } from '../utils';
 import { Workflow, WorkflowReturn, WorkflowType, Workspace } from './workflows';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/publish_dht_ops_workflow.rs
@@ -11,32 +12,29 @@ export const publish_dht_ops = async (
   let workCompleted = true;
   const dhtOps = getNonPublishedDhtOps(workspace.state);
 
-  const dhtOpsByBasis: Dictionary<Dictionary<DHTOp>> = {};
+  const dhtOpsByBasis: HoloHashMap<HoloHashMap<DhtOp>> = new HoloHashMap();
 
-  for (const dhtOpHash of Object.keys(dhtOps)) {
-    const dhtOp = dhtOps[dhtOpHash];
-    const basis = getDHTOpBasis(dhtOp);
+  for (const [dhtOpHash, dhtOp] of dhtOps.entries()) {
+    const basis = getDhtOpBasis(dhtOp);
 
-    if (!dhtOpsByBasis[basis]) dhtOpsByBasis[basis] = {};
+    if (!dhtOpsByBasis.has(basis)) dhtOpsByBasis.put(basis, new HoloHashMap());
 
-    dhtOpsByBasis[basis][dhtOpHash] = dhtOp;
+    dhtOpsByBasis.get(basis).put(dhtOpHash, dhtOp);
   }
 
-  const promises = Object.entries(dhtOpsByBasis).map(
-    async ([basis, dhtOps]) => {
-      try {
-        // Publish the operations
-        await workspace.p2p.publish(basis, dhtOps);
+  const promises = dhtOpsByBasis.entries().map(async ([basis, dhtOps]) => {
+    try {
+      // Publish the operations
+      await workspace.p2p.publish(basis, dhtOps);
 
-        for (const dhtOpHash of Object.keys(dhtOps)) {
-          workspace.state.authoredDHTOps[dhtOpHash].last_publish_time =
-            Date.now();
-        }
-      } catch (e) {
-        workCompleted = false;
+      for (const dhtOpHash of dhtOps.keys()) {
+        workspace.state.authoredDHTOps.get(dhtOpHash).last_publish_time =
+          Date.now() * 1000;
       }
+    } catch (e) {
+      workCompleted = false;
     }
-  );
+  });
 
   await Promise.all(promises);
 

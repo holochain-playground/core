@@ -1,18 +1,21 @@
 import {
-  AnyDhtHashB64,
-  CreateLink,
   Details,
   DetailsType,
   Dictionary,
   Element,
   ElementDetails,
-  Entry,
   EntryDetails,
-  EntryHashB64,
-  HeaderHashB64,
+} from '@holochain-open-dev/core-types';
+import {
+  AnyDhtHash,
+  Entry,
+  EntryHash,
+  HeaderHash,
   NewEntryHeader,
   SignedHeaderHashed,
-} from '@holochain-open-dev/core-types';
+} from '@holochain/conductor-api';
+import isEqual from 'lodash-es/isEqual';
+
 import { getHashType, HashType } from '../../../processors/hash';
 import { GetLinksOptions, GetOptions, GetStrategy } from '../../../types';
 import { P2pCell } from '../../network/p2p-cell';
@@ -36,7 +39,7 @@ export class Cascade {
 
   // TODO refactor when sqlite gets merged
   public async retrieve_header(
-    hash: HeaderHashB64,
+    hash: HeaderHash,
     options: GetOptions
   ): Promise<SignedHeaderHashed | undefined> {
     if (getHashType(hash) !== HashType.HEADER)
@@ -44,11 +47,11 @@ export class Cascade {
         `Trying to retrieve a header with a hash of another type`
       );
 
-    const isPresent = this.state.CAS[hash];
+    const isPresent = this.state.CAS.get(hash);
 
     // TODO only return local if GetOptions::content() is given
     if (isPresent && options.strategy === GetStrategy.Contents) {
-      const signed_header = this.state.CAS[hash];
+      const signed_header = this.state.CAS.get(hash);
       return signed_header;
     }
 
@@ -60,17 +63,17 @@ export class Cascade {
   }
 
   public async retrieve_entry(
-    hash: EntryHashB64,
+    hash: EntryHash,
     options: GetOptions
   ): Promise<Entry | undefined> {
     const hashType = getHashType(hash);
     if (hashType !== HashType.ENTRY && hashType !== HashType.AGENT)
       throw new Error(`Trying to retrieve a entry with a hash of another type`);
 
-    const isPresent = this.state.CAS[hash];
+    const isPresent = this.state.CAS.get(hash);
 
     if (isPresent && options.strategy === GetStrategy.Contents) {
-      const entry = this.state.CAS[hash];
+      const entry = this.state.CAS.get(hash);
       return entry;
     }
 
@@ -82,25 +85,28 @@ export class Cascade {
   }
 
   public async dht_get(
-    hash: AnyDhtHashB64,
+    hash: AnyDhtHash,
     options: GetOptions
   ): Promise<Element | undefined> {
     // TODO rrDHT arcs
     const authority = new Authority(this.state, this.p2p);
 
-    const isPresent = this.state.CAS[hash];
+    const isPresent = this.state.CAS.get(hash);
 
     // TODO only return local if GetOptions::content() is given
     if (isPresent && options.strategy === GetStrategy.Contents) {
       const hashType = getHashType(hash);
 
       if (hashType === HashType.ENTRY) {
-        const entry = this.state.CAS[hash];
-        const signed_header = Object.values(this.state.CAS).find(
+        const entry = this.state.CAS.get(hash);
+        const signed_header = this.state.CAS.values().find(
           header =>
             (header as SignedHeaderHashed).header &&
-            (header as SignedHeaderHashed<NewEntryHeader>).header.content
-              .entry_hash === hash
+            isEqual(
+              (header as SignedHeaderHashed<NewEntryHeader>).header.content
+                .entry_hash,
+              hash
+            )
         );
 
         return {
@@ -110,11 +116,11 @@ export class Cascade {
       }
 
       if (hashType === HashType.HEADER) {
-        const signed_header = this.state.CAS[hash];
-        const entry = this.state.CAS[
-          (signed_header as SignedHeaderHashed<NewEntryHeader>).header.content
-            .entry_hash
-        ];
+        const signed_header = this.state.CAS.get(hash);
+        const entry_hash = (signed_header as SignedHeaderHashed<NewEntryHeader>)
+          .header.content.entry_hash;
+
+        const entry = entry_hash ? this.state.CAS.get(entry_hash) : undefined;
         return {
           entry,
           signed_header,
@@ -140,7 +146,7 @@ export class Cascade {
   }
 
   public async dht_get_details(
-    hash: AnyDhtHashB64,
+    hash: AnyDhtHash,
     options: GetOptions
   ): Promise<Details | undefined> {
     if (getHashType(hash) === HashType.ENTRY) {
@@ -167,7 +173,7 @@ export class Cascade {
   }
 
   public async dht_get_links(
-    base_address: EntryHashB64,
+    base_address: EntryHash,
     options: GetLinksOptions
   ): Promise<Link[]> {
     // TODO: check if we are an authority
@@ -177,7 +183,7 @@ export class Cascade {
   }
 
   async getEntryDetails(
-    entryHash: EntryHashB64,
+    entryHash: EntryHash,
     options: GetOptions
   ): Promise<EntryDetails | undefined> {
     // TODO: check if we are an authority
@@ -208,7 +214,7 @@ export class Cascade {
   }
 
   async getHeaderDetails(
-    headerHash: HeaderHashB64,
+    headerHash: HeaderHash,
     options: GetOptions
   ): Promise<ElementDetails | undefined> {
     const result = await this.p2p.get(headerHash, options);

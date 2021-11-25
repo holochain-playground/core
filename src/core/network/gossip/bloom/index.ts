@@ -1,5 +1,5 @@
-import { Dictionary } from '@holochain-open-dev/core-types';
 import { sleep } from '../../../../executor/delay-middleware';
+import { HoloHashMap } from '../../../../processors/holo-hash-map';
 import { getValidationReceipts } from '../../../cell';
 import { P2pCell } from '../../p2p-cell';
 import { getBadActions } from '../../utils';
@@ -29,23 +29,20 @@ export class SimpleBloomMod {
   }
 
   async run_one_iteration(): Promise<void> {
-    const localDhtOpsHashes = Object.keys(
-      this.p2pCell.cell._state.integratedDHTOps
-    );
-    const localDhtOps = this.p2pCell.cell.handle_fetch_op_hash_data(
-      localDhtOpsHashes
-    );
+    const localDhtOpsHashes = this.p2pCell.cell._state.integratedDHTOps.keys();
+    const localDhtOps =
+      this.p2pCell.cell.handle_fetch_op_hash_data(localDhtOpsHashes);
 
     const state = this.p2pCell.cell._state;
 
-    const dhtOpData: Dictionary<GossipDhtOpData> = {};
+    const dhtOpData: HoloHashMap<GossipDhtOpData> = new HoloHashMap();
 
-    for (const dhtOpHash of Object.keys(localDhtOps)) {
+    for (const dhtOpHash of localDhtOps.keys()) {
       const receipts = getValidationReceipts(dhtOpHash)(state);
-      dhtOpData[dhtOpHash] = {
-        op: localDhtOps[dhtOpHash],
+      dhtOpData.put(dhtOpHash, {
+        op: localDhtOps.get(dhtOpHash),
         validation_receipts: receipts,
-      };
+      });
     }
 
     const pretendValid =

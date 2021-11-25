@@ -2,7 +2,7 @@ import { ValidationStatus } from '../state';
 import { getIntegratedDhtOpsWithoutReceipt } from '../dht/get';
 import { putDhtOpToIntegrated, putValidationReceipt } from '../dht/put';
 import { Workflow, WorkflowReturn, WorkflowType, Workspace } from './workflows';
-import { now, ValidationReceipt } from '@holochain-open-dev/core-types';
+import { ValidationReceipt } from '@holochain-open-dev/core-types';
 import { getBadAgents } from '../../network/utils';
 import { uniq } from 'lodash-es';
 
@@ -17,16 +17,17 @@ export const validation_receipt = async (
     workspace.badAgentConfig &&
     workspace.badAgentConfig.pretend_invalid_elements_are_valid;
 
-  for (const [dhtOpHash, integratedValue] of Object.entries(
-    integratedOpsWithoutReceipt
-  )) {
+  for (const [
+    dhtOpHash,
+    integratedValue,
+  ] of integratedOpsWithoutReceipt.entries()) {
     const receipt: ValidationReceipt = {
       dht_op_hash: dhtOpHash,
       validation_status: pretendIsValid
         ? ValidationStatus.Valid
         : integratedValue.validation_status,
       validator: workspace.state.agentPubKey,
-      when_integrated: now(),
+      when_integrated: Date.now() * 1000,
     };
 
     putValidationReceipt(dhtOpHash, receipt)(workspace.state);

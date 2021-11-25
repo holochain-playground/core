@@ -1,28 +1,31 @@
 import {
   Dictionary,
   DhtOpHashB64,
-  Header,
-  getSysMetaValHeaderHash,
-  LinkMetaVal,
   EntryDhtStatus,
   EntryDetails,
+  ValidationReceipt,
+  EntryHashB64,
+  HeaderHashB64,
+  DhtOpHash,
+} from '@holochain-open-dev/core-types';
+import {
   NewEntryHeader,
   SignedHeaderHashed,
-  DHTOpType,
+  DhtOpType,
   Update,
   Delete,
   CreateLink,
   DeleteLink,
   HeaderType,
   Create,
-  Metadata,
-  DHTOp,
-  ValidationReceipt,
-  EntryHashB64,
-  HeaderHashB64,
-} from '@holochain-open-dev/core-types';
-import { isEqual, uniq } from 'lodash-es';
-import { hash, HashType } from '../../../processors/hash';
+  DhtOp,
+  EntryHash,
+  HeaderHash,
+} from '@holochain/conductor-api';
+
+import { isEqual, uniq, uniqWith } from 'lodash-es';
+import { HoloHashMap } from '../../../processors/holo-hash-map';
+
 import { GetLinksResponse, Link } from '../cascade/types';
 import {
   CellState,
@@ -32,54 +35,53 @@ import {
   IntegratedDhtOpsValue,
   ValidationStatus,
 } from '../state';
+import { getSysMetaValHeaderHash, LinkMetaVal } from '../state/metadata';
 
 export function getValidationLimboDhtOps(
   state: CellState,
   statuses: ValidationLimboStatus[]
-): Dictionary<ValidationLimboValue> {
-  const pendingDhtOps: Dictionary<ValidationLimboValue> = {};
+): HoloHashMap<ValidationLimboValue> {
+  const pendingDhtOps: HoloHashMap<ValidationLimboValue> = new HoloHashMap();
 
-  for (const dhtOpHash of Object.keys(state.validationLimbo)) {
-    const limboValue = state.validationLimbo[dhtOpHash];
-
+  for (const [dhtOpHash, limboValue] of state.validationLimbo.entries()) {
     if (statuses.includes(limboValue.status)) {
-      pendingDhtOps[dhtOpHash] = limboValue;
+      pendingDhtOps.put(dhtOpHash, limboValue);
     }
   }
 
   return pendingDhtOps;
 }
 
-export const getValidationReceipts = (dhtOpHash: DhtOpHashB64) => (
-  state: CellState
-): ValidationReceipt[] => {
-  return state.validationReceipts[dhtOpHash]
-    ? Object.values(state.validationReceipts[dhtOpHash])
-    : [];
-};
+export const getValidationReceipts =
+  (dhtOpHash: DhtOpHash) =>
+  (state: CellState): ValidationReceipt[] => {
+    return state.validationReceipts.has(dhtOpHash)
+      ? state.validationReceipts.get(dhtOpHash).values()
+      : [];
+  };
 
 export function pullAllIntegrationLimboDhtOps(
   state: CellState
-): Dictionary<IntegrationLimboValue> {
+): HoloHashMap<IntegrationLimboValue> {
   const dhtOps = state.integrationLimbo;
 
-  state.integrationLimbo = {};
+  state.integrationLimbo = new HoloHashMap();
 
   return dhtOps;
 }
 
 export function getHeadersForEntry(
   state: CellState,
-  entryHash: EntryHashB64
+  entryHash: EntryHash
 ): SignedHeaderHashed[] {
-  const entryMetadata = state.metadata.system_meta[entryHash];
+  const entryMetadata = state.metadata.system_meta.get(entryHash);
   if (!entryMetadata) return [];
 
   return entryMetadata
     .map(h => {
       const hash = getSysMetaValHeaderHash(h);
       if (hash) {
-        return state.CAS[hash];
+        return state.CAS.get(hash);
       }
       return undefined;
     })
@@ -88,44 +90,52 @@ export function getHeadersForEntry(
 
 export function getEntryDhtStatus(
   state: CellState,
-  entryHash: EntryHashB64
+  entryHash: EntryHash
 ): EntryDhtStatus | undefined {
-  const meta = state.metadata.misc_meta[entryHash];
+  const meta = state.metadata.misc_meta.get(entryHash);
 
   return meta
-    ? (meta as {
-        EntryStatus: EntryDhtStatus;
-      }).EntryStatus
+    ? (
+        meta as {
+          EntryStatus: EntryDhtStatus;
+        }
+      ).EntryStatus
     : undefined;
 }
 
 export function getEntryDetails(
   state: CellState,
-  entry_hash: EntryHashB64
+  entry_hash: EntryHash
 ): EntryDetails {
-  const entry = state.CAS[entry_hash];
+  const entry = state.CAS.get(entry_hash);
   const allHeaders = getHeadersForEntry(state, entry_hash);
   const dhtStatus = getEntryDhtStatus(state, entry_hash);
 
-  const live_headers: Dictionary<SignedHeaderHashed<Create>> = {};
-  const updates: Dictionary<SignedHeaderHashed<Update>> = {};
-  const deletes: Dictionary<SignedHeaderHashed<Delete>> = {};
+  const live_headers: HoloHashMap<SignedHeaderHashed<Create>> =
+    new HoloHashMap();
+  const updates: HoloHashMap<SignedHeaderHashed<Update>> = new HoloHashMap();
+  const deletes: HoloHashMap<SignedHeaderHashed<Delete>> = new HoloHashMap();
 
   for (const header of allHeaders) {
     const headerContent = (header as SignedHeaderHashed).header.content;
 
     if (
       (headerContent as Update).original_entry_address &&
-      (headerContent as Update).original_entry_address === entry_hash
+      isEqual((headerContent as Update).original_entry_address, entry_hash)
     ) {
-      updates[header.header.hash] = header as SignedHeaderHashed<Update>;
+      updates.put(header.header.hash, header as SignedHeaderHashed<Update>);
     } else if (
       (headerContent as Create).entry_hash &&
-      (headerContent as Create).entry_hash === entry_hash
+      isEqual((headerContent as Create).entry_hash, entry_hash)
     ) {
-      live_headers[header.header.hash] = header as SignedHeaderHashed<Create>;
-    } else if ((headerContent as Delete).deletes_entry_address === entry_hash) {
-      deletes[header.header.hash] = header as SignedHeaderHashed<Delete>;
+      live_headers.put(
+        header.header.hash,
+        header as SignedHeaderHashed<Create>
+      );
+    } else if (
+      isEqual((headerContent as Delete).deletes_entry_address, entry_hash)
+    ) {
+      deletes.put(header.header.hash, header as SignedHeaderHashed<Delete>);
     }
   }
 
@@ -133,20 +143,20 @@ export function getEntryDetails(
     entry,
     headers: allHeaders,
     entry_dht_status: dhtStatus as EntryDhtStatus,
-    updates: Object.values(updates),
-    deletes: Object.values(deletes),
+    updates: updates.values(),
+    deletes: deletes.values(),
     rejected_headers: [], // TODO: after validation is implemented
   };
 }
 
 export function getHeaderModifiers(
   state: CellState,
-  headerHash: HeaderHashB64
+  headerHash: HeaderHash
 ): {
   updates: SignedHeaderHashed<Update>[];
   deletes: SignedHeaderHashed<Delete>[];
 } {
-  const allModifiers = state.metadata.system_meta[headerHash];
+  const allModifiers = state.metadata.system_meta.get(headerHash);
   if (!allModifiers)
     return {
       updates: [],
@@ -154,11 +164,11 @@ export function getHeaderModifiers(
     };
 
   const updates = allModifiers
-    .filter(m => (m as { Update: HeaderHashB64 }).Update)
-    .map(m => state.CAS[(m as { Update: HeaderHashB64 }).Update]);
+    .filter(m => (m as { Update: HeaderHash }).Update)
+    .map(m => state.CAS.get((m as { Update: HeaderHash }).Update));
   const deletes = allModifiers
-    .filter(m => (m as { Delete: HeaderHashB64 }).Delete)
-    .map(m => state.CAS[(m as { Delete: HeaderHashB64 }).Delete]);
+    .filter(m => (m as { Delete: HeaderHash }).Delete)
+    .map(m => state.CAS.get((m as { Delete: HeaderHash }).Delete));
 
   return {
     updates,
@@ -166,50 +176,62 @@ export function getHeaderModifiers(
   };
 }
 
-export function getAllHeldEntries(state: CellState): EntryHashB64[] {
-  const newEntryHeaders = Object.values(state.integratedDHTOps)
-    .filter(dhtOpValue => dhtOpValue.op.type === DHTOpType.StoreEntry)
+export function getAllHeldEntries(state: CellState): EntryHash[] {
+  const newEntryHeaders = state.integratedDHTOps
+    .values()
+    .filter(dhtOpValue => dhtOpValue.op.type === DhtOpType.StoreEntry)
     .map(dhtOpValue => dhtOpValue.op.header);
 
   const allEntryHashes = newEntryHeaders.map(
     h => (h.header.content as NewEntryHeader).entry_hash
   );
 
-  return uniq(allEntryHashes);
+  return uniqWith(allEntryHashes, isEqual);
 }
 
-export function getAllHeldHeaders(state: CellState): HeaderHashB64[] {
-  const headers = Object.values(state.integratedDHTOps)
-    .filter(dhtOpValue => dhtOpValue.op.type === DHTOpType.StoreElement)
+export function getAllHeldHeaders(state: CellState): HeaderHash[] {
+  const headers = state.integratedDHTOps
+    .values()
+    .filter(dhtOpValue => dhtOpValue.op.type === DhtOpType.StoreElement)
     .map(dhtOpValue => dhtOpValue.op.header);
 
   const allHeaderHashes = headers.map(h => h.header.hash);
 
-  return uniq(allHeaderHashes);
+  return uniqWith(allHeaderHashes, isEqual);
 }
 
-export function getAllAuthoredEntries(state: CellState): EntryHashB64[] {
-  const allHeaders = Object.values(state.authoredDHTOps).map(
-    dhtOpValue => dhtOpValue.op.header
-  );
+export function getAllAuthoredEntries(state: CellState): EntryHash[] {
+  const allHeaders = state.authoredDHTOps
+    .values()
+    .map(dhtOpValue => dhtOpValue.op.header);
 
-  const newEntryHeaders: SignedHeaderHashed<NewEntryHeader>[] = allHeaders.filter(
-    h => (h.header.content as NewEntryHeader).entry_hash
-  ) as SignedHeaderHashed<NewEntryHeader>[];
+  const newEntryHeaders: SignedHeaderHashed<NewEntryHeader>[] =
+    allHeaders.filter(
+      h => (h.header.content as NewEntryHeader).entry_hash
+    ) as SignedHeaderHashed<NewEntryHeader>[];
 
   return newEntryHeaders.map(h => h.header.content.entry_hash);
 }
 
-export function isHoldingEntry(state: CellState, entryHash: EntryHashB64): boolean {
-  return state.metadata.system_meta[entryHash] !== undefined;
+export function isHoldingEntry(
+  state: CellState,
+  entryHash: EntryHash
+): boolean {
+  return state.metadata.system_meta.get(entryHash) !== undefined;
 }
 
-export function isHoldingElement(state: CellState, headerHash: HeaderHashB64): boolean {
-  return state.metadata.misc_meta[headerHash] === 'StoreElement';
+export function isHoldingElement(
+  state: CellState,
+  headerHash: HeaderHash
+): boolean {
+  return state.metadata.misc_meta.get(headerHash) === 'StoreElement';
 }
 
-export function isHoldingDhtOp(state: CellState, dhtOpHash: DhtOpHashB64): boolean {
-  return !!state.integratedDHTOps[dhtOpHash];
+export function isHoldingDhtOp(
+  state: CellState,
+  dhtOpHash: DhtOpHash
+): boolean {
+  return !!state.integratedDHTOps.get(dhtOpHash);
 }
 
 export interface EntryDHTInfo {
@@ -217,16 +239,16 @@ export interface EntryDHTInfo {
   links: LinkMetaVal[];
 }
 
-export function getDhtShard(state: CellState): Dictionary<EntryDHTInfo> {
+export function getDhtShard(state: CellState): HoloHashMap<EntryDHTInfo> {
   const heldEntries = getAllHeldEntries(state);
 
-  const dhtShard: Dictionary<EntryDHTInfo> = {};
+  const dhtShard: HoloHashMap<EntryDHTInfo> = new HoloHashMap();
 
   for (const entryHash of heldEntries) {
-    dhtShard[entryHash] = {
+    dhtShard.put(entryHash, {
       details: getEntryDetails(state, entryHash),
       links: getCreateLinksForEntry(state, entryHash),
-    };
+    });
   }
 
   return dhtShard;
@@ -234,7 +256,7 @@ export function getDhtShard(state: CellState): Dictionary<EntryDHTInfo> {
 
 export function getLinksForEntry(
   state: CellState,
-  entryHash: EntryHashB64
+  entryHash: EntryHash
 ): GetLinksResponse {
   const linkMetaVals = getCreateLinksForEntry(state, entryHash);
 
@@ -242,7 +264,7 @@ export function getLinksForEntry(
   const link_removes: SignedHeaderHashed<DeleteLink>[] = [];
 
   for (const value of linkMetaVals) {
-    const header = state.CAS[value.link_add_hash];
+    const header = state.CAS.get(value.link_add_hash);
 
     if (header) {
       link_adds.push(header);
@@ -251,7 +273,7 @@ export function getLinksForEntry(
     const removes = getRemovesOnLinkAdd(state, value.link_add_hash);
 
     for (const remove of removes) {
-      const removeHeader = state.CAS[remove];
+      const removeHeader = state.CAS.get(remove);
       link_removes.push(removeHeader);
     }
   }
@@ -264,7 +286,7 @@ export function getLinksForEntry(
 
 export function getCreateLinksForEntry(
   state: CellState,
-  entryHash: EntryHashB64
+  entryHash: EntryHash
 ): LinkMetaVal[] {
   return state.metadata.link_meta
     .filter(({ key, value }) => isEqual(key.base, entryHash))
@@ -273,16 +295,16 @@ export function getCreateLinksForEntry(
 
 export function getRemovesOnLinkAdd(
   state: CellState,
-  link_add_hash: HeaderHashB64
-): HeaderHashB64[] {
-  const metadata = state.metadata.system_meta[link_add_hash];
+  link_add_hash: HeaderHash
+): HeaderHash[] {
+  const metadata = state.metadata.system_meta.get(link_add_hash);
 
   if (!metadata) return [];
 
-  const removes: HeaderHashB64[] = [];
+  const removes: HeaderHash[] = [];
   for (const val of metadata) {
-    if ((val as { DeleteLink: HeaderHashB64 }).DeleteLink) {
-      removes.push((val as { DeleteLink: HeaderHashB64 }).DeleteLink);
+    if ((val as { DeleteLink: HeaderHash }).DeleteLink) {
+      removes.push((val as { DeleteLink: HeaderHash }).DeleteLink);
     }
   }
   return removes;
@@ -292,23 +314,24 @@ export function getLiveLinks(
   getLinksResponses: Array<GetLinksResponse>
 ): Array<Link> {
   // Map and flatten adds
-  const linkAdds: Dictionary<CreateLink | undefined> = {};
+  const linkAdds: HoloHashMap<CreateLink | undefined> = new HoloHashMap();
   for (const responses of getLinksResponses) {
     for (const linkAdd of responses.link_adds) {
-      linkAdds[linkAdd.header.hash] = linkAdd.header.content;
+      linkAdds.put(linkAdd.header.hash, linkAdd.header.content);
     }
   }
 
   for (const responses of getLinksResponses) {
     for (const linkRemove of responses.link_removes) {
       const removedAddress = linkRemove.header.content.link_add_address;
-      if (linkAdds[removedAddress]) linkAdds[removedAddress] = undefined;
+
+      linkAdds.delete(removedAddress);
     }
   }
 
   const resultingLinks: Link[] = [];
 
-  for (const liveLink of Object.values(linkAdds)) {
+  for (const liveLink of linkAdds.values()) {
     if (liveLink)
       resultingLinks.push({
         base: liveLink.base_address,
@@ -320,18 +343,17 @@ export function getLiveLinks(
   return resultingLinks;
 }
 
-export function computeDhtStatus(
-  allHeadersForEntry: SignedHeaderHashed[]
-): {
+export function computeDhtStatus(allHeadersForEntry: SignedHeaderHashed[]): {
   entry_dht_status: EntryDhtStatus;
   rejected_headers: SignedHeaderHashed[];
 } {
-  const aliveHeaders: Dictionary<SignedHeaderHashed | undefined> = {};
+  const aliveHeaders: HoloHashMap<SignedHeaderHashed | undefined> =
+    new HoloHashMap();
   const rejected_headers: SignedHeaderHashed[] = [];
 
   for (const header of allHeadersForEntry) {
     if (header.header.content.type === HeaderType.Create) {
-      aliveHeaders[header.header.hash] = header;
+      aliveHeaders.put(header.header.hash, header);
     }
   }
 
@@ -340,17 +362,17 @@ export function computeDhtStatus(
       header.header.content.type === HeaderType.Update ||
       header.header.content.type === HeaderType.Delete
     ) {
-      if (aliveHeaders[header.header.hash])
+      if (aliveHeaders.has(header.header.hash))
         rejected_headers.push(
-          aliveHeaders[header.header.hash] as SignedHeaderHashed
+          aliveHeaders.get(header.header.hash) as SignedHeaderHashed
         );
-      aliveHeaders[header.header.hash] = undefined;
+      aliveHeaders.delete(header.header.hash);
     }
   }
 
-  const isSomeHeaderAlive = Object.values(aliveHeaders).some(
-    header => header !== undefined
-  );
+  const isSomeHeaderAlive = aliveHeaders
+    .values()
+    .some(header => header !== undefined);
 
   // TODO: add more cases
   const entry_dht_status = isSomeHeaderAlive
@@ -365,25 +387,23 @@ export function computeDhtStatus(
 
 export function hasDhtOpBeenProcessed(
   state: CellState,
-  dhtOpHash: DhtOpHashB64
+  dhtOpHash: DhtOpHash
 ): boolean {
   return (
-    !!state.integrationLimbo[dhtOpHash] ||
-    !!state.integratedDHTOps[dhtOpHash] ||
-    !!state.validationLimbo[dhtOpHash]
+    !!state.integrationLimbo.has(dhtOpHash) ||
+    !!state.integratedDHTOps.has(dhtOpHash) ||
+    !!state.validationLimbo.has(dhtOpHash)
   );
 }
 
 export function getIntegratedDhtOpsWithoutReceipt(
   state: CellState
-): Dictionary<IntegratedDhtOpsValue> {
-  const needReceipt: Dictionary<IntegratedDhtOpsValue> = {};
+): HoloHashMap<IntegratedDhtOpsValue> {
+  const needReceipt: HoloHashMap<IntegratedDhtOpsValue> = new HoloHashMap();
 
-  for (const [dhtOpHash, integratedValue] of Object.entries(
-    state.integratedDHTOps
-  )) {
+  for (const [dhtOpHash, integratedValue] of state.integratedDHTOps.entries()) {
     if (integratedValue.send_receipt) {
-      needReceipt[dhtOpHash] = integratedValue;
+      needReceipt.put(dhtOpHash, integratedValue);
     }
   }
   return needReceipt;

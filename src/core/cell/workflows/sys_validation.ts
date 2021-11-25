@@ -1,20 +1,21 @@
-import { ValidationLimboStatus } from '../state';
-import { getValidationLimboDhtOps } from '../dht/get';
-import { putValidationLimboValue } from '../dht/put';
-import { app_validation_task } from './app_validation';
-import { Workflow, WorkflowReturn, WorkflowType, Workspace } from './workflows';
 import {
-  AnyDhtHashB64,
   AppEntryType,
   Create,
-  Element,
   Entry,
   Header,
   HeaderType,
   NewEntryHeader,
   Signature,
   Update,
-} from '@holochain-open-dev/core-types';
+  AnyDhtHash,
+} from '@holochain/conductor-api';
+import { Element } from '@holochain-open-dev/core-types';
+
+import { ValidationLimboStatus } from '../state';
+import { getValidationLimboDhtOps } from '../dht/get';
+import { putValidationLimboValue } from '../dht/put';
+import { app_validation_task } from './app_validation';
+import { Workflow, WorkflowReturn, WorkflowType, Workspace } from './workflows';
 import { P2pCell } from '../../network/p2p-cell';
 import {
   author_key_is_valid,
@@ -45,9 +46,7 @@ export const sys_validation = async (
   ]);
 
   // TODO: actually validate
-  for (const dhtOpHash of Object.keys(pendingDhtOps)) {
-    const limboValue = pendingDhtOps[dhtOpHash];
-
+  for (const [dhtOpHash, limboValue] of pendingDhtOps.entries()) {
     limboValue.status = ValidationLimboStatus.SysValidated;
 
     putValidationLimboValue(dhtOpHash, limboValue)(worskpace.state);
@@ -99,12 +98,16 @@ export async function sys_validate_element(
 
   if (
     element.entry &&
-    (entry_type as {
-      App: AppEntryType;
-    }).App &&
-    (entry_type as {
-      App: AppEntryType;
-    }).App.visibility === 'Public'
+    (
+      entry_type as {
+        App: AppEntryType;
+      }
+    ).App &&
+    (
+      entry_type as {
+        App: AppEntryType;
+      }
+    ).App.visibility === 'Public'
   ) {
     maybeDepsMissing = await store_entry(
       element.signed_header.header.content as NewEntryHeader,
@@ -131,7 +134,7 @@ export async function counterfeit_check(
 }
 
 export interface DepsMissing {
-  depsHashes: Array<AnyDhtHashB64>;
+  depsHashes: Array<AnyDhtHash>;
 }
 
 export async function store_element(

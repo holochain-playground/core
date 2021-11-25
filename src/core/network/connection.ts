@@ -1,4 +1,6 @@
-import { AgentPubKeyB64 } from '@holochain-open-dev/core-types';
+import { AgentPubKey } from '@holochain/conductor-api';
+import isEqual from 'lodash-es/isEqual';
+
 import { Cell } from '../cell';
 import { NetworkRequest } from './network-request';
 
@@ -15,29 +17,29 @@ export class Connection {
 
   constructor(public opener: Cell, public receiver: Cell) {
     if (
-      opener.p2p.badAgents.includes(receiver.agentPubKey) ||
-      receiver.p2p.badAgents.includes(opener.agentPubKey)
+      opener.p2p.badAgents.find(a => isEqual(a, receiver.agentPubKey)) ||
+      receiver.p2p.badAgents.find(a => isEqual(a, opener.agentPubKey))
     ) {
       throw new Error('Connection closed!');
     }
   }
 
   sendRequest<T>(
-    fromAgent: AgentPubKeyB64,
+    fromAgent: AgentPubKey,
     networkRequest: NetworkRequest<T>
   ): Promise<T> {
     if (this.closed) throw new Error('Connection closed!');
 
-    if (this.opener.agentPubKey === fromAgent) {
+    if (isEqual(this.opener.agentPubKey, fromAgent)) {
       return networkRequest(this.receiver);
-    } else if (this.receiver.agentPubKey === fromAgent) {
+    } else if (isEqual(this.receiver.agentPubKey, fromAgent)) {
       return networkRequest(this.opener);
     }
     throw new Error('Bad request');
   }
 
-  getPeer(myAgentPubKeyB64: AgentPubKeyB64): Cell {
-    if (this.opener.agentPubKey === myAgentPubKeyB64) return this.receiver;
+  getPeer(myAgentPubKey: AgentPubKey): Cell {
+    if (isEqual(myAgentPubKey, this.opener.agentPubKey)) return this.receiver;
     return this.opener;
   }
 }

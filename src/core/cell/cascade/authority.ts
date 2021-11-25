@@ -2,13 +2,14 @@ import {
   Create,
   Delete,
   Entry,
-  EntryHashB64,
   EntryType,
-  HeaderHashB64,
   NewEntryHeader,
   SignedHeaderHashed,
   Update,
-} from '@holochain-open-dev/core-types';
+  EntryHash,
+  HeaderHash,
+} from '@holochain/conductor-api';
+
 import { P2pCell } from '../../..';
 import { GetLinksOptions, GetOptions } from '../../../types';
 import {
@@ -29,10 +30,10 @@ export class Authority {
   constructor(protected state: CellState, protected p2p: P2pCell) {}
 
   public async handle_get_entry(
-    entry_hash: EntryHashB64,
+    entry_hash: EntryHash,
     options: GetOptions
   ): Promise<GetEntryResponse | undefined> {
-    const entry = this.state.CAS[entry_hash];
+    const entry = this.state.CAS.get(entry_hash);
     if (!entry) return undefined;
 
     const allHeaders = getHeadersForEntry(this.state, entry_hash);
@@ -56,14 +57,14 @@ export class Authority {
   }
 
   public async handle_get_element(
-    header_hash: HeaderHashB64,
+    header_hash: HeaderHash,
     options: GetOptions
   ): Promise<GetElementResponse | undefined> {
-    if (this.state.metadata.misc_meta[header_hash] !== 'StoreElement') {
+    if (this.state.metadata.misc_meta.get(header_hash) !== 'StoreElement') {
       return undefined;
     }
 
-    const header = this.state.CAS[header_hash] as SignedHeaderHashed;
+    const header = this.state.CAS.get(header_hash) as SignedHeaderHashed;
     let maybe_entry: Entry | undefined = undefined;
     let validation_status: ValidationStatus = ValidationStatus.Valid;
 
@@ -73,7 +74,7 @@ export class Authority {
       ) {
         const entryHash = (header as SignedHeaderHashed<NewEntryHeader>).header
           .content.entry_hash;
-        maybe_entry = this.state.CAS[entryHash];
+        maybe_entry = this.state.CAS.get(entryHash);
       }
     } else {
       validation_status = ValidationStatus.Rejected;
@@ -91,7 +92,7 @@ export class Authority {
   }
 
   public async handle_get_links(
-    base_address: EntryHashB64,
+    base_address: EntryHash,
     options: GetLinksOptions
   ): Promise<GetLinksResponse> {
     return getLinksForEntry(this.state, base_address);

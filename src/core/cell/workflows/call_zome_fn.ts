@@ -1,11 +1,11 @@
+import { AgentPubKeyB64, Element } from '@holochain-open-dev/core-types';
 import {
-  AgentPubKeyB64,
-  Element,
+  AgentPubKey,
   HeaderType,
   NewEntryHeader,
   SignedHeaderHashed,
-} from '@holochain-open-dev/core-types';
-import { cloneDeep } from 'lodash-es';
+} from '@holochain/conductor-api';
+import { cloneDeep, isEqual } from 'lodash-es';
 
 import { SimulatedZome } from '../../../dnas/simulated-dna';
 import { GetStrategy } from '../../../types';
@@ -29,103 +29,110 @@ import { Workflow, WorkflowType, Workspace } from './workflows';
  * Calls the zome function of the cell DNA
  * This can only be called in the simulated mode: we can assume that cell.simulatedDna exists
  */
-export const callZomeFn = (
-  zomeName: string,
-  fnName: string,
-  payload: any,
-  provenance: AgentPubKeyB64,
-  cap: string
-) => async (
-  workspace: Workspace
-): Promise<{ result: any; triggers: Array<Workflow<any, any>> }> => {
-  if (!valid_cap_grant(workspace.state, zomeName, fnName, provenance, cap))
-    throw new Error('Unauthorized Zome Call');
+export const callZomeFn =
+  (
+    zomeName: string,
+    fnName: string,
+    payload: any,
+    provenance: AgentPubKey,
+    cap: Uint8Array
+  ) =>
+  async (
+    workspace: Workspace
+  ): Promise<{ result: any; triggers: Array<Workflow<any, any>> }> => {
+    if (!valid_cap_grant(workspace.state, zomeName, fnName, provenance, cap))
+      throw new Error('Unauthorized Zome Call');
 
-  const currentHeader = getTipOfChain(workspace.state);
-  const chain_head_start_len = workspace.state.sourceChain.length;
+    const currentHeader = getTipOfChain(workspace.state);
+    const chain_head_start_len = workspace.state.sourceChain.length;
 
-  const zomeIndex = workspace.dna.zomes.findIndex(
-    zome => zome.name === zomeName
-  );
-  if (zomeIndex < 0)
-    throw new Error(`There is no zome with the name ${zomeName} in this DNA`);
+    const zomeIndex = workspace.dna.zomes.findIndex(
+      zome => zome.name === zomeName
+    );
+    if (zomeIndex < 0)
+      throw new Error(`There is no zome with the name ${zomeName} in this DNA`);
 
-  const zome = workspace.dna.zomes[zomeIndex];
-  if (!zome.zome_functions[fnName])
-    throw new Error(
-      `There isn't a function with the name ${fnName} in this zome with the name ${zomeName}`
+    const zome = workspace.dna.zomes[zomeIndex];
+    if (!zome.zome_functions[fnName])
+      throw new Error(
+        `There isn't a function with the name ${fnName} in this zome with the name ${zomeName}`
+      );
+
+    const contextState = cloneDeep(workspace.state);
+
+    const hostFnWorkspace: HostFnWorkspace = {
+      cascade: new Cascade(workspace.state, workspace.p2p),
+      state: contextState,
+      dna: workspace.dna,
+      p2p: workspace.p2p,
+    };
+    const zomeFnContext = buildZomeFunctionContext(hostFnWorkspace, zomeIndex);
+
+    const result = await zome.zome_functions[fnName].call(zomeFnContext)(
+      payload
     );
 
-  const contextState = cloneDeep(workspace.state);
+    let triggers: Array<Workflow<any, any>> = [];
+    if (!isEqual(getTipOfChain(contextState), currentHeader)) {
+      // Do validation
+      let i = chain_head_start_len;
 
-  const hostFnWorkspace: HostFnWorkspace = {
-    cascade: new Cascade(workspace.state, workspace.p2p),
-    state: contextState,
-    dna: workspace.dna,
-    p2p: workspace.p2p,
-  };
-  const zomeFnContext = buildZomeFunctionContext(hostFnWorkspace, zomeIndex);
+      const elementsToAppValidate = [];
 
-  const result = await zome.zome_functions[fnName].call(zomeFnContext)(payload);
+      while (i < contextState.sourceChain.length) {
+        const headerHash = contextState.sourceChain[i];
+        const signed_header: SignedHeaderHashed =
+          contextState.CAS.get(headerHash);
+        const entry_hash = (signed_header.header.content as NewEntryHeader)
+          .entry_hash;
 
-  let triggers: Array<Workflow<any, any>> = [];
-  if (getTipOfChain(contextState) !== currentHeader) {
-    // Do validation
-    let i = chain_head_start_len;
+        const element: Element = {
+          entry: entry_hash ? contextState.CAS.get(entry_hash) : undefined,
+          signed_header,
+        };
 
-    const elementsToAppValidate = [];
-
-    while (i < contextState.sourceChain.length) {
-      const headerHash = contextState.sourceChain[i];
-      const signed_header: SignedHeaderHashed = contextState.CAS[headerHash];
-      const entry_hash = (signed_header.header.content as NewEntryHeader)
-        .entry_hash;
-
-      const element: Element = {
-        entry: entry_hash ? contextState.CAS[entry_hash] : undefined,
-        signed_header,
-      };
-
-      const depsMissing = await sys_validate_element(
-        element,
-        { ...workspace, state: contextState },
-        workspace.p2p
-      );
-      if (depsMissing)
-        throw new Error(
-          `Could not validate a new element due to missing dependencies`
-        );
-
-      elementsToAppValidate.push(element);
-      i++;
-    }
-
-    if (shouldValidateBeforePublishing(workspace.badAgentConfig)) {
-      for (const element of elementsToAppValidate) {
-        const outcome = await run_app_validation(
-          zome,
+        const depsMissing = await sys_validate_element(
           element,
-          contextState,
-          workspace
+          { ...workspace, state: contextState },
+          workspace.p2p
         );
-        if (!outcome.resolved)
-          throw new Error('Error creating a new element: missing dependencies');
-        if (!outcome.valid)
-          throw new Error('Error creating a new element: invalid');
+        if (depsMissing)
+          throw new Error(
+            `Could not validate a new element due to missing dependencies`
+          );
+
+        elementsToAppValidate.push(element);
+        i++;
       }
+
+      if (shouldValidateBeforePublishing(workspace.badAgentConfig)) {
+        for (const element of elementsToAppValidate) {
+          const outcome = await run_app_validation(
+            zome,
+            element,
+            contextState,
+            workspace
+          );
+          if (!outcome.resolved)
+            throw new Error(
+              'Error creating a new element: missing dependencies'
+            );
+          if (!outcome.valid)
+            throw new Error('Error creating a new element: invalid');
+        }
+      }
+
+      triggers.push(produce_dht_ops_task());
     }
 
-    triggers.push(produce_dht_ops_task());
-  }
+    workspace.state.CAS = contextState.CAS;
+    workspace.state.sourceChain = contextState.sourceChain;
 
-  workspace.state.CAS = contextState.CAS;
-  workspace.state.sourceChain = contextState.sourceChain;
-
-  return {
-    result: cloneDeep(result),
-    triggers,
+    return {
+      result: cloneDeep(result),
+      triggers,
+    };
   };
-};
 
 export type CallZomeFnWorkflow = Workflow<
   { zome: string; fnName: string; payload: any },
@@ -136,7 +143,7 @@ export function call_zome_fn_workflow(
   zome: string,
   fnName: string,
   payload: any,
-  provenance: AgentPubKeyB64
+  provenance: AgentPubKey
 ): CallZomeFnWorkflow {
   return {
     type: WorkflowType.CALL_ZOME,
@@ -146,7 +153,13 @@ export function call_zome_fn_workflow(
       zome,
     },
     task: worskpace =>
-      callZomeFn(zome, fnName, payload, provenance, '')(worskpace),
+      callZomeFn(
+        zome,
+        fnName,
+        payload,
+        provenance,
+        new Uint8Array()
+      )(worskpace),
   };
 }
 

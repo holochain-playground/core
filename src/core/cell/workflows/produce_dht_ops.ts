@@ -1,8 +1,7 @@
-import { elementToDHTOps } from '@holochain-open-dev/core-types';
-
 import { hash, HashType } from '../../../processors/hash';
 import { getNewHeaders } from '../source-chain/get';
 import { getElement } from '../source-chain/utils';
+import { elementToDhtOps } from '../utils';
 import { publish_dht_ops_task } from './publish_dht_ops';
 import { Workflow, WorkflowReturn, WorkflowType, Workspace } from './workflows';
 
@@ -14,7 +13,7 @@ export const produce_dht_ops = async (
 
   for (const newHeaderHash of newHeaderHashes) {
     const element = getElement(worskpace.state, newHeaderHash);
-    const dhtOps = elementToDHTOps(element);
+    const dhtOps = elementToDhtOps(element);
 
     for (const dhtOp of dhtOps) {
       const dhtOpHash = hash(dhtOp, HashType.DHTOP);
@@ -24,7 +23,7 @@ export const produce_dht_ops = async (
         receipt_count: 0,
       };
 
-      worskpace.state.authoredDHTOps[dhtOpHash] = dhtOpValue;
+      worskpace.state.authoredDHTOps.put(dhtOpHash, dhtOpValue);
     }
   }
 

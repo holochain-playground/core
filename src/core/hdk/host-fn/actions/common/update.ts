@@ -1,10 +1,11 @@
+import { Element } from '@holochain-open-dev/core-types';
 import {
-  HeaderHashB64,
-  Element,
   NewEntryHeader,
   Entry,
   EntryType,
-} from '@holochain-open-dev/core-types';
+  HeaderHash,
+} from '@holochain/conductor-api';
+
 import { GetStrategy } from '../../../../../types';
 import {
   buildDelete,
@@ -16,10 +17,10 @@ import { HostFnWorkspace } from '../../../host-fn';
 
 export async function common_update(
   worskpace: HostFnWorkspace,
-  original_header_hash: HeaderHashB64,
+  original_header_hash: HeaderHash,
   entry: Entry,
   entry_type: EntryType
-): Promise<HeaderHashB64> {
+): Promise<HeaderHash> {
   const headerToUpdate = await worskpace.cascade.retrieve_header(
     original_header_hash,
     {

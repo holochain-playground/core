@@ -1,10 +1,18 @@
 import {
   serializeHash,
   Dictionary,
-  AnyDhtHashB64,
+  deserializeHash,
 } from '@holochain-open-dev/core-types';
+import {
+  AgentPubKey,
+  CellId,
+  DnaHash,
+  HoloHash,
+} from '@holochain/conductor-api';
 // @ts-ignore
 import blake from 'blakejs';
+import { encode } from '@msgpack/msgpack';
+import { Base64 } from 'js-base64';
 
 export enum HashType {
   AGENT,
@@ -35,43 +43,26 @@ function getPrefix(type: HashType) {
   }
 }
 
-function str2ab(str: string) {
-  var buf = new ArrayBuffer(str.length);
-  var bufView = new Uint8Array(buf);
-  for (var i = 0, strLen = str.length; i < strLen; i++) {
-    bufView[i] = str.charCodeAt(i);
-  }
-  return buf;
-}
-
-const hashCache: Dictionary<AnyDhtHashB64> = {};
-
 // From https://github.com/holochain/holochain/blob/dc0cb61d0603fa410ac5f024ed6ccfdfc29715b3/crates/holo_hash/src/encode.rs
-export function hash(content: any, type: HashType): AnyDhtHashB64 {
-  const contentString =
-    typeof content === 'string' ? content : JSON.stringify(content);
+export function hash(content: any, type: HashType): HoloHash {
+  const bytesHash: Uint8Array = blake.blake2b(encode(content), null, 32);
 
-  if (hashCache[contentString]) return hashCache[contentString];
+  const fullhash = new Uint8Array([
+    ...Base64.toUint8Array(getPrefix(type)),
+    ...bytesHash,
+  ]);
 
-  const hashable = new Uint8Array(str2ab(contentString));
-
-  const bytesHash = blake.blake2b(hashable, null, 32);
-
-  const strHash = serializeHash(bytesHash);
-  const hash = `u${getPrefix(type)}${strHash.slice(1)}`;
-
-  hashCache[contentString] = hash;
-
-  return hash;
+  return fullhash;
 }
 
 const hashLocationCache: Dictionary<number> = {};
 
-export function location(hash: string): number {
+export function location(bytesHash: HoloHash): number {
+  const hash = bytesHash.toString();
+
   if (hashLocationCache[hash]) return hashLocationCache[hash];
 
-  const hashable = new Uint8Array(str2ab(hash.slice(5)));
-  const hash128: Uint8Array = blake.blake2b(hashable, null, 16);
+  const hash128: Uint8Array = blake.blake2b(bytesHash, null, 16);
 
   const out = [hash128[0], hash128[1], hash128[2], hash128[3]];
 
@@ -91,7 +82,7 @@ export function location(hash: string): number {
 }
 
 // We return the distance as the shortest distance between two hashes in the circle
-export function distance(hash1: AnyDhtHashB64, hash2: AnyDhtHashB64): number {
+export function distance(hash1: HoloHash, hash2: HoloHash): number {
   const location1 = location(hash1);
   const location2 = location(hash2);
 
@@ -115,8 +106,8 @@ export function wrap(uint: number): number {
   return uint;
 }
 
-export function getHashType(hash: AnyDhtHashB64): HashType {
-  const hashExt = hash.slice(1, 5);
+export function getHashType(hash: HoloHash): HashType {
+  const hashExt = serializeHash(hash).slice(1, 5);
 
   if (hashExt === AGENT_PREFIX) return HashType.AGENT;
   if (hashExt === DNA_PREFIX) return HashType.DNA;

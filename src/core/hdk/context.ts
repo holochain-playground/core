@@ -15,7 +15,7 @@ import { UpdateEntryFn, update_entry } from './host-fn/actions/update_entry';
 import { AgentInfoFn, agent_info } from './host-fn/agent_info';
 import { CallRemoteFn, call_remote } from './host-fn/call_remote';
 import { get, GetFn } from './host-fn/get';
-import { GetDetailsFn, get_details } from './host-fn/get_detailts';
+import { GetDetailsFn, get_details } from './host-fn/get_details';
 import { GetLinksFn, get_links } from './host-fn/get_links';
 import { HashEntryFn, hash_entry } from './host-fn/hash_entry';
 import { query, QueryFn } from './host-fn/query';

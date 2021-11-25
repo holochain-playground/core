@@ -1,42 +1,37 @@
 import {
   AgentPubKeyB64,
-  AnyDhtHashB64,
-  DHTOp,
   ValidationReceipt,
   ValidationStatus,
 } from '@holochain-open-dev/core-types';
+import { AgentPubKey, AnyDhtHash, DhtOp } from '@holochain/conductor-api';
 import { uniq } from 'lodash-es';
 import { distance, location, wrap } from '../../processors/hash';
 import { CellState } from '../cell';
 
 export function getClosestNeighbors(
-  peers: AgentPubKeyB64[],
-  targetHash: AnyDhtHashB64,
+  peers: AgentPubKey[],
+  targetHash: AnyDhtHash,
   numNeighbors: number
-): AgentPubKeyB64[] {
-  const sortedPeers = peers.sort(
-    (agentA: AgentPubKeyB64, agentB: AgentPubKeyB64) => {
-      const distanceA = distance(agentA, targetHash);
-      const distanceB = distance(agentB, targetHash);
-      return distanceA - distanceB;
-    }
-  );
+): AgentPubKey[] {
+  const sortedPeers = peers.sort((agentA: AgentPubKey, agentB: AgentPubKey) => {
+    const distanceA = distance(agentA, targetHash);
+    const distanceB = distance(agentB, targetHash);
+    return distanceA - distanceB;
+  });
 
   return sortedPeers.slice(0, numNeighbors);
 }
 
 export function getFarthestNeighbors(
-  peers: AgentPubKeyB64[],
-  targetHash: AnyDhtHashB64
-): AgentPubKeyB64[] {
-  const sortedPeers = peers.sort(
-    (agentA: AgentPubKeyB64, agentB: AgentPubKeyB64) => {
-      return (
-        wrap(location(agentA) - location(targetHash)) -
-        wrap(location(agentB) - location(targetHash))
-      );
-    }
-  );
+  peers: AgentPubKey[],
+  targetHash: AnyDhtHash
+): AgentPubKey[] {
+  const sortedPeers = peers.sort((agentA: AgentPubKey, agentB: AgentPubKey) => {
+    return (
+      wrap(location(agentA) - location(targetHash)) -
+      wrap(location(agentB) - location(targetHash))
+    );
+  });
 
   const index35 = Math.floor(sortedPeers.length * 0.35);
   const index50 = Math.floor(sortedPeers.length / 2);
@@ -52,29 +47,27 @@ export function getFarthestNeighbors(
 }
 
 export interface BadAction {
-  badAgents: AgentPubKeyB64[];
-  op: DHTOp;
+  badAgents: AgentPubKey[];
+  op: DhtOp;
   receipts: ValidationReceipt[];
 }
 export function getBadActions(state: CellState): Array<BadAction> {
   const badActions: Array<BadAction> = [];
 
-  for (const [dhtOpHash, receipts] of Object.entries(
-    state.validationReceipts
-  )) {
-    const myReceipt = receipts[state.agentPubKey];
+  for (const [dhtOpHash, receipts] of state.validationReceipts.entries()) {
+    const myReceipt = receipts.get(state.agentPubKey);
     if (myReceipt) {
-      const dhtOp = state.integratedDHTOps[dhtOpHash].op;
+      const dhtOp = state.integratedDHTOps.get(dhtOpHash).op;
       const badAction: BadAction = {
         badAgents: [],
         op: dhtOp,
-        receipts: Object.values(receipts),
+        receipts: receipts.values(),
       };
 
       if (myReceipt.validation_status === ValidationStatus.Rejected) {
         badAction.badAgents.push(dhtOp.header.header.content.author);
       }
-      for (const [validatorAgent, receipt] of Object.entries(receipts)) {
+      for (const [validatorAgent, receipt] of receipts.entries()) {
         if (receipt.validation_status !== myReceipt.validation_status) {
           badAction.badAgents.push(receipt.validator);
         }
@@ -88,12 +81,12 @@ export function getBadActions(state: CellState): Array<BadAction> {
   return badActions;
 }
 
-export function getBadAgents(state: CellState): AgentPubKeyB64[] {
+export function getBadAgents(state: CellState): AgentPubKey[] {
   const actions = getBadActions(state);
 
-  const badAgents: AgentPubKeyB64[] = actions.reduce(
+  const badAgents: AgentPubKey[] = actions.reduce(
     (acc, next) => [...acc, ...next.badAgents],
-    [] as string[]
+    [] as AgentPubKey[]
   );
 
   return uniq(badAgents);

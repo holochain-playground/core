@@ -51,8 +51,8 @@ describe('Links', () => {
       },
       zome: 'demo_links',
     });
-
     expect(links.length).to.equal(1);
+    await sleep(3000);
 
     await conductors[0].callZomeFn({
       cellId: cell.cellId,
@@ -63,7 +63,7 @@ describe('Links', () => {
       },
       zome: 'demo_links',
     });
-    await sleep(2000);
+    await sleep(5000);
 
     links = await conductors[0].callZomeFn({
       cellId: cell.cellId,

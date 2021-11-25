@@ -6,7 +6,9 @@ describe('Stress tests links', () => {
   it('create multiple links', async function () {
     this.timeout(0);
 
-    for (let i = 0; i < 5; i++) {
+    const start = Date.now();
+
+    for (let i = 0; i < 2; i++) {
       await oneRound();
     }
 
@@ -45,7 +47,7 @@ describe('Stress tests links', () => {
 
       expect(add_link_hash).to.be.ok;
 
-      await sleep(1000);
+      await sleep(6000);
 
       let links = await conductors[0].callZomeFn({
         cellId: cell.cellId,
@@ -59,5 +61,7 @@ describe('Stress tests links', () => {
 
       expect(links.length).to.equal(1);
     }
+
+    console.log('Ended in ', (Date.now() - start) / 1000);
   });
 });

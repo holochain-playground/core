@@ -1,33 +1,38 @@
 import {
-  AgentPubKeyB64,
-  DHTOp,
-  Dictionary,
-  DnaHashB64,
-  HeaderHashB64,
+  deserializeHash,
+  DhtOpHash,
   DhtOpHashB64,
-  Metadata,
+  Dictionary,
   ValidationReceipt,
-  AnyDhtHashB64,
 } from '@holochain-open-dev/core-types';
+import {
+  AgentPubKey,
+  DhtOp,
+  DnaHash,
+  HeaderHash,
+  HoloHash,
+} from '@holochain/conductor-api';
 import { location } from '../../processors/hash';
+import { HoloHashMap } from '../../processors/holo-hash-map';
 import { contains, DhtArc } from '../network/dht_arc';
+import { Metadata } from './state/metadata';
 
 export interface CellState {
-  dnaHash: DnaHashB64;
-  agentPubKey: AgentPubKeyB64;
-  sourceChain: Array<HeaderHashB64>;
-  CAS: Dictionary<any>;
+  dnaHash: DnaHash;
+  agentPubKey: AgentPubKey;
+  sourceChain: Array<HeaderHash>;
+  CAS: HoloHashMap<any>;
   metadata: Metadata; // For the moment only DHT shard
-  integratedDHTOps: Dictionary<IntegratedDhtOpsValue>; // Key is the hash of the DHT op
-  authoredDHTOps: Dictionary<AuthoredDhtOpsValue>; // Key is the hash of the DHT op
-  integrationLimbo: Dictionary<IntegrationLimboValue>; // Key is the hash of the DHT op
-  validationLimbo: Dictionary<ValidationLimboValue>; // Key is the hash of the DHT op
-  validationReceipts: Dictionary<Dictionary<ValidationReceipt>>; // Segmented by dhtOpHash/authorOfReceipt
-  badAgents: AgentPubKeyB64[];
+  integratedDHTOps: HoloHashMap<IntegratedDhtOpsValue>; // Key is the hash of the DHT op
+  authoredDHTOps: HoloHashMap<AuthoredDhtOpsValue>; // Key is the hash of the DHT op
+  integrationLimbo: HoloHashMap<IntegrationLimboValue>; // Key is the hash of the DHT op
+  validationLimbo: HoloHashMap<ValidationLimboValue>; // Key is the hash of the DHT op
+  validationReceipts: HoloHashMap<HoloHashMap<ValidationReceipt>>; // Segmented by dhtOpHash/authorOfReceipt
+  badAgents: AgentPubKey[];
 }
 
 export interface IntegratedDhtOpsValue {
-  op: DHTOp;
+  op: DhtOp;
   validation_status: ValidationStatus;
   when_integrated: number;
   /// Send a receipt to this author.
@@ -35,7 +40,7 @@ export interface IntegratedDhtOpsValue {
 }
 
 export interface IntegrationLimboValue {
-  op: DHTOp;
+  op: DhtOp;
   validation_status: ValidationStatus;
   /// Send a receipt to this author.
   send_receipt: Boolean;
@@ -49,7 +54,7 @@ export enum ValidationStatus {
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/state/dht_op_integration.rs
 export interface AuthoredDhtOpsValue {
-  op: DHTOp;
+  op: DhtOp;
   receipt_count: number;
   last_publish_time: number | undefined;
 }
@@ -64,24 +69,24 @@ export enum ValidationLimboStatus {
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/state/validation_db.rs#L24
 export interface ValidationLimboValue {
   status: ValidationLimboStatus;
-  op: DHTOp;
-  basis: AnyDhtHashB64;
+  op: DhtOp;
+  basis: HoloHash;
   time_added: number;
   last_try: number | undefined;
   num_tries: number;
-  from_agent: AgentPubKeyB64 | undefined;
+  from_agent: AgentPubKey | undefined;
   /// Send a receipt to this author.
   send_receipt: Boolean;
 }
 
 export function query_dht_ops(
-  integratedDHTOps: Dictionary<IntegratedDhtOpsValue>,
+  integratedDhtOps: HoloHashMap<IntegratedDhtOpsValue>,
   from: number | undefined,
   to: number | undefined,
   dht_arc: DhtArc
-): Array<DhtOpHashB64> {
+): Array<DhtOpHash> {
   const isDhtOpsInFilter = ([dhtOpHash, dhtOpValue]: [
-    DhtOpHashB64,
+    DhtOpHash,
     IntegratedDhtOpsValue
   ]) => {
     if (from && dhtOpValue.when_integrated < from) return false;
@@ -89,6 +94,6 @@ export function query_dht_ops(
     if (dht_arc && !contains(dht_arc, location(dhtOpHash))) return false;
   };
 
-  const ops = Object.entries(integratedDHTOps).filter(isDhtOpsInFilter);
+  const ops = integratedDhtOps.entries().filter(isDhtOpsInFilter);
   return ops.map(op => op[0]);
 }

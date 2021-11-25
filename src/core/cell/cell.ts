@@ -1,17 +1,20 @@
+import { cloneDeep, uniqWith, isEqual } from 'lodash-es';
 import {
-  CellId,
-  AgentPubKeyB64,
   Dictionary,
-  DHTOp,
-  CapSecret,
-  Timestamp,
   ValidationReceipt,
   Element,
-  DnaHashB64,
-  AnyDhtHashB64,
-  EntryHashB64,
-  DhtOpHashB64,
+  DhtOpHash,
 } from '@holochain-open-dev/core-types';
+import {
+  AgentPubKey,
+  AnyDhtHash,
+  CellId,
+  DhtOp,
+  DnaHash,
+  EntryHash,
+} from '@holochain/conductor-api';
+
+import { GetLinksOptions, GetOptions } from '../../types';
 import { Conductor } from '../conductor';
 import { genesis, genesis_task } from './workflows/genesis';
 import { call_zome_fn_workflow } from './workflows/call_zome_fn';
@@ -24,10 +27,9 @@ import { MiddlewareExecutor } from '../../executor/middleware-executor';
 import { GetLinksResponse, GetResult } from './cascade/types';
 import { Authority } from './cascade/authority';
 import { getHashType, hash, HashType } from '../../processors/hash';
-import { GetLinksOptions, GetOptions } from '../../types';
-import { cloneDeep, uniq } from 'lodash-es';
+import { HoloHashMap } from '../../processors/holo-hash-map';
 import { DhtArc } from '../network/dht_arc';
-import { getDHTOpBasis } from './utils';
+import { getDhtOpBasis } from './utils';
 import { GossipData } from '../network/gossip/types';
 import { hasDhtOpBeenProcessed } from './dht/get';
 import { putValidationReceipt } from './dht/put';
@@ -38,6 +40,7 @@ import {
 } from './workflows/app_validation';
 import { getSourceChainElements } from './source-chain/get';
 import { publish_dht_ops_task } from './workflows/publish_dht_ops';
+import { CapSecret } from '@holochain/conductor-api';
 
 export type CellSignal = 'after-workflow-executed' | 'before-workflow-executed';
 export type CellSignalListener = (payload: any) => void;
@@ -66,16 +69,16 @@ export class Cell {
     return [this._state.dnaHash, this._state.agentPubKey];
   }
 
-  get agentPubKey(): AgentPubKeyB64 {
+  get agentPubKey(): AgentPubKey {
     return this.cellId[1];
   }
 
-  get dnaHash(): DnaHashB64 {
+  get dnaHash(): DnaHash {
     return this.cellId[0];
   }
 
   get p2p(): P2pCell {
-    return this.conductor.network.p2pCells[this.cellId[0]][this.cellId[1]];
+    return this.conductor.network.p2pCells.get(this.cellId) as P2pCell;
   }
 
   getState(): CellState {
@@ -83,7 +86,7 @@ export class Cell {
   }
 
   getSimulatedDna() {
-    return this.conductor.registeredDnas[this.dnaHash];
+    return this.conductor.registeredDnas.get(this.dnaHash);
   }
 
   static async create(
@@ -94,17 +97,17 @@ export class Cell {
     const newCellState: CellState = {
       dnaHash: cellId[0],
       agentPubKey: cellId[1],
-      CAS: {},
-      integrationLimbo: {},
+      CAS: new HoloHashMap(),
+      integrationLimbo: new HoloHashMap(),
       metadata: {
         link_meta: [],
-        misc_meta: {},
-        system_meta: {},
+        misc_meta: new HoloHashMap(),
+        system_meta: new HoloHashMap(),
       },
-      validationLimbo: {},
-      integratedDHTOps: {},
-      authoredDHTOps: {},
-      validationReceipts: {},
+      validationLimbo: new HoloHashMap(),
+      integratedDHTOps: new HoloHashMap(),
+      authoredDHTOps: new HoloHashMap(),
+      validationReceipts: new HoloHashMap(),
       sourceChain: [],
       badAgents: [],
     };
@@ -126,8 +129,8 @@ export class Cell {
     zome: string;
     fnName: string;
     payload: any;
-    cap: string;
-    provenance: AgentPubKeyB64;
+    cap: CapSecret;
+    provenance: AgentPubKey;
   }): Promise<any> {
     return this._runWorkflow(
       call_zome_fn_workflow(
@@ -143,9 +146,9 @@ export class Cell {
   // https://github.com/holochain/holochain/blob/develop/crates/holochain/src/conductor/cell.rs#L429
 
   public handle_publish(
-    from_agent: AgentPubKeyB64,
+    from_agent: AgentPubKey,
     request_validation_receipt: boolean,
-    ops: Dictionary<DHTOp>
+    ops: HoloHashMap<DhtOp>
   ): Promise<void> {
     return this._runWorkflow(
       incoming_dht_ops_task(from_agent, request_validation_receipt, ops)
@@ -153,7 +156,7 @@ export class Cell {
   }
 
   public async handle_get(
-    dht_hash: AnyDhtHashB64,
+    dht_hash: AnyDhtHash,
     options: GetOptions
   ): Promise<GetResult | undefined> {
     const authority = new Authority(this._state, this.p2p);
@@ -168,7 +171,7 @@ export class Cell {
   }
 
   public async handle_get_links(
-    base_address: EntryHashB64,
+    base_address: EntryHash,
     options: GetLinksOptions
   ): Promise<GetLinksResponse> {
     const authority = new Authority(this._state, this.p2p);
@@ -176,7 +179,7 @@ export class Cell {
   }
 
   public async handle_call_remote(
-    from_agent: AgentPubKeyB64,
+    from_agent: AgentPubKey,
     zome_name: string,
     fn_name: string,
     cap: CapSecret | undefined,
@@ -197,41 +200,41 @@ export class Cell {
     dht_arc: DhtArc,
     since: number | undefined,
     until: number | undefined
-  ): Array<DhtOpHashB64> {
+  ): Array<DhtOpHash> {
     return query_dht_ops(this._state.integratedDHTOps, since, until, dht_arc);
   }
 
   public handle_fetch_op_hash_data(
-    op_hashes: Array<DhtOpHashB64>
-  ): Dictionary<DHTOp> {
-    const result: Dictionary<DHTOp> = {};
+    op_hashes: Array<DhtOpHash>
+  ): HoloHashMap<DhtOp> {
+    const result: HoloHashMap<DhtOp> = new HoloHashMap();
     for (const opHash of op_hashes) {
-      const value = this._state.integratedDHTOps[opHash];
+      const value = this._state.integratedDHTOps.get(opHash);
       if (value) {
-        result[opHash] = value.op;
+        result.put(opHash, value.op);
       }
     }
     return result;
   }
 
-  public handle_gossip_ops(op_hashes: Array<DhtOpHashB64>): Dictionary<DHTOp> {
-    const result: Dictionary<DHTOp> = {};
+  public handle_gossip_ops(op_hashes: Array<DhtOpHash>): HoloHashMap<DhtOp> {
+    const result: HoloHashMap<DhtOp> = new HoloHashMap();
     for (const opHash of op_hashes) {
-      const value = this._state.integratedDHTOps[opHash];
+      const value = this._state.integratedDHTOps.get(opHash);
       if (value) {
-        result[opHash] = value.op;
+        result.put(opHash, value.op);
       }
     }
     return result;
   }
 
-  async handle_gossip(from_agent: AgentPubKeyB64, gossip: GossipData) {
-    const dhtOpsToProcess: Dictionary<DHTOp> = {};
+  async handle_gossip(from_agent: AgentPubKey, gossip: GossipData) {
+    const dhtOpsToProcess: HoloHashMap<DhtOp> = new HoloHashMap();
 
     for (const badAction of gossip.badActions) {
       const dhtOpHash = hash(badAction.op, HashType.DHTOP);
       if (!hasDhtOpBeenProcessed(this._state, dhtOpHash)) {
-        dhtOpsToProcess[dhtOpHash] = badAction.op;
+        dhtOpsToProcess.put(dhtOpHash, badAction.op);
       }
 
       for (const receipt of badAction.receipts) {
@@ -239,9 +242,7 @@ export class Cell {
       }
     }
 
-    for (const [dhtOpHash, validatedOp] of Object.entries(
-      gossip.validated_dht_ops
-    )) {
+    for (const [dhtOpHash, validatedOp] of gossip.validated_dht_ops.entries()) {
       for (const receipt of validatedOp.validation_receipts) {
         putValidationReceipt(dhtOpHash, receipt)(this._state);
       }
@@ -249,20 +250,23 @@ export class Cell {
       // TODO: fix for when sharding is implemented
       if (
         !hasDhtOpBeenProcessed(this._state, dhtOpHash) &&
-        this.p2p.shouldWeHold(getDHTOpBasis(validatedOp.op))
+        this.p2p.shouldWeHold(getDhtOpBasis(validatedOp.op))
       ) {
-        dhtOpsToProcess[dhtOpHash] = validatedOp.op;
+        dhtOpsToProcess.put(dhtOpHash, validatedOp.op);
       }
     }
 
-    if (Object.keys(dhtOpsToProcess).length > 0) {
+    if (dhtOpsToProcess.keys().length > 0) {
       await this.handle_publish(from_agent, false, dhtOpsToProcess);
     }
 
     const previousCount = this._state.badAgents.length;
 
     const badAgents = getBadAgents(this._state);
-    this._state.badAgents = uniq([...this._state.badAgents, ...badAgents]);
+    this._state.badAgents = uniqWith(
+      [...this._state.badAgents, ...badAgents],
+      isEqual
+    );
 
     if (this._state.badAgents.length > previousCount) {
       // We have added bad agents: resync the neighbors
@@ -327,14 +331,10 @@ export class Cell {
     let dna = this.getSimulatedDna();
     if (this.conductor.badAgent) {
       badAgentConfig = this.conductor.badAgent.config;
-      if (
-        this.conductor.badAgent.counterfeitDnas[this.cellId[0]] &&
-        this.conductor.badAgent.counterfeitDnas[this.cellId[0]][this.cellId[1]]
-      ) {
-        dna =
-          this.conductor.badAgent.counterfeitDnas[this.cellId[0]][
-            this.cellId[1]
-          ];
+
+      let badDna = this.conductor.badAgent.counterfeitDnas.get(this.cellId);
+      if (badDna) {
+        dna = badDna;
       }
     }
 

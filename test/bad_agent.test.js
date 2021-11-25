@@ -1,5 +1,6 @@
 import { createConductors, demoHapp } from '../dist';
 import { expect } from '@esm-bundle/chai';
+import isEqual from 'lodash-es/isEqual';
 import { sleep } from './utils';
 
 describe('Bad Agent', () => {
@@ -64,35 +65,20 @@ describe('Bad Agent', () => {
       });
       expect(result).to.be.ok;
 
-      await sleep(6000);
+      await sleep(15000);
 
       const honestCells = conductors
         .map(c => c.getAllCells()[0])
         .filter(
           cell =>
-            cell.agentPubKey !== badAgentAddress &&
-            cell.agentPubKey !== badAgent2Address
+            !isEqual(cell.agentPubKey, badAgentAddress) &&
+            !isEqual(cell.agentPubKey, badAgent2Address)
         );
       const honestCellsWithBadAgentAsNeighbor = honestCells.filter(
         cell =>
-          cell.p2p.neighbors.includes(badAgentAddress) ||
-          cell.p2p.neighbors.includes(badAgent2Address)
+          cell.p2p.neighbors.find(n => isEqual(n, badAgentAddress)) ||
+          cell.p2p.neighbors.find(n => isEqual(n, badAgent2Address))
       );
-
-      if (honestCellsWithBadAgentAsNeighbor.length > 0) {
-        for (const c of honestCellsWithBadAgentAsNeighbor) {
-          console.log(c._state.badAgents);
-          await c.p2p.syncNeighbors();
-        }
-
-        console.log(
-          honestCells.filter(
-            cell =>
-              cell.p2p.neighbors.includes(badAgentAddress) ||
-              cell.p2p.neighbors.includes(badAgent2Address)
-          ).length
-        );
-      }
 
       expect(honestCellsWithBadAgentAsNeighbor.length).to.equal(0);
     }

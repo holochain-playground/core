@@ -1,14 +1,18 @@
 import {
-  AgentPubKeyB64,
   CellId,
-  Dictionary,
-  DnaHashB64,
-} from '@holochain-open-dev/core-types';
+  AgentPubKey,
+  DnaHash,
+  CapSecret,
+} from '@holochain/conductor-api';
+import { Dictionary } from '@holochain-open-dev/core-types';
+
 import { Cell, getCellId } from '../core/cell';
 import { hash, HashType } from '../processors/hash';
+import { CellMap, HoloHashMap } from '../processors/holo-hash-map';
 import { Network, NetworkState } from './network/network';
 
 import {
+  hashDna,
   InstalledHapps,
   SimulatedDna,
   SimulatedHappBundle,
@@ -16,20 +20,21 @@ import {
 import { CellState } from './cell/state';
 import { BootstrapService } from '../bootstrap/bootstrap-service';
 import { BadAgent, BadAgentConfig } from './bad-agent';
+import isEqual from 'lodash-es/isEqual';
 
 export interface ConductorState {
-  // DnaHash / AgentPubKeyB64
-  cellsState: Dictionary<Dictionary<CellState>>;
+  // DnaHash / AgentPubKey
+  cellsState: CellMap<CellState>;
   networkState: NetworkState;
-  registeredDnas: Dictionary<SimulatedDna>;
+  registeredDnas: HoloHashMap<SimulatedDna>;
   installedHapps: Dictionary<InstalledHapps>;
   name: string;
   badAgent: BadAgent | undefined;
 }
 
 export class Conductor {
-  readonly cells: Dictionary<Dictionary<Cell>>;
-  registeredDnas!: Dictionary<SimulatedDna>;
+  readonly cells: CellMap<Cell>;
+  registeredDnas!: HoloHashMap<SimulatedDna>;
   installedHapps!: Dictionary<InstalledHapps>;
 
   network: Network;
@@ -43,13 +48,10 @@ export class Conductor {
     this.installedHapps = state.installedHapps;
     this.name = state.name;
 
-    this.cells = {};
-    for (const [dnaHash, dnaCellsStates] of Object.entries(state.cellsState)) {
-      if (!this.cells[dnaHash]) this.cells[dnaHash] = {};
+    this.cells = new CellMap();
 
-      for (const [agentPubKey, cellState] of Object.entries(dnaCellsStates)) {
-        this.cells[dnaHash][agentPubKey] = new Cell(cellState, this);
-      }
+    for (const [cellId, cellState] of state.cellsState.entries()) {
+      this.cells.put(cellId, new Cell(cellState, this));
     }
   }
 
@@ -58,11 +60,11 @@ export class Conductor {
     name: string
   ): Promise<Conductor> {
     const state: ConductorState = {
-      cellsState: {},
+      cellsState: new CellMap(),
       networkState: {
-        p2pCellsState: {},
+        p2pCellsState: new CellMap(),
       },
-      registeredDnas: {},
+      registeredDnas: new HoloHashMap(),
       installedHapps: {},
       name,
       badAgent: undefined,
@@ -72,14 +74,10 @@ export class Conductor {
   }
 
   getState(): ConductorState {
-    const cellsState: Dictionary<Dictionary<CellState>> = {};
+    const cellsState: CellMap<CellState> = new CellMap();
 
-    for (const [dnaHash, dnaCells] of Object.entries(this.cells)) {
-      if (!cellsState[dnaHash]) cellsState[dnaHash];
-
-      for (const [agentPubKey, cell] of Object.entries(dnaCells)) {
-        cellsState[dnaHash][agentPubKey] = cell.getState();
-      }
+    for (const [cellId, cell] of this.cells.entries()) {
+      cellsState.put(cellId, cell.getState());
     }
 
     return {
@@ -93,36 +91,32 @@ export class Conductor {
   }
 
   getAllCells(): Cell[] {
-    const nestedCells = Object.values(this.cells).map(dnaCells =>
-      Object.values(dnaCells)
-    );
-
-    return ([] as Cell[]).concat(...nestedCells);
+    return this.cells.values();
   }
 
-  getCells(dnaHash: DnaHashB64): Cell[] {
-    const dnaCells = this.cells[dnaHash];
-    return dnaCells ? Object.values(dnaCells) : [];
+  getCells(dnaHash: DnaHash): Cell[] {
+    return this.cells.valuesForDna(dnaHash);
   }
 
-  getCell(dnaHash: DnaHashB64, agentPubKey: AgentPubKeyB64): Cell | undefined {
-    return this.cells[dnaHash] ? this.cells[dnaHash][agentPubKey] : undefined;
+  getCell(cellId: CellId): Cell | undefined {
+    return this.cells.get(cellId);
   }
 
   /** Bad agents */
 
   setBadAgent(badAgentConfig: BadAgentConfig) {
     if (!this.badAgent)
-      this.badAgent = { config: badAgentConfig, counterfeitDnas: {} };
+      this.badAgent = {
+        config: badAgentConfig,
+        counterfeitDnas: new CellMap(),
+      };
     this.badAgent.config = badAgentConfig;
   }
 
   setCounterfeitDna(cellId: CellId, dna: SimulatedDna) {
     if (!this.badAgent) throw new Error('This is not a bad agent');
 
-    if (!this.badAgent.counterfeitDnas[cellId[0]])
-      this.badAgent.counterfeitDnas[cellId[0]] = {};
-    this.badAgent.counterfeitDnas[cellId[0]][cellId[1]] = dna;
+    this.badAgent.counterfeitDnas.put(cellId, dna);
   }
 
   /** Admin API */
@@ -145,13 +139,13 @@ export class Conductor {
       throw new Error(`Given app id doesn't exist`);
 
     const installedApp = this.installedHapps[installedAppId];
-    if (!installedApp.slots[slotNick])
+    if (!installedApp.roles[slotNick])
       throw new Error(`The slot nick doesn't exist for the given app id`);
 
-    const slotToClone = installedApp.slots[slotNick];
+    const slotToClone = installedApp.roles[slotNick];
 
     const hashOfDnaToClone = slotToClone.base_cell_id[0];
-    const dnaToClone = this.registeredDnas[hashOfDnaToClone];
+    const dnaToClone = this.registeredDnas.get(hashOfDnaToClone);
 
     if (!dnaToClone) {
       throw new Error(
@@ -164,20 +158,20 @@ export class Conductor {
     if (uid) dna.uid = uid;
     if (properties) dna.properties = properties;
 
-    const newDnaHash = hash(dna, HashType.DNA);
+    const newDnaHash = hashDna(dna);
 
-    if (newDnaHash === hashOfDnaToClone)
+    if (isEqual(newDnaHash, hashOfDnaToClone))
       throw new Error(
         `Trying to clone a dna would create exactly the same DNA`
       );
-    this.registeredDnas[newDnaHash] = dna;
+    this.registeredDnas.put(newDnaHash, dna);
 
     const cell = await this.createCell(
       dna,
       installedApp.agent_pub_key,
       membraneProof
     );
-    this.installedHapps[installedAppId].slots[slotNick].clones.push(
+    this.installedHapps[installedAppId].roles[slotNick].clones.push(
       cell.cellId
     );
 
@@ -194,27 +188,27 @@ export class Conductor {
     this.installedHapps[happ.name] = {
       agent_pub_key: agentId,
       app_id: happ.name,
-      slots: {},
+      roles: {},
     };
 
     for (const [cellNick, dnaSlot] of Object.entries(happ.slots)) {
-      let dnaHash: string | undefined = undefined;
-      if (typeof dnaSlot.dna === 'string') {
+      let dnaHash: DnaHash | undefined = undefined;
+      if (ArrayBuffer.isView(dnaSlot.dna)) {
         dnaHash = dnaSlot.dna;
-        if (!this.registeredDnas[dnaHash])
+        if (!this.registeredDnas.get(dnaHash))
           throw new Error(
             `Trying to reference a Dna that this conductor doesn't have registered`
           );
       } else if (typeof dnaSlot.dna === 'object') {
-        dnaHash = hash(dnaSlot.dna, HashType.DNA);
-        this.registeredDnas[dnaHash] = dnaSlot.dna;
+        dnaHash = hashDna(dnaSlot.dna);
+        this.registeredDnas.put(dnaHash, dnaSlot.dna);
       } else {
         throw new Error(
           'Bad DNA Slot: you must pass in the hash of the dna or the simulated Dna object'
         );
       }
 
-      this.installedHapps[happ.name].slots[cellNick] = {
+      this.installedHapps[happ.name].roles[cellNick] = {
         base_cell_id: [dnaHash, agentId],
         is_provisioned: !dnaSlot.deferred,
         clones: [],
@@ -222,7 +216,7 @@ export class Conductor {
 
       if (!dnaSlot.deferred) {
         const cell = await this.createCell(
-          this.registeredDnas[dnaHash],
+          this.registeredDnas.get(dnaHash),
           agentId,
           membrane_proofs[cellNick]
         );
@@ -232,17 +226,15 @@ export class Conductor {
 
   private async createCell(
     dna: SimulatedDna,
-    agentPubKey: string,
+    agentPubKey: AgentPubKey,
     membraneProof?: any
   ): Promise<Cell> {
-    const newDnaHash = hash(dna, HashType.DNA);
+    const newDnaHash = hashDna(dna);
 
     const cellId: CellId = [newDnaHash, agentPubKey];
     const cell = await Cell.create(this, cellId, membraneProof);
 
-    if (!this.cells[cell.dnaHash]) this.cells[cell.dnaHash] = {};
-
-    this.cells[cell.dnaHash][cell.agentPubKey] = cell;
+    this.cells.put(cellId, cell);
 
     return cell;
   }
@@ -254,11 +246,11 @@ export class Conductor {
     zome: string;
     fnName: string;
     payload: any;
-    cap: string;
+    cap: CapSecret;
   }): Promise<any> {
     const dnaHash = args.cellId[0];
     const agentPubKey = args.cellId[1];
-    const cell = this.cells[dnaHash][agentPubKey];
+    const cell = this.cells.get(args.cellId);
 
     if (!cell)
       throw new Error(`No cells existst with cellId ${dnaHash}:${agentPubKey}`);

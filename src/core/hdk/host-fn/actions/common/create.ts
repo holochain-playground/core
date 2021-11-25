@@ -1,9 +1,6 @@
-import {
-  Entry,
-  EntryType,
-  HeaderHashB64,
-  Element,
-} from '@holochain-open-dev/core-types';
+import { Element } from '@holochain-open-dev/core-types';
+import { HeaderHash, Entry, EntryType } from '@holochain/conductor-api';
+
 import {
   buildCreate,
   buildShh,
@@ -15,7 +12,7 @@ export function common_create(
   worskpace: HostFnWorkspace,
   entry: Entry,
   entry_type: EntryType
-): HeaderHashB64 {
+): HeaderHash {
   const create = buildCreate(worskpace.state, entry, entry_type);
 
   const element: Element = {
@@ -23,6 +20,6 @@ export function common_create(
     entry,
   };
   putElement(element)(worskpace.state);
-  
+
   return element.signed_header.header.hash;
 }

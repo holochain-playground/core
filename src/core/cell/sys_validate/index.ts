@@ -1,19 +1,21 @@
 import {
-  AgentPubKeyB64,
+  AgentPubKey,
   AppEntryType,
   Create,
   Entry,
-  EntryHashB64,
+  EntryHash,
   EntryType,
   Header,
   HeaderType,
-  Metadata,
   NewEntryHeader,
   Signature,
   Timestamp,
   Update,
-} from '@holochain-open-dev/core-types';
+} from '@holochain/conductor-api';
+import isEqual from 'lodash-es/isEqual';
+
 import { EntryDef, SimulatedDna } from '../../../dnas/simulated-dna';
+import { Metadata } from '../state/metadata';
 import { hashEntry } from '../utils';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/sys_validate.rs
@@ -30,7 +32,7 @@ export async function verify_header_signature(
 /// of signing with dpki
 /// TODO: This is just a stub until we have dpki.
 export async function author_key_is_valid(
-  author: AgentPubKeyB64
+  author: AgentPubKey
 ): Promise<boolean> {
   return true;
 }
@@ -46,7 +48,7 @@ export function check_prev_header(header: Header): void {
 }
 
 export function check_valid_if_dna(header: Header, metadata: Metadata): void {
-  if (metadata.misc_meta[header.author])
+  if (metadata.misc_meta.get(header.author))
     throw new Error(
       `Trying to validate a Dna header when the agent already has committed other headers`
     );
@@ -64,7 +66,7 @@ export function check_prev_timestamp(
   header: Header,
   prev_header: Header
 ): void {
-  const tsToMillis = (t: Timestamp) => t[0] * 1000000 + t[1];
+  const tsToMillis = (t: Timestamp) => Math.floor(t / 1000);
 
   if (tsToMillis(header.timestamp) <= tsToMillis(prev_header.timestamp)) {
     // TODO: find out why this isn't working and fix it
@@ -127,8 +129,9 @@ export function check_not_private(entry_def: EntryDef): void {
     throw new Error(`Trying to validate as public a private entry type`);
 }
 
-export function check_entry_hash(hash: EntryHashB64, entry: Entry): void {
-  if (hashEntry(entry) !== hash) throw new Error(`Entry hash is invalid`);
+export function check_entry_hash(hash: EntryHash, entry: Entry): void {
+  if (!isEqual(hashEntry(entry), hash))
+    throw new Error(`Entry hash is invalid`);
 }
 
 export function check_new_entry_header(header: Header): void {

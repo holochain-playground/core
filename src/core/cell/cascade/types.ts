@@ -7,9 +7,9 @@ import {
   Update,
   CreateLink,
   DeleteLink,
-  EntryHashB64,
-} from '@holochain-open-dev/core-types';
-import { ValidationStatus } from '..';
+  EntryHash,
+} from '@holochain/conductor-api';
+import { ValidationStatus } from '../state';
 
 export interface GetEntryResponse {
   entry: Entry;
@@ -39,7 +39,7 @@ export interface GetLinksResponse {
 }
 
 export interface Link {
-  base: EntryHashB64;
-  target: EntryHashB64;
+  base: EntryHash;
+  target: EntryHash;
   tag: any;
 }

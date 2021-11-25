@@ -1,57 +1,70 @@
 import {
   AgentPubKeyB64,
-  AnyDhtHashB64,
-  CellId,
   Dictionary,
   DnaHashB64,
 } from '@holochain-open-dev/core-types';
+import {
+  AgentPubKey,
+  AnyDhtHash,
+  CellId,
+  DnaHash,
+} from '@holochain/conductor-api';
+import isEqual from 'lodash-es/isEqual';
+
 import { Cell } from '../core/cell';
 import {
   getClosestNeighbors,
   getFarthestNeighbors,
 } from '../core/network/utils';
+import { CellMap } from '../processors/holo-hash-map';
 
 export class BootstrapService {
-  cells: Dictionary<Dictionary<Cell>> = {};
+  cells: CellMap<Cell> = new CellMap();
 
   announceCell(cellId: CellId, cell: Cell) {
-    const dnaHash = cellId[0];
-    const agentPubKey = cellId[1];
-    if (!this.cells[dnaHash]) this.cells[dnaHash] = {};
-    this.cells[dnaHash][agentPubKey] = cell;
+    this.cells.put(cellId, cell);
   }
 
   getNeighborhood(
-    dnaHash: DnaHashB64,
-    basis_dht_hash: AnyDhtHashB64,
+    dnaHash: DnaHash,
+    basis_dht_hash: AnyDhtHash,
     numNeighbors: number,
-    filteredAgents: AgentPubKeyB64[] = []
+    filteredAgents: AgentPubKey[] = []
   ): Cell[] {
-    const cells = Object.keys(this.cells[dnaHash]).filter(
-      cellPubKey => !filteredAgents.includes(cellPubKey)
+    const dnaCells = this.cells.valuesForDna(dnaHash);
+
+    const cells = dnaCells.filter(
+      cell => !filteredAgents.find(fa => isEqual(fa, cell.agentPubKey))
     );
 
     const neighborsKeys = getClosestNeighbors(
-      cells,
+      cells.map(c => c.agentPubKey),
       basis_dht_hash,
       numNeighbors
     );
 
-    return neighborsKeys.map(pubKey => this.cells[dnaHash][pubKey]);
+    return neighborsKeys.map(
+      pubKey => dnaCells.find(c => isEqual(pubKey, c.agentPubKey)) as Cell
+    );
   }
 
   getFarKnownPeers(
-    dnaHash: DnaHashB64,
-    agentPubKey: AgentPubKeyB64,
-    filteredAgents: AgentPubKeyB64[] = []
+    dnaHash: DnaHash,
+    agentPubKey: AgentPubKey,
+    filteredAgents: AgentPubKey[] = []
   ): Cell[] {
-    const cells = Object.keys(this.cells[dnaHash]).filter(
+    const dnaAgents = this.cells.agentsForDna(dnaHash);
+
+    const cells = dnaAgents.filter(
       peerPubKey =>
-        peerPubKey !== agentPubKey && !filteredAgents.includes(peerPubKey)
+        !isEqual(peerPubKey, agentPubKey) &&
+        !filteredAgents.find(a => isEqual(peerPubKey, a))
     );
 
     const farthestKeys = getFarthestNeighbors(cells, agentPubKey);
 
-    return farthestKeys.map(pubKey => this.cells[dnaHash][pubKey]);
+    return farthestKeys.map(
+      pubKey => this.cells.get([dnaHash, pubKey]) as Cell
+    );
   }
 }

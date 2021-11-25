@@ -1,5 +1,5 @@
-import { Dictionary } from '@holochain-open-dev/core-types';
 import { SimulatedDna } from '../dnas/simulated-dna';
+import { CellMap, HoloHashMap } from '../processors/holo-hash-map';
 
 export interface BadAgentConfig {
   disable_validation_before_publish: boolean;
@@ -9,5 +9,5 @@ export interface BadAgentConfig {
 export interface BadAgent {
   config: BadAgentConfig;
 
-  counterfeitDnas: Dictionary<Dictionary<SimulatedDna>>; // Segmented by DnaHash / AgentPubKeyB64
+  counterfeitDnas: CellMap<SimulatedDna>; // Segmented by DnaHash / AgentPubKey
 }

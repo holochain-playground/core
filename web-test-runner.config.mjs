@@ -6,15 +6,16 @@ const commonjs = fromRollup(rollupCommonjs);
 
 export default /** @type {import("@web/test-runner").TestRunnerConfig} */ ({
   files: 'test/**/*.test.js',
-  nodeResolve: true,
 
   /** Compile JS for older browsers. Requires @web/dev-server-esbuild plugin */
   // esbuildTarget: 'auto',
 
   /** Confgure bare import resolve plugin */
-  // nodeResolve: {
-  //   exportConditions: ['browser', 'development']
-  // },
+  nodeResolve: {
+    browser: true,
+    preferBuiltins: false,
+    exportConditions: ['browser', 'development'],
+  },
 
   /** Amount of browsers to run concurrently */
   // concurrentBrowsers: 2,
@@ -29,7 +30,12 @@ export default /** @type {import("@web/test-runner").TestRunnerConfig} */ ({
     //   playwrightLauncher({ product: 'webkit' }),
   ],
 
-  plugins: [commonjs({ include: ['node_modules/blakejs/**/*'] })],
+  plugins: [commonjs()],
+  testFramework: {
+    config: {
+      timeout: 300000,
+    },
+  },
 
   // See documentation for all available options
 });

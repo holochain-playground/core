@@ -1,4 +1,4 @@
-import { AgentPubKeyB64, AnyDhtHashB64, DnaHashB64 } from '@holochain-open-dev/core-types';
+import { AgentPubKey, AnyDhtHash, DnaHash } from '@holochain/conductor-api';
 import { Cell } from '../cell/cell';
 import { Network } from './network';
 import { NetworkRequest } from './network-request';
@@ -10,9 +10,9 @@ export class KitsuneP2p {
   }
 
   async rpc_single<T>(
-    dna_hash: DnaHashB64,
-    from_agent: AgentPubKeyB64,
-    to_agent: AgentPubKeyB64,
+    dna_hash: DnaHash,
+    from_agent: AgentPubKey,
+    to_agent: AgentPubKey,
     networkRequest: NetworkRequest<T>
   ): Promise<T> {
     const peer = await this.discover.peer_discover(
@@ -24,11 +24,11 @@ export class KitsuneP2p {
   }
 
   async rpc_multi<T>(
-    dna_hash: DnaHashB64,
-    from_agent: AgentPubKeyB64,
-    basis: AnyDhtHashB64,
+    dna_hash: DnaHash,
+    from_agent: AgentPubKey,
+    basis: AnyDhtHash,
     remote_agent_count: number,
-    filtered_agents: AgentPubKeyB64[],
+    filtered_agents: AgentPubKey[],
     networkRequest: NetworkRequest<T>
   ): Promise<Array<T>> {
     // Discover neighbors
@@ -41,7 +41,6 @@ export class KitsuneP2p {
       networkRequest
     );
   }
-
 }
 
 // From https://github.com/holochain/holochain/blob/develop/crates/kitsune_p2p/kitsune_p2p/src/spawn/actor/discover.rs
@@ -50,19 +49,22 @@ export class Discover {
 
   // TODO fix this
   async peer_discover(
-    dna_hash: DnaHashB64,
-    from_agent: AgentPubKeyB64,
-    to_agent: AgentPubKeyB64
+    dna_hash: DnaHash,
+    from_agent: AgentPubKey,
+    to_agent: AgentPubKey
   ): Promise<Cell> {
-    return this.network.bootstrapService.cells[dna_hash][to_agent];
+    return this.network.bootstrapService.cells.get([
+      dna_hash,
+      to_agent,
+    ]) as Cell;
   }
 
   async message_neighborhood<T>(
-    dna_hash: DnaHashB64,
-    from_agent: AgentPubKeyB64,
-    basis: AnyDhtHashB64,
+    dna_hash: DnaHash,
+    from_agent: AgentPubKey,
+    basis: AnyDhtHash,
     remote_agent_count: number,
-    filtered_agents: AgentPubKeyB64[],
+    filtered_agents: AgentPubKey[],
     networkRequest: NetworkRequest<T>
   ): Promise<Array<T>> {
     const agents = await this.search_for_agents(
@@ -77,10 +79,10 @@ export class Discover {
   }
 
   private async search_for_agents(
-    dna_hash: DnaHashB64,
-    basis: AnyDhtHashB64,
+    dna_hash: DnaHash,
+    basis: AnyDhtHash,
     remote_agent_count: number,
-    filtered_agents: AgentPubKeyB64[]
+    filtered_agents: AgentPubKey[]
   ): Promise<Cell[]> {
     return this.network.bootstrapService.getNeighborhood(
       dna_hash,
