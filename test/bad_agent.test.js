@@ -1,13 +1,13 @@
 import { createConductors, demoHapp } from '../dist';
 import { expect } from '@esm-bundle/chai';
-import isEqual from 'lodash-es/isEqual';
+
 import { sleep } from './utils';
 
 describe('Bad Agent', () => {
   it(`bad agent cheats and gets booted out of the network`, async function () {
     this.timeout(0);
 
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       const conductors = await createConductors(10, [], demoHapp());
 
       await sleep(100);

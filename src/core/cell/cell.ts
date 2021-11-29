@@ -1,9 +1,9 @@
-import { cloneDeep, uniqWith, isEqual } from 'lodash-es';
+import { cloneDeep, uniqWith } from 'lodash-es';
 import {
   Dictionary,
-  ValidationReceipt,
   Element,
   DhtOpHash,
+  serializeHash,
 } from '@holochain-open-dev/core-types';
 import {
   AgentPubKey,
@@ -16,7 +16,7 @@ import {
 
 import { GetLinksOptions, GetOptions } from '../../types';
 import { Conductor } from '../conductor';
-import { genesis, genesis_task } from './workflows/genesis';
+import { genesis_task } from './workflows/genesis';
 import { call_zome_fn_workflow } from './workflows/call_zome_fn';
 import { P2pCell } from '../network/p2p-cell';
 import { incoming_dht_ops_task } from './workflows/incoming_dht_ops';
@@ -26,14 +26,14 @@ import { triggeredWorkflowFromType } from './workflows/trigger';
 import { MiddlewareExecutor } from '../../executor/middleware-executor';
 import { GetLinksResponse, GetResult } from './cascade/types';
 import { Authority } from './cascade/authority';
-import { getHashType, hash, HashType } from '../../processors/hash';
+import { areEqual, getHashType, hash, HashType } from '../../processors/hash';
 import { HoloHashMap } from '../../processors/holo-hash-map';
 import { DhtArc } from '../network/dht_arc';
 import { getDhtOpBasis } from './utils';
 import { GossipData } from '../network/gossip/types';
 import { hasDhtOpBeenProcessed } from './dht/get';
 import { putValidationReceipt } from './dht/put';
-import { BadAction, getBadActions, getBadAgents } from '../network/utils';
+import { getBadAgents } from '../network/utils';
 import {
   app_validation_task,
   run_agent_validation_callback,
@@ -252,6 +252,7 @@ export class Cell {
         !hasDhtOpBeenProcessed(this._state, dhtOpHash) &&
         this.p2p.shouldWeHold(getDhtOpBasis(validatedOp.op))
       ) {
+        console.log('hoorey');
         dhtOpsToProcess.put(dhtOpHash, validatedOp.op);
       }
     }
@@ -265,7 +266,7 @@ export class Cell {
     const badAgents = getBadAgents(this._state);
     this._state.badAgents = uniqWith(
       [...this._state.badAgents, ...badAgents],
-      isEqual
+      areEqual
     );
 
     if (this._state.badAgents.length > previousCount) {

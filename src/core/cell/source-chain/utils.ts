@@ -20,7 +20,8 @@ import {
   DnaHash,
   HeaderHash,
 } from '@holochain/conductor-api';
-import isEqual from 'lodash-es/isEqual';
+import { areEqual } from '../../../processors/hash';
+
 import { HoloHashMap } from '../../../processors/holo-hash-map';
 import { CellState } from '../state';
 import { getAllAuthoredHeaders } from './get';
@@ -90,7 +91,7 @@ export function valid_cap_grant(
   provenance: AgentPubKey,
   secret: CapSecret | undefined
 ): boolean {
-  if (isEqual(provenance, getCellId(state)[1])) return true;
+  if (areEqual(provenance, getCellId(state)[1])) return true;
 
   const aliveCapGrantsHeaders: HoloHashMap<SignedHeaderHashed<NewEntryHeader>> =
     new HoloHashMap();
@@ -163,7 +164,7 @@ function isCapGrantValid(
           assignees: AgentPubKey[];
         };
       }
-    ).Assigned.assignees.find(a => isEqual(a, check_agent));
+    ).Assigned.assignees.find(a => areEqual(a, check_agent));
   } else {
     return (
       (

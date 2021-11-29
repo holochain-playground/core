@@ -10,27 +10,28 @@ import {
   HoloHash,
 } from '@holochain/conductor-api';
 import flatMap from 'lodash-es/flatMap';
+import { hashToString } from './hash';
 
 export class HoloHashMap<T> {
   _values: Dictionary<{ hash: HoloHash; value: T }> = {};
 
   has(key: HoloHash): boolean {
-    return !!this._values[this.stringify(key)];
+    return !!this._values[hashToString(key)];
   }
 
   get(key: HoloHash): T {
-    return this._values[this.stringify(key)]?.value;
+    return this._values[hashToString(key)]?.value;
   }
 
   put(key: HoloHash, value: T) {
-    this._values[this.stringify(key)] = {
+    this._values[hashToString(key)] = {
       hash: key,
       value,
     };
   }
 
   delete(key: HoloHash) {
-    const str = this.stringify(key);
+    const str = hashToString(key);
     if (this._values[str]) {
       this._values[str] = undefined as any;
       delete this._values[str];
@@ -52,9 +53,6 @@ export class HoloHashMap<T> {
     ]);
   }
 
-  private stringify(holoHash: HoloHash): string {
-    return holoHash.toString();
-  }
 }
 
 export class CellMap<T> {
@@ -65,6 +63,10 @@ export class CellMap<T> {
     return this.#cellMap.get(dnaHash)
       ? this.#cellMap.get(dnaHash).get(agentPubKey)
       : undefined;
+  }
+
+  has(cellId: CellId): boolean {
+    return !!this.get(cellId);
   }
 
   valuesForDna(dnaHash: DnaHash): Array<T> {
@@ -81,6 +83,16 @@ export class CellMap<T> {
     if (!this.#cellMap.get(dnaHash))
       this.#cellMap.put(dnaHash, new HoloHashMap());
     this.#cellMap.get(dnaHash).put(agentPubKey, value);
+  }
+
+  delete([dnaHash, agentPubKey]: CellId) {
+    if (this.#cellMap.get(dnaHash)) {
+      this.#cellMap.get(dnaHash).delete(agentPubKey);
+
+      if (this.#cellMap.get(dnaHash).keys().length === 0) {
+        this.#cellMap.delete(dnaHash);
+      }
+    }
   }
 
   entries(): Array<[CellId, T]> {

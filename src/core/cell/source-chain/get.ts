@@ -4,7 +4,8 @@ import {
   NewEntryHeader,
   SignedHeaderHashed,
 } from '@holochain/conductor-api';
-import isEqual from 'lodash-es/isEqual';
+import { areEqual } from '../../../processors/hash';
+
 
 import { CellState } from '../state';
 
@@ -18,7 +19,7 @@ export function getNewHeaders(state: CellState): Array<HeaderHash> {
   );
   return state.sourceChain.filter(
     headerHash =>
-      !headerHashesAlreadyPublished.find(h => isEqual(h, headerHash))
+      !headerHashesAlreadyPublished.find(h => areEqual(h, headerHash))
   );
 }
 

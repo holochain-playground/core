@@ -12,9 +12,10 @@ import {
   Timestamp,
   Update,
 } from '@holochain/conductor-api';
-import isEqual from 'lodash-es/isEqual';
+
 
 import { EntryDef, SimulatedDna } from '../../../dnas/simulated-dna';
+import { areEqual } from '../../../processors/hash';
 import { Metadata } from '../state/metadata';
 import { hashEntry } from '../utils';
 
@@ -130,7 +131,7 @@ export function check_not_private(entry_def: EntryDef): void {
 }
 
 export function check_entry_hash(hash: EntryHash, entry: Entry): void {
-  if (!isEqual(hashEntry(entry), hash))
+  if (!areEqual(hashEntry(entry), hash))
     throw new Error(`Entry hash is invalid`);
 }
 

@@ -1,5 +1,5 @@
 import { Update } from '@holochain/conductor-api';
-import isEqual from 'lodash-es/isEqual';
+import { areEqual } from '../processors/hash';
 
 import { GetStrategy } from '../types';
 import {
@@ -88,7 +88,7 @@ export const demoEntriesZome: SimulatedZome = {
           };
 
         if (
-          !isEqual(
+          !areEqual(
             originalHeader.signed_header.header.content.author,
             updateAuthor
           )

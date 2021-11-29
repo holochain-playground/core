@@ -13,6 +13,7 @@ import {
 import blake from 'blakejs';
 import { encode } from '@msgpack/msgpack';
 import { Base64 } from 'js-base64';
+import { HoloHashMap } from './holo-hash-map';
 
 export enum HashType {
   AGENT,
@@ -55,12 +56,10 @@ export function hash(content: any, type: HashType): HoloHash {
   return fullhash;
 }
 
-const hashLocationCache: Dictionary<number> = {};
+const hashLocationCache: HoloHashMap<number> = new HoloHashMap();
 
 export function location(bytesHash: HoloHash): number {
-  const hash = bytesHash.toString();
-
-  if (hashLocationCache[hash]) return hashLocationCache[hash];
+  if (hashLocationCache.has(bytesHash)) return hashLocationCache.get(bytesHash);
 
   const hash128: Uint8Array = blake.blake2b(bytesHash, null, 16);
 
@@ -76,7 +75,7 @@ export function location(bytesHash: HoloHash): number {
   const view = new DataView(new Uint8Array(out).buffer, 0);
   const location = wrap(view.getUint32(0, false));
 
-  hashLocationCache[hash] = location;
+  hashLocationCache.put(bytesHash, location);
 
   return location;
 }
@@ -87,6 +86,15 @@ export function distance(hash1: HoloHash, hash2: HoloHash): number {
   const location2 = location(hash2);
 
   return shortest_arc_distance(location1, location2) + 1;
+}
+
+export function areEqual(b1: Uint8Array, b2: Uint8Array): boolean {
+  if (b1.length !== b2.length) return false;
+  return hashToString(b1) === hashToString(b2);
+}
+
+export function hashToString(holoHash: HoloHash): string {
+  return new DataView(holoHash.buffer).getBigUint64(0) as any as string;
 }
 
 export function shortest_arc_distance(

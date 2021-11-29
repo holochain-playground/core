@@ -1,5 +1,4 @@
 import {
-  AgentPubKeyB64,
   ValidationReceipt,
   ValidationStatus,
 } from '@holochain-open-dev/core-types';

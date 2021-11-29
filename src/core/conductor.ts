@@ -7,7 +7,7 @@ import {
 import { Dictionary } from '@holochain-open-dev/core-types';
 
 import { Cell, getCellId } from '../core/cell';
-import { hash, HashType } from '../processors/hash';
+import { areEqual, hash, HashType } from '../processors/hash';
 import { CellMap, HoloHashMap } from '../processors/holo-hash-map';
 import { Network, NetworkState } from './network/network';
 
@@ -20,7 +20,6 @@ import {
 import { CellState } from './cell/state';
 import { BootstrapService } from '../bootstrap/bootstrap-service';
 import { BadAgent, BadAgentConfig } from './bad-agent';
-import isEqual from 'lodash-es/isEqual';
 
 export interface ConductorState {
   // DnaHash / AgentPubKey
@@ -32,10 +31,18 @@ export interface ConductorState {
   badAgent: BadAgent | undefined;
 }
 
+export enum ConductorSignalType {
+  CellsChanged,
+}
+
+export type SignalCb = (type: ConductorSignalType) => void;
+
 export class Conductor {
   readonly cells: CellMap<Cell>;
   registeredDnas!: HoloHashMap<SimulatedDna>;
   installedHapps!: Dictionary<InstalledHapps>;
+
+  signalCbs: Array<SignalCb> = [];
 
   network: Network;
   name: string;
@@ -71,6 +78,20 @@ export class Conductor {
     };
 
     return new Conductor(state, bootstrapService);
+  }
+
+  addSignalHandler(signalCb: SignalCb) {
+    this.signalCbs.push(signalCb);
+    return {
+      unsubscribe: () => {
+        const index = this.signalCbs.findIndex(s => s === signalCb);
+        this.signalCbs.splice(index, 1);
+      },
+    };
+  }
+
+  emit(signal: ConductorSignalType) {
+    this.signalCbs.forEach(cb => cb(signal));
   }
 
   getState(): ConductorState {
@@ -160,7 +181,7 @@ export class Conductor {
 
     const newDnaHash = hashDna(dna);
 
-    if (isEqual(newDnaHash, hashOfDnaToClone))
+    if (areEqual(newDnaHash, hashOfDnaToClone))
       throw new Error(
         `Trying to clone a dna would create exactly the same DNA`
       );
@@ -235,6 +256,8 @@ export class Conductor {
     const cell = await Cell.create(this, cellId, membraneProof);
 
     this.cells.put(cellId, cell);
+
+    this.emit(ConductorSignalType.CellsChanged);
 
     return cell;
   }

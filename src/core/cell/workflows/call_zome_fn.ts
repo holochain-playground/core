@@ -5,9 +5,10 @@ import {
   NewEntryHeader,
   SignedHeaderHashed,
 } from '@holochain/conductor-api';
-import { cloneDeep, isEqual } from 'lodash-es';
+import { cloneDeep } from 'lodash-es';
 
 import { SimulatedZome } from '../../../dnas/simulated-dna';
+import { areEqual } from '../../../processors/hash';
 import { GetStrategy } from '../../../types';
 import { BadAgentConfig } from '../../bad-agent';
 import { buildZomeFunctionContext } from '../../hdk/context';
@@ -73,7 +74,7 @@ export const callZomeFn =
     );
 
     let triggers: Array<Workflow<any, any>> = [];
-    if (!isEqual(getTipOfChain(contextState), currentHeader)) {
+    if (!areEqual(getTipOfChain(contextState), currentHeader)) {
       // Do validation
       let i = chain_head_start_len;
 

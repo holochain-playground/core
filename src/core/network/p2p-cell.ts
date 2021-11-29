@@ -1,9 +1,4 @@
 import {
-  AgentPubKeyB64,
-  AnyDhtHashB64,
-  Dictionary,
-} from '@holochain-open-dev/core-types';
-import {
   AgentPubKey,
   AnyDhtHash,
   CapSecret,
@@ -11,12 +6,12 @@ import {
   DhtOp,
   EntryHash,
 } from '@holochain/conductor-api';
-import isEqual from 'lodash-es/isEqual';
+
 import { MiddlewareExecutor } from '../../executor/middleware-executor';
-import { location } from '../../processors/hash';
+import { areEqual, location } from '../../processors/hash';
 import { HoloHashMap } from '../../processors/holo-hash-map';
 import { GetLinksOptions, GetOptions } from '../../types';
-import { Cell, getSourceChainElements, isHoldingDhtOp } from '../cell';
+import { Cell, getSourceChainElements } from '../cell';
 import {
   GetElementResponse,
   GetEntryResponse,
@@ -32,7 +27,6 @@ import {
   NetworkRequest,
   NetworkRequestType,
 } from './network-request';
-import { getBadAgents } from './utils';
 
 export type P2pCellState = {
   neighbors: AgentPubKey[];
@@ -210,7 +204,7 @@ export class P2pCell {
     try {
       await this.cell.handle_check_agent(peerFirst3Elements);
     } catch (e) {
-      if (!this.cell._state.badAgents.find(a => isEqual(a, peer.agentPubKey)))
+      if (!this.cell._state.badAgents.find(a => areEqual(a, peer.agentPubKey)))
         this.cell._state.badAgents.push(peer.agentPubKey);
 
       throw new Error('Invalid agent');
@@ -284,11 +278,11 @@ export class P2pCell {
       .filter(cell => cell.agentPubKey != agentPubKey);
 
     const newNeighbors = neighbors.filter(
-      cell => !this.neighbors.find(a => isEqual(a, cell.agentPubKey))
+      cell => !this.neighbors.find(a => areEqual(a, cell.agentPubKey))
     );
 
     const neighborsToForget = this.neighbors.filter(
-      n => !neighbors.find(c => isEqual(c.agentPubKey, n))
+      n => !neighbors.find(c => areEqual(c.agentPubKey, n))
     );
 
     neighborsToForget.forEach(n => this.closeNeighborConnection(n));
@@ -318,8 +312,9 @@ export class P2pCell {
     );
 
     const index = neighbors.findIndex(cell =>
-      isEqual(cell.agentPubKey, this.cellId[1])
+      areEqual(cell.agentPubKey, this.cellId[1])
     );
+
     return index >= 0 && index < this.redundancyFactor;
   }
 

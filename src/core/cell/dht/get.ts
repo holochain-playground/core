@@ -23,7 +23,8 @@ import {
   HeaderHash,
 } from '@holochain/conductor-api';
 
-import { isEqual, uniq, uniqWith } from 'lodash-es';
+import { uniqWith } from 'lodash-es';
+import { areEqual } from '../../../processors/hash';
 import { HoloHashMap } from '../../../processors/holo-hash-map';
 
 import { GetLinksResponse, Link } from '../cascade/types';
@@ -121,19 +122,19 @@ export function getEntryDetails(
 
     if (
       (headerContent as Update).original_entry_address &&
-      isEqual((headerContent as Update).original_entry_address, entry_hash)
+      areEqual((headerContent as Update).original_entry_address, entry_hash)
     ) {
       updates.put(header.header.hash, header as SignedHeaderHashed<Update>);
     } else if (
       (headerContent as Create).entry_hash &&
-      isEqual((headerContent as Create).entry_hash, entry_hash)
+      areEqual((headerContent as Create).entry_hash, entry_hash)
     ) {
       live_headers.put(
         header.header.hash,
         header as SignedHeaderHashed<Create>
       );
     } else if (
-      isEqual((headerContent as Delete).deletes_entry_address, entry_hash)
+      areEqual((headerContent as Delete).deletes_entry_address, entry_hash)
     ) {
       deletes.put(header.header.hash, header as SignedHeaderHashed<Delete>);
     }
@@ -186,7 +187,7 @@ export function getAllHeldEntries(state: CellState): EntryHash[] {
     h => (h.header.content as NewEntryHeader).entry_hash
   );
 
-  return uniqWith(allEntryHashes, isEqual);
+  return uniqWith(allEntryHashes, areEqual);
 }
 
 export function getAllHeldHeaders(state: CellState): HeaderHash[] {
@@ -197,7 +198,7 @@ export function getAllHeldHeaders(state: CellState): HeaderHash[] {
 
   const allHeaderHashes = headers.map(h => h.header.hash);
 
-  return uniqWith(allHeaderHashes, isEqual);
+  return uniqWith(allHeaderHashes, areEqual);
 }
 
 export function getAllAuthoredEntries(state: CellState): EntryHash[] {
@@ -289,7 +290,7 @@ export function getCreateLinksForEntry(
   entryHash: EntryHash
 ): LinkMetaVal[] {
   return state.metadata.link_meta
-    .filter(({ key, value }) => isEqual(key.base, entryHash))
+    .filter(({ key, value }) => areEqual(key.base, entryHash))
     .map(({ key, value }) => value);
 }
 
@@ -390,9 +391,9 @@ export function hasDhtOpBeenProcessed(
   dhtOpHash: DhtOpHash
 ): boolean {
   return (
-    !!state.integrationLimbo.has(dhtOpHash) ||
-    !!state.integratedDHTOps.has(dhtOpHash) ||
-    !!state.validationLimbo.has(dhtOpHash)
+    state.integrationLimbo.has(dhtOpHash) ||
+    state.integratedDHTOps.has(dhtOpHash) ||
+    state.validationLimbo.has(dhtOpHash)
   );
 }
 

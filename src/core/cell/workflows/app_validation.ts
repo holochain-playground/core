@@ -47,7 +47,8 @@ import { buildValidationFunctionContext } from '../../hdk/context';
 import { BadAgentConfig } from '../../bad-agent';
 import { Cascade } from '../cascade/cascade';
 import { getEntry } from '../utils';
-import isEqual from 'lodash-es/isEqual';
+import { areEqual } from '../../../processors/hash';
+
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/app_validation_workflow.rs
 export const app_validation = async (
@@ -125,7 +126,7 @@ function shouldValidate(
   badAgentConfig?: BadAgentConfig
 ): boolean {
   if (!badAgentConfig) return true;
-  return !isEqual(dhtOp.header.header.content.author, agentPubKey);
+  return !areEqual(dhtOp.header.header.content.author, agentPubKey);
 }
 
 export async function validate_op(

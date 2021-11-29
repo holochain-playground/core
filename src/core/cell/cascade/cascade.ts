@@ -14,9 +14,9 @@ import {
   NewEntryHeader,
   SignedHeaderHashed,
 } from '@holochain/conductor-api';
-import isEqual from 'lodash-es/isEqual';
 
-import { getHashType, HashType } from '../../../processors/hash';
+
+import { areEqual, getHashType, HashType } from '../../../processors/hash';
 import { GetLinksOptions, GetOptions, GetStrategy } from '../../../types';
 import { P2pCell } from '../../network/p2p-cell';
 import { Cell } from '../cell';
@@ -102,7 +102,7 @@ export class Cascade {
         const signed_header = this.state.CAS.values().find(
           header =>
             (header as SignedHeaderHashed).header &&
-            isEqual(
+            areEqual(
               (header as SignedHeaderHashed<NewEntryHeader>).header.content
                 .entry_hash,
               hash

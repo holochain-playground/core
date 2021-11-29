@@ -17,7 +17,7 @@ import {
 import { Element } from '@holochain-open-dev/core-types';
 
 import { hash, HashType } from '../../processors/hash';
-import { Cell } from './cell';
+import { SimulatedDna } from '../../dnas/simulated-dna';
 
 export function hashEntry(entry: Entry): EntryHash {
   if (entry.entry_type === 'Agent') return entry.content;
@@ -32,11 +32,13 @@ export function getAppEntryType(
   return undefined;
 }
 
-export function getEntryTypeString(cell: Cell, entryType: EntryType): string {
+export function getEntryTypeString(
+  dna: SimulatedDna,
+  entryType: EntryType
+): string {
   const appEntryType = getAppEntryType(entryType);
 
   if (appEntryType) {
-    const dna = cell.getSimulatedDna();
     return dna.zomes[appEntryType.zome_id].entry_defs[appEntryType.id].id;
   }
 

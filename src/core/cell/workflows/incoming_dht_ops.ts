@@ -1,4 +1,8 @@
-import { Dictionary, AgentPubKeyB64 } from '@holochain-open-dev/core-types';
+import {
+  Dictionary,
+  AgentPubKeyB64,
+  serializeHash,
+} from '@holochain-open-dev/core-types';
 import { AgentPubKey, DhtOp } from '@holochain/conductor-api';
 
 import { ValidationLimboValue, ValidationLimboStatus } from '../state';
