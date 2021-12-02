@@ -21,10 +21,12 @@ import {
   DhtOp,
   EntryHash,
   HeaderHash,
+  getDhtOpType,
+  getDhtOpHeader,
 } from '@holochain/conductor-api';
 
 import { uniqWith } from 'lodash-es';
-import { areEqual } from '../../../processors/hash';
+import { areEqual, hash, HashType } from '../../../processors/hash';
 import { HoloHashMap } from '../../../processors/holo-hash-map';
 
 import { GetLinksResponse, Link } from '../cascade/types';
@@ -180,11 +182,11 @@ export function getHeaderModifiers(
 export function getAllHeldEntries(state: CellState): EntryHash[] {
   const newEntryHeaders = state.integratedDHTOps
     .values()
-    .filter(dhtOpValue => dhtOpValue.op.type === DhtOpType.StoreEntry)
-    .map(dhtOpValue => dhtOpValue.op.header);
+    .filter(dhtOpValue => getDhtOpType(dhtOpValue.op) === DhtOpType.StoreEntry)
+    .map(dhtOpValue => getDhtOpHeader(dhtOpValue.op));
 
   const allEntryHashes = newEntryHeaders.map(
-    h => (h.header.content as NewEntryHeader).entry_hash
+    h => (h as NewEntryHeader).entry_hash
   );
 
   return uniqWith(allEntryHashes, areEqual);
@@ -193,10 +195,12 @@ export function getAllHeldEntries(state: CellState): EntryHash[] {
 export function getAllHeldHeaders(state: CellState): HeaderHash[] {
   const headers = state.integratedDHTOps
     .values()
-    .filter(dhtOpValue => dhtOpValue.op.type === DhtOpType.StoreElement)
-    .map(dhtOpValue => dhtOpValue.op.header);
+    .filter(
+      dhtOpValue => getDhtOpType(dhtOpValue.op) === DhtOpType.StoreElement
+    )
+    .map(dhtOpValue => getDhtOpHeader(dhtOpValue.op));
 
-  const allHeaderHashes = headers.map(h => h.header.hash);
+  const allHeaderHashes = headers.map(h => hash(h, HashType.HEADER));
 
   return uniqWith(allHeaderHashes, areEqual);
 }
@@ -204,14 +208,13 @@ export function getAllHeldHeaders(state: CellState): HeaderHash[] {
 export function getAllAuthoredEntries(state: CellState): EntryHash[] {
   const allHeaders = state.authoredDHTOps
     .values()
-    .map(dhtOpValue => dhtOpValue.op.header);
+    .map(dhtOpValue => getDhtOpHeader(dhtOpValue.op));
 
-  const newEntryHeaders: SignedHeaderHashed<NewEntryHeader>[] =
-    allHeaders.filter(
-      h => (h.header.content as NewEntryHeader).entry_hash
-    ) as SignedHeaderHashed<NewEntryHeader>[];
+  const newEntryHeaders: NewEntryHeader[] = allHeaders.filter(
+    h => (h as NewEntryHeader).entry_hash
+  ) as NewEntryHeader[];
 
-  return newEntryHeaders.map(h => h.header.content.entry_hash);
+  return newEntryHeaders.map(h => h.entry_hash);
 }
 
 export function isHoldingEntry(

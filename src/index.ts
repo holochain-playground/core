@@ -5,6 +5,7 @@ export * from './core/network/network-request';
 export * from './core/network/kitsune_p2p';
 export * from './core/network/utils';
 export * from './core/conductor';
+export * from './core/bad-agent';
 
 export * as Hdk from './core/hdk/index';
 

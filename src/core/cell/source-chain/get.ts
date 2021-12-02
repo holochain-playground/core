@@ -1,11 +1,11 @@
 import { Element, HeaderHashB64 } from '@holochain-open-dev/core-types';
 import {
+  getDhtOpHeader,
   HeaderHash,
   NewEntryHeader,
   SignedHeaderHashed,
 } from '@holochain/conductor-api';
-import { areEqual } from '../../../processors/hash';
-
+import { areEqual, hash, HashType } from '../../../processors/hash';
 
 import { CellState } from '../state';
 
@@ -14,8 +14,8 @@ import { CellState } from '../state';
  */
 export function getNewHeaders(state: CellState): Array<HeaderHash> {
   const dhtOps = state.authoredDHTOps.values();
-  const headerHashesAlreadyPublished = dhtOps.map(
-    dhtOp => dhtOp.op.header.header.hash
+  const headerHashesAlreadyPublished = dhtOps.map(dhtOp =>
+    hash(getDhtOpHeader(dhtOp.op), HashType.HEADER)
   );
   return state.sourceChain.filter(
     headerHash =>

@@ -13,6 +13,9 @@ import {
   Entry,
   EntryHash,
   EntryType,
+  getDhtOpType,
+  getDhtOpEntry,
+  getDhtOpHeader,
 } from '@holochain/conductor-api';
 import { Element } from '@holochain-open-dev/core-types';
 
@@ -46,25 +49,29 @@ export function getEntryTypeString(
 }
 
 export function getDhtOpBasis(dhtOp: DhtOp): AnyDhtHash {
-  switch (dhtOp.type) {
+  const type = getDhtOpType(dhtOp);
+  const header = getDhtOpHeader(dhtOp);
+  const headerHash = hash(header, HashType.HEADER);
+
+  switch (type) {
     case DhtOpType.StoreElement:
-      return dhtOp.header.header.hash;
+      return headerHash;
     case DhtOpType.StoreEntry:
-      return dhtOp.header.header.content.entry_hash;
+      return (header as Create).entry_hash;
     case DhtOpType.RegisterUpdatedContent:
-      return dhtOp.header.header.content.original_entry_address;
+      return (header as Update).original_entry_address;
     case DhtOpType.RegisterUpdatedElement:
-      return dhtOp.header.header.content.original_header_address;
+      return (header as Update).original_header_address;
     case DhtOpType.RegisterAgentActivity:
-      return dhtOp.header.header.content.author;
+      return header.author;
     case DhtOpType.RegisterAddLink:
-      return dhtOp.header.header.content.base_address;
+      return (header as CreateLink).base_address;
     case DhtOpType.RegisterRemoveLink:
-      return dhtOp.header.header.content.base_address;
+      return (header as DeleteLink).base_address;
     case DhtOpType.RegisterDeletedBy:
-      return dhtOp.header.header.content.deletes_address;
+      return (header as Delete).deletes_address;
     case DhtOpType.RegisterDeletedEntryHeader:
-      return dhtOp.header.header.content.deletes_entry_address;
+      return (header as Delete).deletes_entry_address;
     default:
       return undefined as unknown as AnyDhtHash;
   }
@@ -88,73 +95,96 @@ export function elementToDhtOps(element: Element): DhtOp[] {
   // All hdk commands have these two DHT Ops
 
   allDhtOps.push({
-    type: DhtOpType.RegisterAgentActivity,
-    header: element.signed_header,
+    [DhtOpType.RegisterAgentActivity]: [
+      element.signed_header.signature,
+      element.signed_header.header.content,
+    ],
   });
   allDhtOps.push({
-    type: DhtOpType.StoreElement,
-    header: element.signed_header,
-    maybe_entry: element.entry,
+    [DhtOpType.StoreElement]: [
+      element.signed_header.signature,
+      element.signed_header.header.content,
+      element.entry,
+    ],
   });
 
   // Each header derives into different DhtOps
 
   if (element.signed_header.header.content.type == HeaderType.Update) {
     allDhtOps.push({
-      type: DhtOpType.RegisterUpdatedContent,
-      header: element.signed_header as SignedHeaderHashed<Update>,
+      [DhtOpType.RegisterUpdatedContent]: [
+        element.signed_header.signature,
+        element.signed_header.header.content,
+        element.entry,
+      ],
     });
     allDhtOps.push({
-      type: DhtOpType.RegisterUpdatedElement,
-      header: element.signed_header as SignedHeaderHashed<Update>,
+      [DhtOpType.RegisterUpdatedElement]: [
+        element.signed_header.signature,
+        element.signed_header.header.content,
+        element.entry,
+      ],
     });
     allDhtOps.push({
-      type: DhtOpType.StoreEntry,
-      header: element.signed_header as SignedHeaderHashed<Update>,
-      entry: element.entry as Entry,
+      [DhtOpType.StoreEntry]: [
+        element.signed_header.signature,
+        element.signed_header.header.content,
+        element.entry as Entry,
+      ],
     });
   } else if (element.signed_header.header.content.type == HeaderType.Create) {
     allDhtOps.push({
-      type: DhtOpType.StoreEntry,
-      header: element.signed_header as SignedHeaderHashed<Create>,
-      entry: element.entry as Entry,
+      [DhtOpType.StoreEntry]: [
+        element.signed_header.signature,
+        element.signed_header.header.content,
+        element.entry as Entry,
+      ],
     });
   } else if (element.signed_header.header.content.type == HeaderType.Delete) {
     allDhtOps.push({
-      type: DhtOpType.RegisterDeletedBy,
-      header: element.signed_header as SignedHeaderHashed<Delete>,
+      [DhtOpType.RegisterDeletedBy]: [
+        element.signed_header.signature,
+        element.signed_header.header.content,
+      ],
     });
     allDhtOps.push({
-      type: DhtOpType.RegisterDeletedEntryHeader,
-      header: element.signed_header as SignedHeaderHashed<Delete>,
+      [DhtOpType.RegisterDeletedEntryHeader]: [
+        element.signed_header.signature,
+        element.signed_header.header.content,
+      ],
     });
   } else if (
     element.signed_header.header.content.type == HeaderType.DeleteLink
   ) {
     allDhtOps.push({
-      type: DhtOpType.RegisterRemoveLink,
-      header: element.signed_header as SignedHeaderHashed<DeleteLink>,
+      [DhtOpType.RegisterRemoveLink]: [
+        element.signed_header.signature,
+        element.signed_header.header.content,
+      ],
     });
   } else if (
     element.signed_header.header.content.type == HeaderType.CreateLink
   ) {
     allDhtOps.push({
-      type: DhtOpType.RegisterAddLink,
-      header: element.signed_header as SignedHeaderHashed<CreateLink>,
+      [DhtOpType.RegisterAddLink]: [
+        element.signed_header.signature,
+        element.signed_header.header.content,
+      ],
     });
   }
 
   return allDhtOps;
 }
 
-export function sortDhtOps(DhtOps: DhtOp[]): DhtOp[] {
-  const prio = (DhtOp: DhtOp) =>
-    DHT_SORT_PRIORITY.findIndex(type => type === DhtOp.type);
-  return DhtOps.sort((dhtA: DhtOp, dhtB: DhtOp) => prio(dhtA) - prio(dhtB));
+export function sortDhtOps(dhtOps: DhtOp[]): DhtOp[] {
+  const prio = (dhtOp: DhtOp) =>
+    DHT_SORT_PRIORITY.findIndex(type => type === getDhtOpType(dhtOp));
+  return dhtOps.sort((dhtA: DhtOp, dhtB: DhtOp) => prio(dhtA) - prio(dhtB));
 }
 
-export function getEntry(DhtOp: DhtOp): Entry | undefined {
-  if (DhtOp.type === DhtOpType.StoreEntry) return DhtOp.entry;
-  else if (DhtOp.type === DhtOpType.StoreElement) return DhtOp.maybe_entry;
+export function getEntry(dhtOp: DhtOp): Entry | undefined {
+  const type = getDhtOpType(dhtOp);
+  if (type === DhtOpType.StoreEntry) return getDhtOpEntry(dhtOp);
+  else if (type === DhtOpType.StoreElement) return getDhtOpEntry(dhtOp);
   return undefined;
 }

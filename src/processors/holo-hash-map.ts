@@ -15,6 +15,14 @@ import { hashToString } from './hash';
 export class HoloHashMap<T> {
   _values: Dictionary<{ hash: HoloHash; value: T }> = {};
 
+  constructor(initialEntries?: Array<[HoloHash, T]>) {
+    if (initialEntries) {
+      for (const [cellId, value] of initialEntries) {
+        this.put(cellId, value);
+      }
+    }
+  }
+
   has(key: HoloHash): boolean {
     return !!this._values[hashToString(key)];
   }
@@ -52,12 +60,19 @@ export class HoloHashMap<T> {
       value.value,
     ]);
   }
-
 }
 
 export class CellMap<T> {
   // Segmented by DnaHash / AgentPubKey
   #cellMap: HoloHashMap<HoloHashMap<T>> = new HoloHashMap();
+
+  constructor(initialEntries?: Array<[CellId, T]>) {
+    if (initialEntries) {
+      for (const [cellId, value] of initialEntries) {
+        this.put(cellId, value);
+      }
+    }
+  }
 
   get([dnaHash, agentPubKey]: CellId): T | undefined {
     return this.#cellMap.get(dnaHash)
@@ -99,6 +114,22 @@ export class CellMap<T> {
     return this.cellIds().map(
       cellId => [cellId, this.get(cellId)] as [CellId, T]
     );
+  }
+
+  filter(fn: (value: T) => boolean): CellMap<T> {
+    const entries = this.entries();
+
+    const mappedValues = entries.filter(([id, v]) => fn(v));
+
+    return new CellMap(mappedValues);
+  }
+
+  map<R>(fn: (value: T) => R): CellMap<R> {
+    const entries = this.entries();
+
+    const mappedValues = entries.map(([id, v]) => [id, fn(v)] as [CellId, R]);
+
+    return new CellMap(mappedValues);
   }
 
   values(): Array<T> {

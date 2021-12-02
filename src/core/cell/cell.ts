@@ -252,7 +252,6 @@ export class Cell {
         !hasDhtOpBeenProcessed(this._state, dhtOpHash) &&
         this.p2p.shouldWeHold(getDhtOpBasis(validatedOp.op))
       ) {
-        console.log('hoorey');
         dhtOpsToProcess.put(dhtOpHash, validatedOp.op);
       }
     }

@@ -13,6 +13,14 @@ import {
   HeaderHash,
   EntryHash,
   AnyDhtHash,
+  Header,
+  getDhtOpType,
+  getDhtOpHeader,
+  Update,
+  Delete,
+  CreateLink,
+  DeleteLink,
+  getDhtOpSignature,
 } from '@holochain/conductor-api';
 import {
   ChainStatus,
@@ -31,6 +39,7 @@ import {
 import { getHeadersForEntry } from './get';
 import { HoloHashMap } from '../../../processors/holo-hash-map';
 import { getEntry } from '../utils';
+import { hash, HashType } from '../../../processors/hash';
 
 export const putValidationLimboValue =
   (dhtOpHash: DhtOpHash, validationLimboValue: ValidationLimboValue) =>
@@ -62,94 +71,102 @@ export const putIntegrationLimboValue =
   };
 
 export const putDhtOpData = (dhtOp: DhtOp) => (state: CellState) => {
-  const headerHash = dhtOp.header.header.hash;
-  state.CAS.put(headerHash, dhtOp.header);
+  const header = getDhtOpHeader(dhtOp);
+  const headerHash = hash(header, HashType.HEADER);
+
+  const ssh: SignedHeaderHashed = {
+    header: {
+      content: header,
+      hash: headerHash,
+    },
+    signature: getDhtOpSignature(dhtOp),
+  };
+  state.CAS.put(headerHash, ssh);
 
   const entry = getEntry(dhtOp);
 
   if (entry) {
-    state.CAS.put(
-      (dhtOp.header.header.content as NewEntryHeader).entry_hash,
-      entry
-    );
+    state.CAS.put((header as NewEntryHeader).entry_hash, entry);
   }
 };
 
 export const putDhtOpMetadata = (dhtOp: DhtOp) => (state: CellState) => {
-  const headerHash = dhtOp.header.header.hash;
+  const type = getDhtOpType(dhtOp);
+  const header = getDhtOpHeader(dhtOp);
+  const headerHash = hash(header, HashType.HEADER);
 
-  if (dhtOp.type === DhtOpType.StoreElement) {
+  if (type === DhtOpType.StoreElement) {
     state.metadata.misc_meta.put(headerHash, 'StoreElement');
-  } else if (dhtOp.type === DhtOpType.StoreEntry) {
-    const entryHash = dhtOp.header.header.content.entry_hash;
+  } else if (type === DhtOpType.StoreEntry) {
+    const entryHash = (header as NewEntryHeader).entry_hash;
 
-    if (dhtOp.header.header.content.type === HeaderType.Update) {
-      register_header_on_basis(headerHash, dhtOp.header)(state);
-      register_header_on_basis(entryHash, dhtOp.header)(state);
+    if (header.type === HeaderType.Update) {
+      register_header_on_basis(headerHash, header, headerHash)(state);
+      register_header_on_basis(entryHash, header, headerHash)(state);
     }
 
-    register_header_on_basis(entryHash, dhtOp.header)(state);
+    register_header_on_basis(entryHash, header, headerHash)(state);
     update_entry_dht_status(entryHash)(state);
-  } else if (dhtOp.type === DhtOpType.RegisterAgentActivity) {
+  } else if (type === DhtOpType.RegisterAgentActivity) {
     state.metadata.misc_meta.put(headerHash, {
-      ChainItem: dhtOp.header.header.content.timestamp,
+      ChainItem: header.timestamp,
     });
 
-    state.metadata.misc_meta.put(dhtOp.header.header.content.author, {
+    state.metadata.misc_meta.put(header.author, {
       ChainStatus: ChainStatus.Valid,
     });
   } else if (
-    dhtOp.type === DhtOpType.RegisterUpdatedContent ||
-    dhtOp.type === DhtOpType.RegisterUpdatedElement
+    type === DhtOpType.RegisterUpdatedContent ||
+    type === DhtOpType.RegisterUpdatedElement
   ) {
     register_header_on_basis(
-      dhtOp.header.header.content.original_header_address,
-      dhtOp.header
+      (header as Update).original_header_address,
+      header,
+      headerHash
     )(state);
     register_header_on_basis(
-      dhtOp.header.header.content.original_entry_address,
-      dhtOp.header
+      (header as Update).original_entry_address,
+      header,
+      headerHash
     )(state);
-    update_entry_dht_status(dhtOp.header.header.content.original_entry_address)(
-      state
-    );
+    update_entry_dht_status((header as Update).original_entry_address)(state);
   } else if (
-    dhtOp.type === DhtOpType.RegisterDeletedBy ||
-    dhtOp.type === DhtOpType.RegisterDeletedEntryHeader
+    type === DhtOpType.RegisterDeletedBy ||
+    type === DhtOpType.RegisterDeletedEntryHeader
   ) {
     register_header_on_basis(
-      dhtOp.header.header.content.deletes_address,
-      dhtOp.header
+      (header as Delete).deletes_address,
+      header,
+      headerHash
     )(state);
     register_header_on_basis(
-      dhtOp.header.header.content.deletes_entry_address,
-      dhtOp.header
+      (header as Delete).deletes_entry_address,
+      header,
+      headerHash
     )(state);
 
-    update_entry_dht_status(dhtOp.header.header.content.deletes_entry_address)(
-      state
-    );
-  } else if (dhtOp.type === DhtOpType.RegisterAddLink) {
+    update_entry_dht_status((header as Delete).deletes_entry_address)(state);
+  } else if (type === DhtOpType.RegisterAddLink) {
     const key: LinkMetaKey = {
-      base: dhtOp.header.header.content.base_address,
+      base: (header as CreateLink).base_address,
       header_hash: headerHash,
-      tag: dhtOp.header.header.content.tag,
-      zome_id: dhtOp.header.header.content.zome_id,
+      tag: (header as CreateLink).tag,
+      zome_id: (header as CreateLink).zome_id,
     };
     const value: LinkMetaVal = {
       link_add_hash: headerHash,
-      tag: dhtOp.header.header.content.tag,
-      target: dhtOp.header.header.content.target_address,
-      timestamp: dhtOp.header.header.content.timestamp,
-      zome_id: dhtOp.header.header.content.zome_id,
+      tag: (header as CreateLink).tag,
+      target: (header as CreateLink).target_address,
+      timestamp: (header as CreateLink).timestamp,
+      zome_id: (header as CreateLink).zome_id,
     };
     state.metadata.link_meta.push({ key, value });
-  } else if (dhtOp.type === DhtOpType.RegisterRemoveLink) {
+  } else if (type === DhtOpType.RegisterRemoveLink) {
     const val: SysMetaVal = {
       DeleteLink: headerHash,
     };
 
-    putSystemMetadata(dhtOp.header.header.content.link_add_address, val)(state);
+    putSystemMetadata((header as DeleteLink).link_add_address, val)(state);
   }
 };
 
@@ -183,15 +200,16 @@ const update_entry_dht_status =
   };
 
 export const register_header_on_basis =
-  (basis: AnyDhtHash, header: SignedHeaderHashed) => (state: CellState) => {
+  (basis: AnyDhtHash, header: Header, headerHash: HeaderHash) =>
+  (state: CellState) => {
     let value: SysMetaVal | undefined;
-    const headerType = header.header.content.type;
+    const headerType = header.type;
     if (headerType === HeaderType.Create) {
-      value = { NewEntry: header.header.hash };
+      value = { NewEntry: headerHash };
     } else if (headerType === HeaderType.Update) {
-      value = { Update: header.header.hash };
+      value = { Update: headerHash };
     } else if (headerType === HeaderType.Delete) {
-      value = { Delete: header.header.hash };
+      value = { Delete: headerHash };
     }
 
     if (value) {

@@ -6,8 +6,10 @@ import {
   DeleteLink,
   DhtOp,
   Entry,
+  getDhtOpHeader,
   HeaderType,
   NewEntryHeader,
+  getDhtOpSignature,
 } from '@holochain/conductor-api';
 import { Element } from '@holochain-open-dev/core-types';
 
@@ -47,8 +49,7 @@ import { buildValidationFunctionContext } from '../../hdk/context';
 import { BadAgentConfig } from '../../bad-agent';
 import { Cascade } from '../cascade/cascade';
 import { getEntry } from '../utils';
-import { areEqual } from '../../../processors/hash';
-
+import { areEqual, hash, HashType } from '../../../processors/hash';
 
 // From https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/workflow/app_validation_workflow.rs
 export const app_validation = async (
@@ -126,7 +127,7 @@ function shouldValidate(
   badAgentConfig?: BadAgentConfig
 ): boolean {
   if (!badAgentConfig) return true;
-  return !areEqual(dhtOp.header.header.content.author, agentPubKey);
+  return !areEqual(getDhtOpHeader(dhtOp).author, agentPubKey);
 }
 
 export async function validate_op(
@@ -210,15 +211,22 @@ export async function validate_op(
 }
 
 function dht_ops_to_element(op: DhtOp): Element {
-  const header = op.header;
+  const header = getDhtOpHeader(op);
+  const headerHash = hash(header, HashType.HEADER);
   let entry = undefined;
-  if ((header.header.content as NewEntryHeader).entry_hash) {
+  if ((header as NewEntryHeader).entry_hash) {
     entry = getEntry(op);
   }
 
   return {
     entry,
-    signed_header: header,
+    signed_header: {
+      header: {
+        content: header,
+        hash: headerHash,
+      },
+      signature: getDhtOpSignature(op),
+    },
   };
 }
 

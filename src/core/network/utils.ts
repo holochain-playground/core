@@ -2,7 +2,12 @@ import {
   ValidationReceipt,
   ValidationStatus,
 } from '@holochain-open-dev/core-types';
-import { AgentPubKey, AnyDhtHash, DhtOp } from '@holochain/conductor-api';
+import {
+  AgentPubKey,
+  AnyDhtHash,
+  DhtOp,
+  getDhtOpHeader,
+} from '@holochain/conductor-api';
 import { uniq } from 'lodash-es';
 import { distance, location, wrap } from '../../processors/hash';
 import { CellState } from '../cell';
@@ -64,7 +69,7 @@ export function getBadActions(state: CellState): Array<BadAction> {
       };
 
       if (myReceipt.validation_status === ValidationStatus.Rejected) {
-        badAction.badAgents.push(dhtOp.header.header.content.author);
+        badAction.badAgents.push(getDhtOpHeader(dhtOp).author);
       }
       for (const [validatorAgent, receipt] of receipts.entries()) {
         if (receipt.validation_status !== myReceipt.validation_status) {

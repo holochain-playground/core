@@ -1,5 +1,6 @@
 import { createConductors, demoHapp } from '../dist';
 import { expect } from '@esm-bundle/chai';
+import isEqual from 'lodash-es/isEqual';
 
 import { sleep } from './utils';
 

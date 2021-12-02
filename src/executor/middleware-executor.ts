@@ -48,20 +48,20 @@ export class MiddlewareExecutor<P> {
 
   before(
     callback: Middleware<P>,
-    priorityLevel: number
+    priorityLevel?: number
   ): MiddlewareSubscription {
     return this._addListener(callback, this._beforeMiddlewares, priorityLevel);
   }
   success(
     callback: SuccessMiddleware<P>,
-    priorityLevel: number
+    priorityLevel?: number
   ): MiddlewareSubscription {
     return this._addListener(callback, this._successMiddlewares, priorityLevel);
   }
 
   error(
     callback: ErrorMiddleware<P>,
-    priorityLevel: number
+    priorityLevel?: number
   ): MiddlewareSubscription {
     return this._addListener(callback, this._errorMiddlewares, priorityLevel);
   }
@@ -69,7 +69,7 @@ export class MiddlewareExecutor<P> {
   private _addListener(
     callback: Function,
     middlewareList: Dictionary<Array<Function>>,
-    priorityLevel: number
+    priorityLevel: number = 10
   ) {
     if (!middlewareList[priorityLevel]) {
       middlewareList[priorityLevel] = [];

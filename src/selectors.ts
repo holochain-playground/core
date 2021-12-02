@@ -1,10 +1,13 @@
 import { Element } from '@holochain-open-dev/core-types';
 import {
+  AgentPubKey,
+  DhtOp,
   Entry,
   NewEntryHeader,
   SignedHeaderHashed,
 } from '@holochain/conductor-api';
 import { CellState } from './core/cell/state';
+import { P2pCellState } from './core/network/p2p-cell';
 
 export function selectSourceChain(cellState: CellState): Element[] {
   const headerHashes = cellState.sourceChain;
@@ -24,4 +27,8 @@ export function selectSourceChain(cellState: CellState): Element[] {
       entry,
     };
   });
+}
+
+export function selectDhtShard(cellState: CellState): DhtOp[] {
+  return cellState.integratedDHTOps.values().map(v => v.op);
 }
